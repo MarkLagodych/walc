@@ -1,0 +1,11 @@
+.*
+*~*
+build/
+
+!.gitignore
+!.gitattributes
+!.gitkeep
+!.gitmodules
+!.editorconfig
+!.clang-format
+!.clangd
