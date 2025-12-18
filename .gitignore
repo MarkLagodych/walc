@@ -1,11 +1,21 @@
-.*
-*~*
-build/
+# Ignore toplevel hidden directories
+/.*/
+# Ignore anything hidden in subdirectories
+**/*/.*
 
-!.gitignore
-!.gitattributes
-!.gitkeep
-!.gitmodules
-!.editorconfig
-!.clang-format
-!.clangd
+# Temporary files
+*~*
+*$*
+*.swp
+
+# Build directories
+build/
+build-*/
+_build/
+target/
+__*__/
+
+
+# Added by cargo
+
+/target
