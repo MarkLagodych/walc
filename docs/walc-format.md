@@ -62,11 +62,11 @@ The input lambda expression must evaluate to a `program`.
 * `option<a>` is `pair<bit,a>` and is either `none` (`pair<0,unreachable>`) or
     `some<a>` (`pair<1,a>`).
 
-* `list<a,...>` is a linked list: `option<pair<a, list<...>>>`.
-    An empty list (`list<>`) is `none`.
+* `list<a,...>` is a linked list: `option<pair<a, list<...>>>`
+    and is either `cons<a,b>` (`some<pair<a, b>>`) or `empty` (`none`)
 
     Example:
-    `list<a,b,c>` is `some<pair<a, some<pair<b, some<pair<c, none>>>>>>`.
+    `list<a,b,c>` is `cons<a,cons<b,cons<c,empty>>>`.
 
 * `byte<bit0,bit1,...bit7>` is `list<bit0,bit1,...bit7>` which is
     an unsigned 8-bit integer where `bit0` is the least significant bit.

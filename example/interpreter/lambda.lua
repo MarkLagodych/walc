@@ -171,42 +171,41 @@ end
 ---@param variable string
 ---@param body Lambda
 ---@return Lambda
-local function abstr(variable, body)
+local function abstract(variable, body)
     return { type = "abstraction", variable = variable, body = body }
 end
 
 ---@param left Lambda
 ---@param right Lambda
 ---@return Lambda
-local function appl(left, right)
+local function apply(left, right)
     return { type = "application", left = left, right = right }
 end
 
----@param value Value
----@param new_lambda Lambda
----@return Value
-local function with_env(value, new_lambda)
-    return { env = value.env, expression = new_lambda }
-end
+local bit0 = abstract("x", abstract("y", var("x")))
+local bit1 = abstract("x", abstract("y", var("y")))
 
-local bit0 = abstr("x", abstr("y", var("x")))
-local bit1 = abstr("x", abstr("y", var("y")))
+---@param value Value Context value
+---@param expression Lambda New expression to be executed in the same env
+---@return Value
+local function eval_as(value, expression)
+    return eval({ env = value.env, expression = expression })
+end
 
 ---@param value Value
 ---@return number
 local function eval_bit(value)
-    local expr = appl(appl(value.expression, bit0), bit1)
-    local res = eval(with_env(value, expr))
-    return res.expression == bit0 and 0 or 1
+    local expr = apply(apply(value.expression, bit0), bit1)
+    local res = eval_as(value, expr)
+    if res.expression == bit0 then return 0 end
+    return 1
 end
 
 ---@param value Value
 ---@return { first: Value, second: Value }
 local function eval_pair(value)
-    local expr = appl(value.expression, bit0)
-    local first = eval(with_env(value, expr))
-    expr = appl(value.expression, bit1)
-    local second = eval(with_env(value, expr))
+    local first = eval_as(value, apply(value.expression, bit0))
+    local second = eval_as(value, apply(value.expression, bit1))
     return { first = first, second = second }
 end
 
@@ -215,7 +214,52 @@ end
 local function eval_optional(value)
     local pair = eval_pair(value)
     local has_value = eval_bit(pair.first)
-    return has_value == 1 and eval(pair.second) or nil
+    if has_value == 0 then return nil end
+    return pair.second
+end
+
+---@param value Value
+---@return Value[]
+local function eval_list(value)
+    local result = {}
+    local current = value
+    while true do
+        local node = eval_optional(current)
+        if not node then break end
+        local item, next
+        item, next = table.unpack(eval_pair(node))
+        table.insert(result, item)
+        current = next
+    end
+
+    return result
+end
+
+---@param value Value
+---@return number
+local function eval_byte(value)
+    local bits = eval_list(value)
+    local byte = 0
+    for i = 1, 8 do
+        local bit = eval_bit(bits[i])
+        byte = byte << 1
+        byte = byte | bit
+    end
+
+    return byte
+end
+
+---@param value Value
+---@return string
+local function eval_string(value)
+    local chars = eval_list(value)
+    local str = ""
+    for _, char_value in ipairs(chars) do
+        local byte = eval_byte(char_value)
+        str = str .. string.char(byte)
+    end
+
+    return str
 end
 
 
@@ -236,11 +280,7 @@ local function main()
     if not lambda then return end -- Empty file
 
     local value = { env = nil, expression = lambda }
-    value = eval(value)
-    local val = eval_optional(value)
-    local res
-    if val then res = eval_bit(val) end
-    print(res)
+    print(eval_string(value))
 end
 
 main()
