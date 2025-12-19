@@ -39,7 +39,7 @@ local function read_token(file)
 
     if c == "(" or c == ")" then return c end
 
-    if c == "\\" then return "λ" end
+    if c == "^" then return "λ" end
     if c == "\xCE" then
         c = file:read(1)
         assert(c == "\xBB", "Unexpected character: \xCE" .. c)
@@ -69,7 +69,7 @@ local function parse(file)
 
     if token == "λ" then
         token = read_token(file)
-        assert(token and not token:find("[λ%(%)]"), "Expected variable name")
+        assert(token and not token:find("[%^%(%)]"), "Expected variable name")
 
         local body = parse(file)
         assert(body, "Expected abstraction body")
@@ -162,6 +162,62 @@ local function eval(value)
     end
 end
 
+---@param name string
+---@return Lambda
+local function var(name)
+    return { type = "variable", name = name }
+end
+
+---@param variable string
+---@param body Lambda
+---@return Lambda
+local function abstr(variable, body)
+    return { type = "abstraction", variable = variable, body = body }
+end
+
+---@param left Lambda
+---@param right Lambda
+---@return Lambda
+local function appl(left, right)
+    return { type = "application", left = left, right = right }
+end
+
+---@param value Value
+---@param new_lambda Lambda
+---@return Value
+local function with_env(value, new_lambda)
+    return { env = value.env, expression = new_lambda }
+end
+
+local bit0 = abstr("x", abstr("y", var("x")))
+local bit1 = abstr("x", abstr("y", var("y")))
+
+---@param value Value
+---@return number
+local function eval_bit(value)
+    local expr = appl(appl(value.expression, bit0), bit1)
+    local res = eval(with_env(value, expr))
+    return res.expression == bit0 and 0 or 1
+end
+
+---@param value Value
+---@return { first: Value, second: Value }
+local function eval_pair(value)
+    local expr = appl(value.expression, bit0)
+    local first = eval(with_env(value, expr))
+    expr = appl(value.expression, bit1)
+    local second = eval(with_env(value, expr))
+    return { first = first, second = second }
+end
+
+---@param value Value
+---@return Value|nil
+local function eval_optional(value)
+    local pair = eval_pair(value)
+    local has_value = eval_bit(pair.first)
+    return has_value == 1 and eval(pair.second) or nil
+end
+
 
 local function main()
     if #arg == 0 or arg[1] == "--help" then
@@ -181,7 +237,10 @@ local function main()
 
     local value = { env = nil, expression = lambda }
     value = eval(value)
-    print(dump(value.expression))
+    local val = eval_optional(value)
+    local res
+    if val then res = eval_bit(val) end
+    print(res)
 end
 
 main()

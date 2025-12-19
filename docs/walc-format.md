@@ -10,12 +10,12 @@ Text is encoded in UTF-8.
 whitespace = ' ' | '\t' | '\v' | '\f' | '\r' | '\n' | '.' ;
 comment = '#' (not '\n')* '\n' ;
 variable = ('a'-'z' | 'A'-'Z' | '0'-'9' | '_')+ ;
-abstraction = ('λ' | '\\') variable term ;
+abstraction = ('λ' | '^') variable term ;
 application = '(' term term ')' ;
 term = variable | function | application ;
 ```
 
-The support for `.` and both versions of lambda (`λ` and `\`)
+The support for `.` and all versions of lambda (`λ`, `^`)
 is *mandatory*.
 
 Notice that every pair of paretheses corresponds to exactly one application.
@@ -30,7 +30,7 @@ hello_world __WAKA_WAKA_123__ 42 1st_param # These are variables
 λx y    # This is a λ-function
 (f x)   # This is a function application
 
-\x y    # Backslashes are allowed for ASCII compatibility
+^x y    # Carets are allowed for ASCII compatibility
 λx. y   # Dots are allowed for compatibility with existing
         # mathematical notations but are completely ignored
 ```
@@ -75,7 +75,7 @@ The input lambda expression must evaluate to a `program`.
     which is an array of arbitrary binary data where
     `byte0` is the starting byte.
 
-* `program` is `pair<output_string, (λinput_string program)|unreachable>`.
+* `program` is `pair<output_string, λinput_string program | unreachable>`.
 
     The output string tells the interpreter what I/O operation to perform.
     If it is empty, the program ends and the 1st pair element can be
