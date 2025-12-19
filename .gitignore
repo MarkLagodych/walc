@@ -1,4 +1,4 @@
-# Ignore toplevel hidden directories
+# Ignore hidden directories in the root
 /.*/
 # Ignore anything hidden in subdirectories
 **/*/.*
@@ -8,14 +8,17 @@
 *$*
 *.swp
 
-# Build directories
+# Build/output directories and files
+*.out
+*.o
+*.obj
+*.exe
+out/
 build/
 build-*/
 _build/
 target/
+node_modules/
+dist/
+bin/
 __*__/
-
-
-# Added by cargo
-
-/target
