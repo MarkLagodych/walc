@@ -296,10 +296,19 @@ local function from_string(str)
 end
 
 ---@return string, Value
-local function into_program(value)
+local function into_output(value)
     local out_string, next_value
     out_string, next_value = into_pair(value)
     return into_string(out_string), next_value
+end
+
+---@param input string
+---@return Value
+local function from_input(input, value)
+    return {
+        env = value.env,
+        expression = apply(value.expression, from_string(input))
+    }
 end
 
 
@@ -346,16 +355,13 @@ local function main()
 
     while true do
         local output
-        output, program = into_program(program)
+        output, program = into_output(program)
 
         if output == "" then break end
 
         local input = execute_command(output)
 
-        program = {
-            env = program.env,
-            expression = apply(program.expression, from_string(input))
-        }
+        program = from_input(input, program)
     end
 end
 
