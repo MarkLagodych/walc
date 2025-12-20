@@ -19,7 +19,10 @@ Notice that every pair of paretheses corresponds to exactly one application.
 Redundant paretheses around abstractions as in `(^x x)`
 as well as syntax sugar like `(a b c)` instead of `((a b) c)`
 are *not allowed*.
-This makes it much easier to parse than traditional mathematical notation.
+This makes it much easier to parse than traditional mathematical notation
+while maintaining the relative ease of manually writing the code.
+The grammar as it is written above directly corresponds to a simple predictive
+recursive-descent parser.
 
 ## Interpretation
 
@@ -31,16 +34,21 @@ function.
 
 ### Definitions
 
+The angle-bracket notation (e.g. `f<a,b,c>`) is similar to templates
+in C++ or perhaps generics in C#/Java/Kotlin/Rust/Swift/TypeScript
+and is needed to distinguish usual lambda applications from
+substitution into the definitions.
+
 * `unreachable` is `^x x` (or anything else, really).
 
     This is used only to fill in places that structurally
     require a value when the value is not important.
 
 * `bit` is either:
-    * `0` (`^a^b a`)
-    * `1` (`^a^b b`).
+    * `0` (`^x0^x1 x0`)
+    * `1` (`^x0^x1 x1`).
 
-* `pair<a,b>` is `^f ((f a) b)`.
+* `pair<x0,x1>` is `^f ((f x0) x1)`.
 
     To get the 0th or the 1st element of a pair, just apply `0` or `1` to it:
     `(my_pair 0)`, `(my_pair 1)`.
