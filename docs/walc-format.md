@@ -8,7 +8,7 @@ This is the text format used by WALC and the interpreters.
 whitespace = ' ' | TAB | VT | FF | CR | LF ;
 comment = '#' (not LF)* LF ;
 variable = ('a'-'z' | 'A'-'Z' | '0'-'9' | '_')+ ;
-abstraction = '\' variable term ;
+abstraction = '\' variable '.' term ;
 application = '(' term term ')' ;
 term = variable | function | application ;
 ```
@@ -18,23 +18,20 @@ Examples:
 ```
 # Comment
 abc _hello_ 123 # Variables
-\x x            # Abstraction
+\x. x            # Abstraction
 (y y)           # Application
 
 # Y combinator
-\f ( \x(f(x x)) \x(f(x x)) )
+\f. ( \x.(f(x x)) \x.(f(x x)) )
 ```
 
 Backslashes `\` are used instead of lambdas `λ` for ASCII compatibility,
 they are simply easier to type on different computers.
 
-Dots `.` are not allowed because they are simply redundant and are a result of
-mathematical syntax sugar when writing `λxyz.yzx` instead of `λx(λy(λz yzx))`.
-
 Omitting parentheses in applications (writing `x y z` instead of `((x y) z)`)
 is not allowed for ease of parsing.
 
-Notice that putting parentheses around abstractions (`(\x x)`) is not possible
+Notice that putting parentheses around abstractions (`(\x. x)`) is not possible
 because they are reserved for applications.
 
 ## Interpretation
@@ -52,16 +49,16 @@ in C++ or perhaps generics in C#/Java/Kotlin/Rust/Swift/TypeScript
 and is needed to distinguish usual lambda applications from
 substitution into the definitions.
 
-* `unreachable` is `\x x` (or anything else, really).
+* `unreachable` is `\x.x` (or anything else, really).
 
     This is used only to fill in places that structurally
     require a value when the value is not important.
 
 * `bit` is either:
-    * `0` (`\x0\x1 x0`)
-    * `1` (`\x0\x1 x1`).
+    * `0` (`\x0.\x1.x0`)
+    * `1` (`\x0.\x1.x1`).
 
-* `pair<x0,x1>` is `\f ((f x0) x1)`.
+* `pair<x0,x1>` is `\f. ((f x0) x1)`.
 
     To get the 0th or the 1st element of a pair, just apply `0` or `1` to it:
     `(my_pair 0)`, `(my_pair 1)`.
@@ -91,7 +88,7 @@ substitution into the definitions.
     `byte0` is the starting byte.
 
 * `program` is either:
-    * `pair<output_string, \input_string program>`
+    * `pair<output_string, \input_string.program>`
     * `pair<output_string, unreachable>` (if the output string is empty)
 
     The output string tells the interpreter what I/O operation to perform.

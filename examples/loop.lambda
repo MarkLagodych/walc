@@ -1,39 +1,42 @@
-# This program prints "Hello world"
+# This program prints "Hello world" in an infinite loop
 
-(\unreachable
-(\0
-(\1
-(\pair
-(\none
-(\some
-(\cons
-(\empty
-(\byte
+(\unreachable.
+(\0.
+(\1.
+(\pair.
+(\none.
+(\some.
+(\cons.
+(\empty.
+(\byte.
 
-(\PRINT
-(\READ_CHAR
-(\READ_ALL
+(\PRINT.
+(\READ_CHAR.
+(\READ_ALL.
 
-(\newline
-(\space
-(\H
-(\e
-(\l
-(\o
-(\w
-(\r
-(\d
+(\newline.
+(\space.
+(\H.
+(\e.
+(\l.
+(\o.
+(\w.
+(\r.
+(\d.
 
-# Initial step
-((pair
+(\print_Hello_world.
 
-# Print "Hello world" and a newline
+
+(\program.
+
+    (program program)
+
+\program. ((pair print_Hello_world) \input. (program program)) )#program
+
+
 ((cons PRINT) ((cons H) ((cons e) ((cons l) ((cons l) ((cons o) ((cons space)
     ((cons w) ((cons o) ((cons r) ((cons l) ((cons d) ((cons newline)
-        empty)))))))))))))
-
-# End the program at the next step
-) \input ((pair empty) unreachable))
+        empty))))))))))))) )# print_Hello_world
 
 ((((((((byte 0)0)1)0)0)1)1)0) )# d
 ((((((((byte 0)1)0)0)1)1)1)0) )# r
@@ -49,14 +52,15 @@
 ((((((((byte 1)0)0)0)0)0)0)0) )# READ_CHAR
 ((((((((byte 0)0)0)0)0)0)0)0) )# PRINT
 
-\0\1\2\3\4\5\6\7
+\0.\1.\2.\3.\4.\5.\6.\7.
     ((cons 0)((cons 1)((cons 2)((cons 3)((cons 4)((cons 5)((cons 6)((cons 7)
-        empty))))))))       )# byte
+        empty)))))))) )# byte
+
 none                        )# empty
-\a\b (some ((pair a) b))    )# cons
-\x ((pair 1) x)             )# some
+\a.\b. (some ((pair a) b))  )# cons
+\x. ((pair 1) x)            )# some
 ((pair 0) unreachable)      )# none
-\x\y \g ((g x) y)           )# pair
-\x\y y                      )# 1
-\x\y x                      )# 0
-\x x                        )# unreachable
+\x.\y. \g. ((g x) y)        )# pair
+\x.\y. y                    )# 1
+\x.\y. x                    )# 0
+\x. x                       )# unreachable

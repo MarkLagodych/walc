@@ -1,0 +1,64 @@
+# This program prints "Hello world"
+
+(\unreachable.
+(\0.
+(\1.
+(\pair.
+(\none.
+(\some.
+(\cons.
+(\empty.
+(\byte.
+
+(\PRINT.
+(\READ_CHAR.
+(\READ_ALL.
+
+(\newline.
+(\space.
+(\H.
+(\e.
+(\l.
+(\o.
+(\w.
+(\r.
+(\d.
+
+(\print_Hello_world.
+
+(\program.
+
+    program
+
+((pair print_Hello_world) \input. ((pair empty) unreachable)) )# prorgam
+
+((cons PRINT) ((cons H) ((cons e) ((cons l) ((cons l) ((cons o) ((cons space)
+    ((cons w) ((cons o) ((cons r) ((cons l) ((cons d) ((cons newline)
+        empty))))))))))))) )# print_Hello_world
+
+((((((((byte 0)0)1)0)0)1)1)0) )# d
+((((((((byte 0)1)0)0)1)1)1)0) )# r
+((((((((byte 1)1)1)0)1)1)1)0) )# w
+((((((((byte 1)1)1)1)0)1)1)0) )# o
+((((((((byte 0)0)1)1)0)1)1)0) )# l
+((((((((byte 1)0)1)0)0)1)1)0) )# e
+((((((((byte 0)0)0)1)0)0)1)0) )# H
+((((((((byte 0)0)0)0)0)1)0)0) )# space
+((((((((byte 0)1)0)1)0)0)0)0) )# newline
+
+((((((((byte 0)1)0)0)0)0)0)0) )# READ_ALL
+((((((((byte 1)0)0)0)0)0)0)0) )# READ_CHAR
+((((((((byte 0)0)0)0)0)0)0)0) )# PRINT
+
+\0.\1.\2.\3.\4.\5.\6.\7.
+    ((cons 0)((cons 1)((cons 2)((cons 3)((cons 4)((cons 5)((cons 6)((cons 7)
+        empty)))))))) )# byte
+
+none                        )# empty
+\a.\b. (some ((pair a) b))  )# cons
+\x. ((pair 1) x)            )# some
+((pair 0) unreachable)      )# none
+\x.\y. \g. ((g x) y)        )# pair
+\x.\y. y                    )# 1
+\x.\y. x                    )# 0
+\x. x                       )# unreachable

@@ -1,7 +1,7 @@
 #!/usr/bin/env lua
 
--- This is a simple lambda calculus interpreter using the WALC format.
--- Works on Lua 5.2 (released in 2011) and LuaJIT 2.1.
+-- This is a simple lambda calculus interpreter based on the WALC format.
+-- Runs on Lua 5.1 (released in 2006) and LuaJIT 2.1.
 
 ---@alias Lambda Lambda.variable|Lambda.abstraction|Lambda.application
 
@@ -9,6 +9,8 @@
 ---@field type "variable"
 ---@field name string
 
+---@param name string
+---@return Lambda
 local function var(name)
     return { type = "variable", name = name }
 end
@@ -18,6 +20,9 @@ end
 ---@field variable string
 ---@field body Lambda
 
+---@param variable string
+---@param body Lambda
+---@return Lambda
 local function abstract(variable, body)
     return { type = "abstraction", variable = variable, body = body }
 end
@@ -27,13 +32,16 @@ end
 ---@field left Lambda
 ---@field right Lambda
 
+---@param left Lambda
+---@param right Lambda
+---@return Lambda
 local function apply(left, right)
     return { type = "application", left = left, right = right }
 end
 
 
 ---@param file file*
----@return "\\"|"("|")"|string|nil
+---@return "\\"|"."|"("|")"|string|nil
 local function read_token(file)
     local c = file:read(1)
 
@@ -48,7 +56,9 @@ local function read_token(file)
         c = file:read(1)
     end
 
-    if not c or c == "(" or c == ")" or c == "\\" then return c end
+    if not c or c == "(" or c == ")" or c == "\\" or c == "." then
+        return c
+    end
 
     local identifier = ""
     while c and c:find("[a-zA-Z0-9_]") do
@@ -69,13 +79,16 @@ local function parse(file)
     if not token then return nil end
 
     if token == "\\" then
+        local id = read_token(file)
+        assert(id and not id:find("[\\%(%)%.]"), "Not a variable name: " .. id)
+
         token = read_token(file)
-        assert(token and not token:find("[\\%(%)]"), "Expected variable name")
+        assert(token == ".", "Expected dot")
 
         local body = parse(file)
         assert(body, "Expected abstraction body")
 
-        return abstract(token, body)
+        return abstract(id, body)
     end
 
     if token == "(" then
@@ -96,19 +109,31 @@ end
 
 
 ---@param lambda Lambda|nil
-local function dump(lambda)
+---@param max_depth number|nil
+local function dump(lambda, max_depth)
+    max_depth = max_depth or 1000000
+
     if not lambda then return "nil" end
 
     if lambda.type == "variable" then
         return lambda.name
-    elseif lambda.type == "abstraction" then
-        return "\\" .. lambda.variable .. " " .. dump(lambda.body)
-    elseif lambda.type == "application" then
-        return "(" .. dump(lambda.left) .. " " .. dump(lambda.right) .. ")"
+    else
+        if max_depth <= 0 then return "[...]" end
+
+        if lambda.type == "abstraction" then
+            return "\\" .. lambda.variable .. "."
+                .. dump(lambda.body, max_depth - 1)
+        elseif lambda.type == "application" then
+            return "("
+                .. dump(lambda.left, max_depth - 1) .. " "
+                .. dump(lambda.right, max_depth - 1)
+                .. ")"
+        end
     end
 end
 
 
+--- Represents a delayed computation of a lambda expression.
 ---@class Value
 ---@field env Environment
 ---@field expression Lambda
@@ -117,13 +142,61 @@ end
 ---@field parent Environment|nil
 ---@field name string
 ---@field value Value
+---@field computed boolean|nil Optimizer hint
+
+---@class VariableOptimizer
+---@field uncomputed_envs { env: Environment, marker: number }[]
+local VariableOptimizer = {
+    ---@return VariableOptimizer
+    new = function(Self)
+        local self = {
+            --- Stack of uncomputed (unoptimized) environments.
+            --- Markers are used to match variables with their values,
+            --- they should be the current stack size.
+            uncomputed_envs = {}
+        }
+
+        return setmetatable(self, { __index = Self })
+    end,
+
+    ---@param self VariableOptimizer
+    ---@param value Value
+    ---@param marker number Use the current stack size as variable marker
+    trigger_on_variable = function(self, value, marker)
+        if not value.env.computed then
+            table.insert(self.uncomputed_envs, {
+                env = value.env,
+                marker = marker
+            })
+        end
+    end,
+
+    --- Assigns the computed value to all variables with the same marker
+    ---@param self VariableOptimizer
+    ---@param value Value
+    ---@param marker number Use the current stack size as variable marker
+    trigger_on_computed_value = function(self, value, marker)
+        -- Looping here handles cases when multiple variables have
+        -- the same value, i.e. X = Y, Y = Z, Z = <some value>.
+        while #self.uncomputed_envs > 0
+            and self.uncomputed_envs[#self.uncomputed_envs].marker == marker
+        do
+            local unoptimized_env = table.remove(self.uncomputed_envs).env
+            unoptimized_env.value = value
+            unoptimized_env.computed = true
+        end
+    end,
+}
 
 ---@param value Value
 ---@return Value
 local function eval(value)
-    local stack = {} ---@type Value[]
+    local stack = {} ---@type Value[] Data/call stack
 
-    -- Based on Krivine's K-machine, but with usual string names for variables.
+    local variable_optimizer = VariableOptimizer:new()
+
+    -- Based on Krivine machine, but with usual string names for variables
+    -- instead of de Bruijn indices.
     while true do
         if value.expression.type == "application" then
             table.insert(stack, {
@@ -136,8 +209,10 @@ local function eval(value)
                 expression = value.expression.left
             }
         elseif value.expression.type == "abstraction" then
+            variable_optimizer:trigger_on_computed_value(value, #stack)
+
             if #stack == 0 then
-                return value
+                break
             end
 
             value = {
@@ -158,35 +233,43 @@ local function eval(value)
 
             assert(value.env, "Unbound variable: " .. value.expression.name)
 
+            variable_optimizer:trigger_on_variable(value, #stack)
+
             value = value.env.value
         end
     end
+
+    return value
 end
 
 
+-- '$' is added to highlight that the terms are inserted by the interpreter
+local unreachable = abstract("$unreachable", var("$unreachable"))
+local bit0 = abstract("$x0", abstract("$x1", var("$x0")))
+local bit1 = abstract("$x0", abstract("$x1", var("$x1")))
+local pair = function(left, right)
+    return abstract("$g", apply(apply(var("$g"), left), right))
+end
 
-local bit0 = abstract("x", abstract("y", var("x")))
-local bit1 = abstract("x", abstract("y", var("y")))
 
-
+---@param value Value
 ---@return number
 local function into_bit(value)
     local expr = apply(apply(value.expression, bit0), bit1)
     local res = eval({ env = value.env, expression = expr })
     if res.expression == bit0 then return 0 end
     if res.expression == bit1 then return 1 end
-    error("Expected bit value")
+    error("Unexpected value when evaluating bit: " .. dump(res.expression))
 end
 
----@return Value
+---@param bit number
+---@return Lambda
 local function from_bit(bit)
     if bit == 0 then
-        return { env = nil, expression = bit0 }
-    elseif bit == 1 then
-        return { env = nil, expression = bit1 }
+        return bit0
+    else
+        return bit1
     end
-
-    error("Invalid bit value: " .. tostring(bit))
 end
 
 ---@param v Value
@@ -197,12 +280,14 @@ local function into_pair(v)
     return first, second
 end
 
----@return Value
+---@param first Lambda
+---@param second Lambda
+---@return Lambda
 local function from_pair(first, second)
-    local expr = abstract("g", apply(apply(var("g"), first), second))
-    return { env = nil, expression = expr }
+    return pair(first, second)
 end
 
+---@param value Value
 ---@return Value|nil
 local function into_optional(value)
     local first
@@ -214,15 +299,17 @@ local function into_optional(value)
     return second
 end
 
----@return Value
-local function from_optional(opt_value)
-    if opt_value then
-        return from_pair(from_bit(1), opt_value)
+---@param opt_lambda Lambda|nil
+---@return Lambda
+local function from_optional(opt_lambda)
+    if opt_lambda then
+        return from_pair(from_bit(1), opt_lambda)
     else
-        return from_pair(from_bit(0), from_bit(0))
+        return from_pair(from_bit(0), unreachable)
     end
 end
 
+---@param value Value
 ---@return Value[]
 local function into_list(value)
     local list = {}
@@ -239,7 +326,8 @@ local function into_list(value)
     return list
 end
 
----@return Value
+---@param list table
+---@return Lambda
 local function from_list(list)
     local result = from_optional(nil)
     for i = #list, 1, -1 do
@@ -249,6 +337,7 @@ local function from_list(list)
     return result
 end
 
+---@param value Value
 ---@return number
 local function into_byte(value)
     local bits = into_list(value)
@@ -262,7 +351,8 @@ local function into_byte(value)
     return byte
 end
 
----@return Value
+---@param byte number
+---@return Lambda
 local function from_byte(byte)
     local bits = {}
     for i = 1, 8 do
@@ -273,6 +363,8 @@ local function from_byte(byte)
     return from_list(bits)
 end
 
+---@param value Value
+---@return string
 local function into_string(value)
     local chars = into_list(value)
     local str = ""
@@ -284,7 +376,8 @@ local function into_string(value)
     return str
 end
 
----@return Value
+---@param str string
+---@return Lambda
 local function from_string(str)
     local chars = {}
     for i = 1, #str do
@@ -295,6 +388,7 @@ local function from_string(str)
     return from_list(chars)
 end
 
+---@param value Value
 ---@return string, Value
 local function into_output(value)
     local out_string, next_value
@@ -320,6 +414,7 @@ local function execute_command(output)
 
     if command == 0 then
         io.write(data)
+        io.flush()
         return ""
     end
 
@@ -337,7 +432,7 @@ end
 
 local function main()
     if #arg == 0 or arg[1] == "--help" then
-        print("Usage: run.lua <filename>")
+        print("Usage: lambda.lua <filename>")
         return
     end
 
