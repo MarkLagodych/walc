@@ -1,0 +1,126 @@
+# This program prints "Hello world" 256 times using recursion and linked lists.
+# Its state is initially an empty list.
+# On each iteration it appends an item to the list and compares it to
+# a long predefined list with 256 items.
+# If the leasts are not equal, it print "Hello world" continues iterating.
+# When the lists get equal, it terminates.
+
+(\unreachable
+(\0
+(\1
+(\pair
+(\none
+(\some
+(\cons
+(\empty
+(\byte
+
+(\PRINT
+(\READ_CHAR
+(\READ_ALL
+
+(\newline
+(\space
+(\H
+(\e
+(\l
+(\o
+(\w
+(\r
+(\d
+
+(\print_Hello_world
+
+(\lists_not_eq
+(\add1
+(\add2
+(\add4
+(\add8
+(\add16
+(\add32
+(\add64
+(\add128
+(\add256
+(\very_long_list
+
+(\initial_state
+(\iterate
+(\should_finish
+
+(\program
+
+    # There is no initial input, so put unreachable
+    (((program program) initial_state) unreachable)
+
+    \program\state\input
+        # if should finish
+        (((should_finish state)
+            # else
+            ((pair empty) unreachable))
+            # then
+            (\next_state
+                ((pair print_Hello_world) ((program program) next_state))
+            (iterate state) )# next_state
+        )
+
+)# program
+
+\state (((lists_not_eq lists_not_eq) state) very_long_list) )# should_finish
+\state ((cons 1) state) )# iterate: append 1 item
+empty )# initial_state: no items
+
+(add256 empty) )# very_long_list
+
+\list (add128 (add128 list)) )# add256
+\list (add64 (add64 list)) )# add128
+\list (add32 (add32 list)) )# add64
+\list (add16 (add16 list)) )# add32
+\list (add8 (add8 list)) )# add16
+\list (add4 (add4 list)) )# add8
+\list (add2 (add2 list)) )# add4
+\list (add1 (add1 list)) )# add2
+\list ((cons 1) list) )# add1
+
+\lists_not_eq\left\right # This assumes that right cannot be shorter
+    (((left 0) # Does left have items?
+        # no
+        (((right 0) # Does right have items?
+            # no
+            0) # The lists are equal
+            # yes
+            1)) # Right is longer
+        # yes
+        (((lists_not_eq lists_not_eq) ((left 1)1)) ((right 1)1)) ) # compare tails
+ )# lists_not_eq
+
+((cons PRINT)
+    ((cons H) ((cons e) ((cons l) ((cons l) ((cons o) ((cons space)
+        ((cons w) ((cons o) ((cons r) ((cons l) ((cons d) ((cons newline)
+            empty))))))))))))) ) # print_Hello_world
+
+((((((((byte 0)0)1)0)0)1)1)0) )# d
+((((((((byte 0)1)0)0)1)1)1)0) )# r
+((((((((byte 1)1)1)0)1)1)1)0) )# w
+((((((((byte 1)1)1)1)0)1)1)0) )# o
+((((((((byte 0)0)1)1)0)1)1)0) )# l
+((((((((byte 1)0)1)0)0)1)1)0) )# e
+((((((((byte 0)0)0)1)0)0)1)0) )# H
+((((((((byte 0)0)0)0)0)1)0)0) )# space
+((((((((byte 0)1)0)1)0)0)0)0) )# newline
+
+((((((((byte 0)1)0)0)0)0)0)0) )# READ_ALL
+((((((((byte 1)0)0)0)0)0)0)0) )# READ_CHAR
+((((((((byte 0)0)0)0)0)0)0)0) )# PRINT
+
+\0\1\2\3\4\5\6\7
+    ((cons 0)((cons 1)((cons 2)((cons 3)((cons 4)((cons 5)((cons 6)((cons 7)
+        empty)))))))) )# byte
+
+none                        )# empty
+\a\b (some ((pair a) b))    )# cons
+\x ((pair 1) x)             )# some
+((pair 0) unreachable)      )# none
+\x\y \g ((g x) y)           )# pair
+\x\y y                      )# 1
+\x\y x                      )# 0
+\x x                        )# unreachable

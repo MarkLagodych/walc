@@ -1,7 +1,7 @@
 #!/usr/bin/env lua
 
 -- This is a simple lambda calculus interpreter using the WALC format.
-
+-- Works on Lua 5.2 (released in 2011) and LuaJIT 2.1.
 
 ---@alias Lambda Lambda.variable|Lambda.abstraction|Lambda.application
 
@@ -33,12 +33,12 @@ end
 
 
 ---@param file file*
----@return "^"|"("|")"|string|nil
+---@return "\\"|"("|")"|string|nil
 local function read_token(file)
     local c = file:read(1)
 
     -- Skip whitespaces (including comments)
-    while c and c:find("[ \t\v\r\n#]") do
+    while c and c:find("[ \t\v\f\r\n#]") do
         if c == "#" then
             while c and c ~= "\n" do
                 c = file:read(1)
@@ -48,7 +48,7 @@ local function read_token(file)
         c = file:read(1)
     end
 
-    if not c or c == "(" or c == ")" or c == "^" then return c end
+    if not c or c == "(" or c == ")" or c == "\\" then return c end
 
     local identifier = ""
     while c and c:find("[a-zA-Z0-9_]") do
@@ -68,9 +68,9 @@ local function parse(file)
     local token = read_token(file)
     if not token then return nil end
 
-    if token == "^" then
+    if token == "\\" then
         token = read_token(file)
-        assert(token and not token:find("[%^%(%)]"), "Expected variable name")
+        assert(token and not token:find("[\\%(%)]"), "Expected variable name")
 
         local body = parse(file)
         assert(body, "Expected abstraction body")
@@ -102,7 +102,7 @@ local function dump(lambda)
     if lambda.type == "variable" then
         return lambda.name
     elseif lambda.type == "abstraction" then
-        return "^" .. lambda.variable .. " " .. dump(lambda.body)
+        return "\\" .. lambda.variable .. " " .. dump(lambda.body)
     elseif lambda.type == "application" then
         return "(" .. dump(lambda.left) .. " " .. dump(lambda.right) .. ")"
     end
@@ -123,7 +123,7 @@ end
 local function eval(value)
     local stack = {} ---@type Value[]
 
-    -- Based on Krivine's K-machine.
+    -- Based on Krivine's K-machine, but with usual string names for variables.
     while true do
         if value.expression.type == "application" then
             table.insert(stack, {
@@ -256,7 +256,7 @@ local function into_byte(value)
 
     local byte = 0
     for i = 8, 1, -1 do
-        byte = (byte << 1) | into_bit(bits[i])
+        byte = (byte * 2) + into_bit(bits[i])
     end
 
     return byte
@@ -266,8 +266,8 @@ end
 local function from_byte(byte)
     local bits = {}
     for i = 1, 8 do
-        table.insert(bits, 1, from_bit(byte & 1))
-        byte = byte >> 1
+        table.insert(bits, 1, from_bit(byte % 2))
+        byte = math.floor(byte / 2)
     end
 
     return from_list(bits)

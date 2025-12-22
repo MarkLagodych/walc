@@ -1,25 +1,26 @@
-# WALC λ-calculus cookbook
+# WALC target code design
+
+See the [WALC format](./walc-format.md).
+
+## Lambda calculus basics
 
 Here you can find examples of different things in λ-calculus can be done
 with a stress on how they are done in WALC output.
 
-Based on the [WALC format](./walc-format.md).
-
 Syntactical constructs (e.g. `let .. in`) are similar to those in
 functional programming languages like ML, OCaml, or Haskell.
 
-
-## Define a variable
+### Define a variable
 
 ```
 let x = some_val in use_x<x>
 ```
 corresponds to this:
 ```
-(^x use_x<x>  some_val)
+(\x use_x<x>  some_val)
 ```
 
-## If...else...
+### If...else...
 
 Assuming `cond` is a `bit` and `a` and `b` are values that need to be selected
 based on the value of `a`:
@@ -35,14 +36,14 @@ corresponds to this:
 A `1`/true bit will select the "then" branch resulting in `a`.
 A `0`/false bit will select the "else" branch resulting in `b`.
 
-## Multiple arguments
+### Multiple arguments
 
 ```
 let f<x,y,z> = ...
 ```
 corresponds to:
 ```
-let f = ^x^y^z ...
+let f = \x\y\z ...
 ```
 
 The lambda that gets the first argument `x` returns another lambda.
@@ -50,7 +51,7 @@ That lambda gets the second argument `y` and returns the third one.
 The third one returns the actual value computed from `x`, `y` and `z`.
 This is called "currying".
 
-## Tuples
+### Tuples
 
 Fast and small, tuples serve as the underlying representation of small
 data structures with just a few items (e.g. objects with fields or numbers with
@@ -61,20 +62,20 @@ tuple<a, b, c>
 ```
 corresponds to:
 ```
-^getter (((getter a) b) c)
+\getter (((getter a) b) c)
 ```
 
 The getter function can be either one of these three:
-* `^x0^x1^x2 x0`
-* `^x0^x1^x2 x1`
-* `^x0^x1^x2 x2`
+* `\x0\x1\x2 x0`
+* `\x0\x1\x2 x1`
+* `\x0\x1\x2 x2`
 
 To retrieve the needed item of the tuple, just apply a getter function to it:
 ```
 (my_tuple my_getter)
 ```
 
-## Recursion
+### Recursion
 
 In λ-calculus, abstractions cannot refer to themselves.
 However, that does not disallow recursion:
@@ -87,7 +88,7 @@ in
 ```
 corresponds to:
 ```
-let f = ^f^x^y^z
+let f = \f\x\y\z
     ...use (f f)...
 in
     ... use ((((f f) 1) 2) 3)
@@ -96,7 +97,7 @@ in
 The key is to always use the function `f` applying it to itself: `(f f)`.
 This way it can always refer to itself by its first argument.
 
-## Recursive loops
+### Recursive loops
 
 The idea is to implement a loop as a recursive function.
 
@@ -114,7 +115,7 @@ let loop<state, i, max> =
 
 To compute the loop, simply use `loop<initial_state, 0, max>`.
 
-## Recursive program
+### Recursive program
 
 Assuming that we have `logic<state,input>` (which produces `output`
 and `next_state`) and `initial_state`:
@@ -123,7 +124,46 @@ and `next_state`) and `initial_state`:
 # There is no initial input, so put unreachable
 main = (((program program) initial_state) unreachable)
 
-program = ^program ^state ^input
+program = \program\state\input
     let output, next_state = logic<state, input>
     in pair<output, ((program program) next_state)>
 ```
+
+## Internal representation
+
+### Numbers
+
+Short, with fixed numbers of bits, mostly need access to all the bits at once.
+
+-> tuples of bits
+
+### Dynamic arrays
+
+Large, variable-sized, never shrink (WASM-specific), need good random access
+time.
+
+-> binary trees
+
+### Stacks
+
+-> linked lists are sufficient
+
+### Binary trees
+
+```
+let tree<left,right> = pair<left, right>
+```
+
+The leaves are optionals.
+
+Empty subtrees are assigned to empty dummy tree constants:
+
+```
+let dummy_tree_2 = tree<none, none>
+let dummy_tree_4 = tree<dummy_tree_2, dummy_tree_2>
+let dummy_tree_8 = tree<dummy_tree_4, dummy_tree_4>
+...
+```
+
+To index a tree, just apply all index bits to it.
+To remove from a tree, just assign its element to `none`.
