@@ -143,49 +143,19 @@ end
 ---@field value Value
 ---@field computed boolean|nil Optimization: if true, do not recompute the value
 
---- Optimization: represents an environment that is scheduled for (re)assignment
---- once its value is computed.
----@class UncomputedEnvironment
----@field env Environment Variable environment
----@field marker number Use current stack size as environment marker.
-
---- Optimization: schedules the assignment of the computed value to the given
---- environment.
----@param env Environment
----@param envs UncomputedEnvironment[]
----@param marker number Use the current stack size as variable marker.
-local function schedule_for_assignment(env, envs, marker)
-    table.insert(envs, { env = env, marker = marker })
-end
-
---- Optimization: assigns the computed value to all variables with the given
---- marker.
----@param value Value
----@param envs UncomputedEnvironment[]
----@param marker number Use the current stack size as variable marker.
-local function assign_to_envs_with_marker(value, envs, marker)
-    -- Looping here handles cases when multiple variables have
-    -- the same value, i.e. X = Y, Y = Z, Z = <some value> as in
-    -- (\Z.(\Y.(\X.X Y) Z) <some value>)
-    -- ...where all the variables will have the same marker
-    while #envs > 0 and envs[#envs].marker == marker do
-        local env = table.remove(envs).env
-        env.value = value
-        env.computed = true
-    end
-end
 
 ---@param value Value
 ---@return Value
 local function eval(value)
     -- Based on Krivine machine, but with an optimization to avoid
     -- recomputing values for variables whose values have already been computed.
-    -- Without the optimization programs can become slower over time.
+    -- Without the optimization programs can become very slow.
 
     local stack = {} ---@type Value[] Data stack
 
     -- Optimization: stores environments whose values have not been computed yet
-    local uncomputed_envs = {} ---@type UncomputedEnvironment[]
+    local uncomputed_envs = {} ---@type Environment[]
+    local compute_locations = {} ---@type number[] Stack locations (sizes)
 
     while true do
         if value.expression.type == "application" then
@@ -200,11 +170,11 @@ local function eval(value)
             }
         elseif value.expression.type == "abstraction" then
             -- Optimization: assign the value to the corresponding variables
-            assign_to_envs_with_marker(value, uncomputed_envs, #stack)
-
-            if value.expression.variable == "H" then
-                -- Yep, this is printed twice
-                print("If this is printed twice, it may be a bug")
+            while compute_locations[#compute_locations] == #stack do
+                table.remove(compute_locations)
+                local env = table.remove(uncomputed_envs)
+                env.value = value
+                env.computed = true
             end
 
             if #stack == 0 then
@@ -231,7 +201,8 @@ local function eval(value)
 
             -- Optimization: assign a computed value to the environment later
             if not value.env.computed then
-                schedule_for_assignment(value.env, uncomputed_envs, #stack)
+                table.insert(uncomputed_envs, value.env)
+                table.insert(compute_locations, #stack)
             end
 
             value = value.env.value
@@ -274,6 +245,8 @@ end
 ---@param value Value
 ---@return Value, Value
 local function into_pair(value)
+    value = eval(value) -- Pre-compute as much as possible for both items
+
     local first_expression = apply(value.expression, bit0)
     local first = eval({ env = value.env, expression = first_expression })
 
