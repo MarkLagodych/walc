@@ -1,7 +1,10 @@
 #!/usr/bin/env lua
 
 -- This is a simple lambda calculus interpreter based on the WALC format.
--- Runs on Lua 5.1 (released in 2006) and LuaJIT 2.1.
+-- Runs on LuaJIT 2.1 / Lua 5.1.
+
+-- Copyright (c) 2025 Mark Lagodych
+-- SPDX-License-Identifier: MIT
 
 ---@alias Lambda Lambda.variable|Lambda.abstraction|Lambda.application
 
