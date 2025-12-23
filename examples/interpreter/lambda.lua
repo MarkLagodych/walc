@@ -83,7 +83,7 @@ local function parse(file)
 
     if token == "\\" then
         local id = read_token(file)
-        assert(id and not id:find("[\\%(%)%.]"), "Not a variable name: " .. id)
+        assert(id and id:find("^[%w_]+$"), "Not a variable name: " .. id)
 
         token = read_token(file)
         assert(token == ".", "Expected dot")
@@ -411,20 +411,19 @@ end
 
 
 local function main()
-    if #arg == 0 or arg[1] == "--help" then
-        print("Usage: lambda.lua <filename>")
+    if #arg ~= 1 or arg[1] == "--help" then
+        print("Lambda calculus interpreter based on WALC format\n")
+        print("Usage: lambda.lua <FILENAME>")
         return
     end
 
-    local file_name = arg[1]
-    assert(file_name, "Expected a file name")
-    local file = io.open(file_name, "r")
-    assert(file, "Cannot open file " .. file_name)
+    local file = io.open(arg[1])
+    assert(file, "Cannot open file " .. arg[1])
 
     local lambda = parse(file)
     file:close()
 
-    if not lambda then return end -- Empty file
+    if not lambda then return end -- Empty/blank file
 
     local program = { env = nil, expression = lambda }
 
