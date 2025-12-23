@@ -1,8 +1,8 @@
-# This program prints "Hello world" 1024 times with a O(N^2) algorithm.
+# This program prints "Hello world" 1024 times with an O(N^2) algorithm.
 # Its state is initially an empty list.
-# On each recursion step it appends an item to the list and compares it to
-# a long predefined list with 1024 items.
-# If the leasts are not equal, it prints "Hello world" and continues recursing.
+# On each iteration it appends an item to the list and compares it to
+# a long predefined list with 1024 items in O(N) time.
+# If the lists are not equal, it prints "Hello world" and continues.
 # When the lists get equal, it terminates.
 
 (\unreachable. (\0. (\1. (\pair. (\none. (\some. (\cons. (\empty. (\byte.
