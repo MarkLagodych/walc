@@ -108,12 +108,12 @@ local function parse(file)
 end
 
 
----@param lambda Lambda|nil
+---@param lambda Lambda
 ---@param max_depth number|nil
 local function dump(lambda, max_depth)
     max_depth = max_depth or 1000000
 
-    if not lambda then return "nil" end
+    assert(lambda, "Got nil lambda expression")
 
     if lambda.type == "variable" then
         return lambda.name
@@ -136,67 +136,57 @@ end
 ---@field env Environment
 ---@field expression Lambda
 
+--- Represents a variable binding in an abstraction.
 ---@class Environment
 ---@field parent Environment|nil
 ---@field name string
 ---@field value Value
----@field computed boolean|nil Optimizer hint
+---@field computed boolean|nil Optimization: if true, do not recompute the value
 
----@class VariableOptimizer
----@field uncomputed_envs { env: Environment, marker: number }[]
-local VariableOptimizer = {
-    ---@return VariableOptimizer
-    new = function(Self)
-        local self = {
-            --- Stack of uncomputed (unoptimized) environments.
-            --- Markers are used to match variables with their values,
-            --- they should be the current stack size.
-            uncomputed_envs = {}
-        }
+--- Optimization: represents an environment that is scheduled for (re)assignment
+--- once its value is computed.
+---@class UncomputedEnvironment
+---@field env Environment Variable environment
+---@field marker number Use current stack size as environment marker.
 
-        return setmetatable(self, { __index = Self })
-    end,
+--- Optimization: schedules the assignment of the computed value to the given
+--- environment.
+---@param env Environment
+---@param envs UncomputedEnvironment[]
+---@param marker number Use the current stack size as variable marker.
+local function schedule_for_assignment(env, envs, marker)
+    table.insert(envs, { env = env, marker = marker })
+end
 
-    ---@param self VariableOptimizer
-    ---@param value Value
-    ---@param marker number Use the current stack size as variable marker
-    trigger_on_variable = function(self, value, marker)
-        if value.env.computed then return end
-
-        table.insert(self.uncomputed_envs, {
-            env = value.env,
-            marker = marker
-        })
-    end,
-
-    --- Assigns the computed value to all variables with the same marker
-    ---@param self VariableOptimizer
-    ---@param value Value
-    ---@param marker number Use the current stack size as variable marker
-    trigger_on_computed_value = function(self, value, marker)
-        -- Looping here handles cases when multiple variables have
-        -- the same value, i.e. X = Y, Y = Z, Z = <some value> as in
-        -- (\Z.(\Y.(\X.X Y) Z) <some value>)
-        -- ...where all the variables will have the same marker
-        while #self.uncomputed_envs > 0
-            and self.uncomputed_envs[#self.uncomputed_envs].marker == marker
-        do
-            local unoptimized_env = table.remove(self.uncomputed_envs).env
-            unoptimized_env.value = value
-            unoptimized_env.computed = true
-        end
-    end,
-}
+--- Optimization: assigns the computed value to all variables with the given
+--- marker.
+---@param value Value
+---@param envs UncomputedEnvironment[]
+---@param marker number Use the current stack size as variable marker.
+local function assign_to_envs_with_marker(value, envs, marker)
+    -- Looping here handles cases when multiple variables have
+    -- the same value, i.e. X = Y, Y = Z, Z = <some value> as in
+    -- (\Z.(\Y.(\X.X Y) Z) <some value>)
+    -- ...where all the variables will have the same marker
+    while #envs > 0 and envs[#envs].marker == marker do
+        local env = table.remove(envs).env
+        env.value = value
+        env.computed = true
+    end
+end
 
 ---@param value Value
 ---@return Value
 local function eval(value)
-    local stack = {} ---@type Value[] Data/call stack
+    -- Based on Krivine machine, but with an optimization to avoid
+    -- recomputing values for variables whose values have already been computed.
+    -- Without the optimization programs can become slower over time.
 
-    local variable_optimizer = VariableOptimizer:new()
+    local stack = {} ---@type Value[] Data stack
 
-    -- Based on Krivine machine, but with usual string names for variables
-    -- instead of de Bruijn indices.
+    -- Optimization: stores environments whose values have not been computed yet
+    local uncomputed_envs = {} ---@type UncomputedEnvironment[]
+
     while true do
         if value.expression.type == "application" then
             table.insert(stack, {
@@ -209,7 +199,13 @@ local function eval(value)
                 expression = value.expression.left
             }
         elseif value.expression.type == "abstraction" then
-            variable_optimizer:trigger_on_computed_value(value, #stack)
+            -- Optimization: assign the value to the corresponding variables
+            assign_to_envs_with_marker(value, uncomputed_envs, #stack)
+
+            if value.expression.variable == "H" then
+                -- Yep, this is printed twice
+                print("If this is printed twice, it may be a bug")
+            end
 
             if #stack == 0 then
                 break
@@ -233,7 +229,10 @@ local function eval(value)
 
             assert(value.env, "Unbound variable: " .. value.expression.name)
 
-            variable_optimizer:trigger_on_variable(value, #stack)
+            -- Optimization: assign a computed value to the environment later
+            if not value.env.computed then
+                schedule_for_assignment(value.env, uncomputed_envs, #stack)
+            end
 
             value = value.env.value
         end
@@ -272,11 +271,15 @@ local function from_bit(bit)
     end
 end
 
----@param v Value
+---@param value Value
 ---@return Value, Value
-local function into_pair(v)
-    local first = eval({ env = v.env, expression = apply(v.expression, bit0) })
-    local second = eval({ env = v.env, expression = apply(v.expression, bit1) })
+local function into_pair(value)
+    local first_expression = apply(value.expression, bit0)
+    local first = eval({ env = value.env, expression = first_expression })
+
+    local second_expression = apply(value.expression, bit1)
+    local second = eval({ env = value.env, expression = second_expression })
+
     return first, second
 end
 
@@ -341,7 +344,7 @@ end
 ---@return number
 local function into_byte(value)
     local bits = into_list(value)
-    assert(#bits == 8, "Expected 8 bits for a byte")
+    assert(#bits == 8, "Expected 8 bits for a byte, got " .. #bits)
 
     local byte = 0
     for i = 8, 1, -1 do
@@ -397,6 +400,7 @@ local function into_output(value)
 end
 
 ---@param input string
+---@param value Value
 ---@return Value
 local function from_input(input, value)
     return {
