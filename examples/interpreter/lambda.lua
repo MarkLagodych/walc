@@ -124,10 +124,8 @@ local function dump(lambda, max_depth)
             return "\\" .. lambda.variable .. "."
                 .. dump(lambda.body, max_depth - 1)
         elseif lambda.type == "application" then
-            return "("
-                .. dump(lambda.left, max_depth - 1) .. " "
-                .. dump(lambda.right, max_depth - 1)
-                .. ")"
+            return "(" .. dump(lambda.left, max_depth - 1) .. " "
+                .. dump(lambda.right, max_depth - 1) .. ")"
         end
     end
 end
@@ -163,12 +161,12 @@ local VariableOptimizer = {
     ---@param value Value
     ---@param marker number Use the current stack size as variable marker
     trigger_on_variable = function(self, value, marker)
-        if not value.env.computed then
-            table.insert(self.uncomputed_envs, {
-                env = value.env,
-                marker = marker
-            })
-        end
+        if value.env.computed then return end
+
+        table.insert(self.uncomputed_envs, {
+            env = value.env,
+            marker = marker
+        })
     end,
 
     --- Assigns the computed value to all variables with the same marker
@@ -177,7 +175,9 @@ local VariableOptimizer = {
     ---@param marker number Use the current stack size as variable marker
     trigger_on_computed_value = function(self, value, marker)
         -- Looping here handles cases when multiple variables have
-        -- the same value, i.e. X = Y, Y = Z, Z = <some value>.
+        -- the same value, i.e. X = Y, Y = Z, Z = <some value> as in
+        -- (\Z.(\Y.(\X.X Y) Z) <some value>)
+        -- ...where all the variables will have the same marker
         while #self.uncomputed_envs > 0
             and self.uncomputed_envs[#self.uncomputed_envs].marker == marker
         do

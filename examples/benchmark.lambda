@@ -5,52 +5,19 @@
 # If the leasts are not equal, it prints "Hello world" and continues recursing.
 # When the lists get equal, it terminates.
 
-(\unreachable.
-(\0.
-(\1.
-(\pair.
-(\none.
-(\some.
-(\cons.
-(\empty.
-(\byte.
-
-(\PRINT.
-(\READ_CHAR.
-(\READ_ALL.
-
-(\newline.
-(\space.
-(\H.
-(\e.
-(\l.
-(\o.
-(\w.
-(\r.
-(\d.
-
+(\unreachable. (\0. (\1. (\pair. (\none. (\some. (\cons. (\empty. (\byte.
+(\PRINT. (\READ_CHAR. (\READ_ALL.
+(\newline. (\space. (\H. (\e. (\l. (\o. (\w. (\r. (\d.
 (\print_Hello_world.
 
 (\lists_not_eq.
 
-(\append1.
-(\append2.
-(\append4.
-(\append8.
-(\append16.
-(\append32.
-(\append64.
-(\append128.
-(\append256.
-(\append512.
-(\append1024.
+(\append1. (\append2. (\append4. (\append8. (\append16. (\append32. (\append64.
+(\append128. (\append256. (\append512. (\append1024.
+
 (\very_long_list.
 
-(\initial_state.
-(\iterate.
-(\should_finish.
-
-(\program.
+(\initial_state. (\iterate. (\should_finish. (\program.
 
     # There is no initial input, so put unreachable
     (((program program) initial_state) unreachable)
@@ -118,11 +85,11 @@ empty )# initial_state: no items
     ((cons 0)((cons 1)((cons 2)((cons 3)((cons 4)((cons 5)((cons 6)((cons 7)
         empty)))))))) )# byte
 
-none                        )# empty
-\a.\b. (some ((pair a) b))  )# cons
-\x. ((pair 1) x)            )# some
-((pair 0) unreachable)      )# none
-\x.\y. \g. ((g x) y)        )# pair
-\x.\y. y                    )# 1
-\x.\y. x                    )# 0
-\x. x                       )# unreachable
+none )# empty
+\x0.\x1. (some ((pair x0) x1)) )# cons
+\x. ((pair 1) x) )# some
+((pair 0) unreachable) )# none
+\x0.\x1.\g. ((g x0) x1) )# pair
+\x0.\x1.x1 )# 1
+\x0.\x1.x0 )# 0
+\x.x )# unreachable
