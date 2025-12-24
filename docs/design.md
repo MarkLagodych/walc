@@ -167,3 +167,19 @@ let dummy_tree_8 = tree<dummy_tree_4, dummy_tree_4>
 
 To index a tree, just apply all index bits to it.
 To remove from a tree, just assign its element to `none`.
+
+### Code
+
+Every WASM program is a list of instructions that are executed sequentially.
+Thus code instructions are stored in a linked list.
+
+However, there exist branching instructions that can jump to arbitrary other
+instructions (WASM dictates strict rules of what those
+instructions can be, but that does not solve the problem nonetheless).
+To be able to efficiently jump, the compiler stores all addressable
+instructions in variables and constructs an array of them that is then
+addressed by branching instructions at runtime.
+
+Time complexity:
+- O(1) to step to the next instruction
+- O(log(#addressable_instructions)) to branch
