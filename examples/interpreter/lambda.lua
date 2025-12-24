@@ -113,7 +113,7 @@ end
 
 ---@param lambda Lambda
 ---@param max_depth number|nil
-local function dump(lambda, max_depth)
+local function stringify(lambda, max_depth)
     max_depth = max_depth or 1000000
 
     assert(lambda, "Got nil lambda expression")
@@ -125,10 +125,10 @@ local function dump(lambda, max_depth)
 
         if lambda.type == "abstraction" then
             return "\\" .. lambda.variable .. "."
-                .. dump(lambda.body, max_depth - 1)
+                .. stringify(lambda.body, max_depth - 1)
         elseif lambda.type == "application" then
-            return "(" .. dump(lambda.left, max_depth - 1) .. " "
-                .. dump(lambda.right, max_depth - 1) .. ")"
+            return "(" .. stringify(lambda.left, max_depth - 1) .. " "
+                .. stringify(lambda.right, max_depth - 1) .. ")"
         end
     end
 end
@@ -141,10 +141,10 @@ end
 
 --- Represents a variable binding in an abstraction.
 ---@class Environment
----@field parent Environment|nil
----@field name string
----@field value Value
----@field computed boolean|nil Optimization: if true, do not recompute the value
+---@field parent Environment|nil Next item in the environment chain
+---@field name string Variable name
+---@field value Value Variable value
+---@field computed boolean|nil Optimization: if true, value is not recomputed
 
 
 ---@param value Value
@@ -152,7 +152,7 @@ end
 local function eval(value)
     -- Based on Krivine machine, but with an optimization to avoid
     -- recomputing values for variables whose values have already been computed.
-    -- Without the optimization programs can become very slow.
+    -- Without the optimization evaluation becomes very slow very quickly.
 
     local stack = {} ---@type Value[] Data stack
 
@@ -227,27 +227,23 @@ end
 
 ---@param value Value
 ---@return number
-local function into_bit(value)
+local function decode_bit(value)
     local expr = apply(apply(value.expression, bit0), bit1)
     local res = eval({ env = value.env, expression = expr })
     if res.expression == bit0 then return 0 end
     if res.expression == bit1 then return 1 end
-    error("Unexpected value when evaluating bit: " .. dump(res.expression))
+    error("Unexpected value when decoding bit: " .. stringify(res.expression))
 end
 
 ---@param bit number
 ---@return Lambda
-local function from_bit(bit)
-    if bit == 0 then
-        return bit0
-    else
-        return bit1
-    end
+local function encode_bit(bit)
+    if bit == 0 then return bit0 else return bit1 end
 end
 
 ---@param value Value
----@return Value, Value
-local function into_pair(value)
+---@return Value first, Value second
+local function decode_pair(value)
     value = eval(value) -- Pre-compute as much as possible for both items
 
     local first_expression = apply(value.expression, bit0)
@@ -262,55 +258,52 @@ end
 ---@param first Lambda
 ---@param second Lambda
 ---@return Lambda
-local function from_pair(first, second)
+local function encode_pair(first, second)
     return pair(first, second)
 end
 
 ---@param value Value
 ---@return Value|nil
-local function into_optional(value)
-    local first
-    local second
-    first, second = into_pair(value)
-
-    local has_value = into_bit(first)
-    if has_value == 0 then return nil end
-    return second
+local function decode_optional(value)
+    local has_data, data = decode_pair(value)
+    if decode_bit(has_data) == 1 then return data end
+    return nil
 end
 
----@param opt_lambda Lambda|nil
+---@param lambda Lambda|nil
 ---@return Lambda
-local function from_optional(opt_lambda)
-    if opt_lambda then
-        return from_pair(from_bit(1), opt_lambda)
+local function encode_optional(lambda)
+    if lambda then
+        return encode_pair(encode_bit(1), lambda)
     else
-        return from_pair(from_bit(0), unreachable)
+        return encode_pair(encode_bit(0), unreachable)
     end
 end
 
 ---@param value Value
 ---@return Value[]
-local function into_list(value)
+local function decode_list(value)
     local list = {}
-    local current = value
+    local current_node = value
     while true do
-        local node = into_optional(current)
+        local node = decode_optional(current_node)
         if not node then break end
 
-        local item
-        item, current = into_pair(node)
+        local item, next_node = decode_pair(node)
         table.insert(list, item)
+
+        current_node = next_node
     end
 
     return list
 end
 
----@param list table
+---@param list Lambda[]
 ---@return Lambda
-local function from_list(list)
-    local result = from_optional(nil)
+local function encode_list(list)
+    local result = encode_optional(nil)
     for i = #list, 1, -1 do
-        result = from_optional(from_pair(list[i], result))
+        result = encode_optional(encode_pair(list[i], result))
     end
 
     return result
@@ -318,13 +311,13 @@ end
 
 ---@param value Value
 ---@return number
-local function into_byte(value)
-    local bits = into_list(value)
+local function decode_byte(value)
+    local bits = decode_list(value)
     assert(#bits == 8, "Expected 8 bits for a byte, got " .. #bits)
 
     local byte = 0
     for i = 8, 1, -1 do
-        byte = (byte * 2) + into_bit(bits[i])
+        byte = (byte * 2) + decode_bit(bits[i])
     end
 
     return byte
@@ -332,24 +325,23 @@ end
 
 ---@param byte number
 ---@return Lambda
-local function from_byte(byte)
+local function encode_byte(byte)
     local bits = {}
     for i = 1, 8 do
-        table.insert(bits, 1, from_bit(byte % 2))
+        table.insert(bits, encode_bit(byte % 2))
         byte = math.floor(byte / 2)
     end
 
-    return from_list(bits)
+    return encode_list(bits)
 end
 
 ---@param value Value
 ---@return string
-local function into_string(value)
-    local chars = into_list(value)
+local function decode_string(value)
+    local chars = decode_list(value)
     local str = ""
-    for _, char_value in ipairs(chars) do
-        local byte = into_byte(char_value)
-        str = str .. string.char(byte)
+    for _, char in ipairs(chars) do
+        str = str .. string.char(decode_byte(char))
     end
 
     return str
@@ -357,31 +349,29 @@ end
 
 ---@param str string
 ---@return Lambda
-local function from_string(str)
+local function encode_string(str)
     local chars = {}
     for i = 1, #str do
-        local byte = string.byte(str, i)
-        table.insert(chars, from_byte(byte))
+        table.insert(chars, encode_byte(string.byte(str, i)))
     end
 
-    return from_list(chars)
+    return encode_list(chars)
 end
 
----@param value Value
----@return string, Value
-local function into_output(value)
-    local out_string, next_value
-    out_string, next_value = into_pair(value)
-    return into_string(out_string), next_value
+---@param program_output Value
+---@return string output, Value input_processing_fn
+local function decode_output(program_output)
+    local output, input_processing_fn = decode_pair(program_output)
+    return decode_string(output), input_processing_fn
 end
 
 ---@param input string
----@param value Value
----@return Value
-local function from_input(input, value)
+---@param input_processing_fn Value
+---@return Value program
+local function encode_input(input, input_processing_fn)
     return {
-        env = value.env,
-        expression = apply(value.expression, from_string(input))
+        env = input_processing_fn.env,
+        expression = apply(input_processing_fn.expression, encode_string(input))
     }
 end
 
@@ -426,16 +416,14 @@ local function main()
     if not lambda then return end -- Empty/blank file
 
     local program = { env = nil, expression = lambda }
-
     while true do
-        local output
-        output, program = into_output(program)
+        local output, process_input = decode_output(program)
 
         if output == "" then break end
 
         local input = execute_command(output)
 
-        program = from_input(input, program)
+        program = encode_input(input, process_input)
     end
 end
 

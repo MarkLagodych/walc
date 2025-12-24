@@ -1,7 +1,8 @@
 # This program prints "Hello world" 1024 times with an O(N^2) algorithm.
 # Its state is initially an empty list.
-# On each iteration it appends an item to the list and compares it to
-# a long predefined list with 1024 items in O(N) time.
+# On each iteration it:
+# 1. appends an item to the list
+# 2. compares the list to a long predefined list with 1024 items (in O(N) time)
 # If the lists are not equal, it prints "Hello world" and continues.
 # When the lists get equal, it terminates.
 
