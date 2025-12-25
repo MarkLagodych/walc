@@ -1,3 +1,7 @@
+use wasmparser::{Parser, Payload};
+
+mod cli;
+
 fn main() {
-    println!("Hello, world!");
+    let args = cli::parse_args();
 }

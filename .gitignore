@@ -22,3 +22,7 @@ node_modules/
 dist/
 bin/
 __*__/
+
+
+!.cargo/
+examples/wasm/Cargo.lock
