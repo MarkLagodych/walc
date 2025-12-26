@@ -1,7 +1,7 @@
 # WebAssembly to Lambda Calculus compiler
 
 WALC /wɑːlts/ compiles stand-alone
-[WebAssembly 2.0](https://webassembly.org/) / [WASI 0.2](https://wasi.dev/)
+[WebAssembly 1.0](https://webassembly.org/) / [WASI 0.1](https://wasi.dev/)
 modules into pure untyped lambda expressions.
 
 The output lambda expressions are in [WALC format](./docs/format.md)
@@ -10,4 +10,6 @@ I/O.
 The format does not change anything about lambda calculus or how it is evaluated
 inside the interpreter, it just defines what the interpreter does with
 the evaluated result.
-You can find an example interpreter in [examples](./examples/interpreter/).
+You can run some [example programs](./examples/lambda-calculus/) written
+in lambda calculus by hand with an
+[example interpreter](./examples/interpreter/).

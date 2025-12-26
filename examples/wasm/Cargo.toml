@@ -3,6 +3,20 @@ name = "walc-wasm-examples"
 version = "0.1.0"
 edition = "2024"
 
+[profile.release]
+strip = "debuginfo"
+panic = "abort"
+lto = "fat"
+target-features = [
+    "-atomics",
+    "-exception-handling",
+    "-multimemory",
+
+    "-extended-const",
+    "-relaxed-simd",
+    "-simd128",
+]
+
 [[bin]]
 name = "hello"
 path = "hello.rs"

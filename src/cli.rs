@@ -5,11 +5,11 @@ use clap::*;
 pub struct Args {
     /// Input WebAssembly/WASI file
     #[arg()]
-    input_file: String,
+    pub input_file: String,
 
     /// Output lambda calculus file
     #[arg(short)]
-    output_file: Option<String>,
+    pub output_file: Option<String>,
 }
 
 pub fn parse_args() -> Args {
