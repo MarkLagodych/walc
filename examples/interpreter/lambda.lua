@@ -59,7 +59,7 @@ local function read_token(file)
         c = file:read(1)
     end
 
-    if not c or c == "(" or c == ")" or c == "\\" or c == "." then
+    if not c or c:find("[\\.()]") then
         return c
     end
 
@@ -83,10 +83,10 @@ local function parse(file)
 
     if token == "\\" then
         local id = read_token(file)
-        assert(id and id:find("^[%w_]+$"), "Not a variable name: " .. id)
+        assert(id and id:find("^[a-zA-Z0-9_]"), "Expected variable identifier")
 
         token = read_token(file)
-        assert(token == ".", "Expected dot")
+        assert(token == ".", "Expected dot after abstraction variable")
 
         local body = parse(file)
         assert(body, "Expected abstraction body")
@@ -108,29 +108,6 @@ local function parse(file)
     end
 
     return var(token)
-end
-
-
----@param lambda Lambda
----@param max_depth number|nil
-local function stringify(lambda, max_depth)
-    max_depth = max_depth or 1000000
-
-    assert(lambda, "Got nil lambda expression")
-
-    if lambda.type == "variable" then
-        return lambda.name
-    else
-        if max_depth <= 0 then return "[...]" end
-
-        if lambda.type == "abstraction" then
-            return "\\" .. lambda.variable .. "."
-                .. stringify(lambda.body, max_depth - 1)
-        elseif lambda.type == "application" then
-            return "(" .. stringify(lambda.left, max_depth - 1) .. " "
-                .. stringify(lambda.right, max_depth - 1) .. ")"
-        end
-    end
 end
 
 
@@ -216,14 +193,10 @@ local function eval(value)
 end
 
 
--- '$' is added to highlight that the terms are inserted by the interpreter
+-- '$' is added to avoid naming conflicts
 local unreachable = abstract("$unreachable", var("$unreachable"))
 local bit0 = abstract("$x0", abstract("$x1", var("$x0")))
 local bit1 = abstract("$x0", abstract("$x1", var("$x1")))
-local pair = function(left, right)
-    return abstract("$g", apply(apply(var("$g"), left), right))
-end
-
 
 ---@param value Value
 ---@return number
@@ -232,7 +205,7 @@ local function decode_bit(value)
     local res = eval({ env = value.env, expression = expr })
     if res.expression == bit0 then return 0 end
     if res.expression == bit1 then return 1 end
-    error("Unexpected value when decoding bit: " .. stringify(res.expression))
+    error("Decoding error: not a bit")
 end
 
 ---@param bit number
@@ -259,7 +232,7 @@ end
 ---@param second Lambda
 ---@return Lambda
 local function encode_pair(first, second)
-    return pair(first, second)
+    return abstract("$g", apply(apply(var("$g"), first), second))
 end
 
 ---@param value Value
@@ -311,25 +284,24 @@ end
 
 ---@param value Value
 ---@return number
-local function decode_byte(value)
+local function decode_number(value)
     local bits = decode_list(value)
-    assert(#bits == 8, "Expected 8 bits for a byte, got " .. #bits)
 
-    local byte = 0
-    for i = 8, 1, -1 do
-        byte = (byte * 2) + decode_bit(bits[i])
+    local number = 0
+    for i = #bits, 1, -1 do
+        number = (number * 2) + decode_bit(bits[i])
     end
 
-    return byte
+    return number
 end
 
----@param byte number
+---@param number number
 ---@return Lambda
-local function encode_byte(byte)
+local function encode_number(number)
     local bits = {}
     for i = 1, 8 do
-        table.insert(bits, encode_bit(byte % 2))
-        byte = math.floor(byte / 2)
+        table.insert(bits, encode_bit(number % 2))
+        number = math.floor(number / 2)
     end
 
     return encode_list(bits)
@@ -340,63 +312,42 @@ end
 local function decode_string(value)
     local chars = decode_list(value)
     local str = ""
-    for _, char in ipairs(chars) do
-        str = str .. string.char(decode_byte(char))
+    for i = 1, #chars do
+        str = str .. string.char(decode_number(chars[i]))
     end
 
     return str
 end
 
----@param str string
----@return Lambda
-local function encode_string(str)
-    local chars = {}
-    for i = 1, #str do
-        table.insert(chars, encode_byte(string.byte(str, i)))
-    end
-
-    return encode_list(chars)
+---@param program Value
+---@return number command, Value payload
+local function decode_command(program)
+    local command, payload = decode_pair(program)
+    return decode_number(command), payload
 end
 
----@param program_output Value
----@return string output, Value input_processing_fn
-local function decode_output(program_output)
-    local output, input_processing_fn = decode_pair(program_output)
-    return decode_string(output), input_processing_fn
+---@param payload Value
+---@return string output, Value continuation
+local function decode_output(payload)
+    local output, continuation = decode_pair(payload)
+    return decode_string(output), continuation
 end
 
----@param input string
----@param input_processing_fn Value
+---@param input string|nil
+---@param continuation Value
 ---@return Value program
-local function encode_input(input, input_processing_fn)
+local function encode_input(input, continuation)
+    local input_lambda
+    if input then
+        input_lambda = encode_optional(encode_number(input:byte()))
+    else
+        input_lambda = encode_optional(nil)
+    end
+
     return {
-        env = input_processing_fn.env,
-        expression = apply(input_processing_fn.expression, encode_string(input))
+        env = continuation.env,
+        expression = apply(continuation.expression, input_lambda)
     }
-end
-
-
----@param output string
----@return string
-local function execute_command(output)
-    local command = string.byte(output, 1)
-    local data = string.sub(output, 2)
-
-    if command == 0 then
-        io.write(data)
-        io.flush()
-        return ""
-    end
-
-    if command == 1 then
-        return io.read(1) or ""
-    end
-
-    if command == 2 then
-        return io.read("*all") or ""
-    end
-
-    error("Unknown command " .. command)
 end
 
 
@@ -417,13 +368,17 @@ local function main()
 
     local program = { env = nil, expression = lambda }
     while true do
-        local output, process_input = decode_output(program)
+        local command, payload = decode_command(program)
 
-        if output == "" then break end
+        if command == 0 then
+            local output = decode_string(payload)
+            io.write(output)
+            io.flush()
+        end
 
-        local input = execute_command(output)
+        if not continuation then break end
 
-        program = encode_input(input, process_input)
+        program = encode_input(io.read(1), continuation)
     end
 end
 

@@ -1,36 +1,27 @@
 # This program prints "Hello world"
 
-(\unreachable. (\0. (\1. (\pair. (\none. (\some. (\cons. (\empty. (\byte.
-(\PRINT. (\newline. (\space. (\H. (\e. (\l. (\o. (\w. (\r. (\d.
-(\print_Hello_world.
+(\0. (\1. (\Pair. (\None. (\Some. (\End. (\Out. (\In.
+(\space. (\newline. (\H_. (\e_. (\l_. (\o_. (\w_. (\r_. (\d_.
 
-    # The program
-    ((pair print_Hello_world) \input. ((pair empty) unreachable))
+    ((Out H_) ((Out e_) ((Out l_) ((Out l_) ((Out o_) ((Out space)
+        ((Out w_) ((Out o_) ((Out r_) ((Out l_) ((Out d_) ((Out newline)
+            End))))))))))))
 
-((cons PRINT) ((cons H) ((cons e) ((cons l) ((cons l) ((cons o) ((cons space)
-    ((cons w) ((cons o) ((cons r) ((cons l) ((cons d) ((cons newline)
-        empty))))))))))))) )# print_Hello_world
+\g.((((((((g 0)0)1)0)0)1)1)0) )# d_
+\g.((((((((g 0)1)0)0)1)1)1)0) )# r_
+\g.((((((((g 1)1)1)0)1)1)1)0) )# w_
+\g.((((((((g 1)1)1)1)0)1)1)0) )# o_
+\g.((((((((g 0)0)1)1)0)1)1)0) )# l_
+\g.((((((((g 1)0)1)0)0)1)1)0) )# e_
+\g.((((((((g 0)0)0)1)0)0)1)0) )# H_
+\g.((((((((g 0)1)0)1)0)0)0)0) )# newline
+\g.((((((((g 0)0)0)0)0)1)0)0) )# space
 
-((((((((byte 0)0)1)0)0)1)1)0) )# d
-((((((((byte 0)1)0)0)1)1)1)0) )# r
-((((((((byte 1)1)1)0)1)1)1)0) )# w
-((((((((byte 1)1)1)1)0)1)1)0) )# o
-((((((((byte 0)0)1)1)0)1)1)0) )# l
-((((((((byte 1)0)1)0)0)1)1)0) )# e
-((((((((byte 0)0)0)1)0)0)1)0) )# H
-((((((((byte 0)0)0)0)0)1)0)0) )# space
-((((((((byte 0)1)0)1)0)0)0)0) )# newline
-((((((((byte 0)0)0)0)0)0)0)0) )# PRINT
-
-\0.\1.\2.\3.\4.\5.\6.\7.
-    ((cons 0)((cons 1)((cons 2)((cons 3)((cons 4)((cons 5)((cons 6)((cons 7)
-        empty)))))))) )# byte
-
-none )# empty
-\x0.\x1. (some ((pair x0) x1)) )# cons
-\x. ((pair 1) x) )# some
-((pair 0) unreachable) )# none
-\x0.\x1.\g. ((g x0) x1) )# pair
+\input_handler. (Some ((Pair 1) input_handler)) )# In
+\out_byte.\next.(Some ((Pair 0) ((Pair out_byte) next))) )# Out
+None )# End
+\x. ((Pair 1) x) )# Some
+((Pair 0) Unreachable) )# None
+\x0.\x1. \p.((p x0) x1) )# Pair
 \x0.\x1.x1 )# 1
 \x0.\x1.x0 )# 0
-\x.x )# unreachable

@@ -1,3 +1,6 @@
+mod walc;
+use walc::*;
+
 fn main() {
-    println!("Hello, world!");
+    println!("Hello world!");
 }

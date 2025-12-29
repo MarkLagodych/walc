@@ -5,17 +5,12 @@ edition = "2024"
 
 [profile.release]
 strip = "debuginfo"
-panic = "abort"
 lto = "fat"
-target-features = [
-    "-atomics",
-    "-exception-handling",
-    "-multimemory",
 
-    "-extended-const",
-    "-relaxed-simd",
-    "-simd128",
-]
+[profile.release-no-panic]
+inherits = "release"
+panic = "abort"
+
 
 [[bin]]
 name = "hello"

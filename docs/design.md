@@ -75,6 +75,19 @@ To retrieve the needed item of the tuple, just apply a getter function to it:
 (my_tuple my_getter)
 ```
 
+### Lists
+
+`list<a,...>` is `optional<pair<a, list<...>>>` and is either:
+* `cons<a,...>`: `some<pair<a, ...>>`
+* `empty`: `none`
+
+Example:
+`list<a,b,c>` is `cons<a, cons<b, cons<c, empty>>>`.
+
+To get if the list has items, use `(my_list 0)`.
+To get the item, use `((my_list 1) 0)`.
+To get the tail, use `((my_list 1) 1)`.
+
 ### Recursion
 
 In λ-calculus, abstractions cannot refer to themselves.

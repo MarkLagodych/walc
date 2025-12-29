@@ -44,70 +44,48 @@ function.
 
 ### Definitions
 
-The angle-bracket notation (e.g. `f<a,b,c>`) is similar to templates
-in C++ or perhaps generics in C#/Java/Kotlin/Rust/Swift/TypeScript
-and is needed to distinguish usual lambda applications from
-substitution into the definitions.
+The angle-bracket notation (e.g. `f<a,b,c>`) denotes a generic definition
+or a substitution into a definition.
 
-* `unreachable` is `\x.x` (or anything else, really).
+* `unreachable` is anything that should not be executed, e.g.
+    `__UNDEFINED_VARIABLE_WAKA_WAKA_1234__`.
 
-    This is used only to fill in places that structurally
+    This is only used to fill in places that structurally
     require a value when the value is not important.
 
 * `bit` is either:
     * `0` (`\x0.\x1.x0`)
     * `1` (`\x0.\x1.x1`).
 
+* `byte` is `\g. ((((((((g bit0) bit1) bit2) bit3) bit4) bit5) bit6) bit7)`
+
 * `pair<x0,x1>` is `\f. ((f x0) x1)`.
 
     To get the 0th or the 1st element of a pair, just apply `0` or `1` to it:
     `(my_pair 0)`, `(my_pair 1)`.
 
-* `option<a>` is `pair<bit,a>` and is either:
+* `optional<a>` is `pair<bit,a>` and is either:
     * `some<a>`: `pair<1,a>`
     * `none`: `pair<0,unreachable>`
 
-* `list<a,...>` is `optional<pair<a, list<...>>>` and is either:
-    * `cons<a,...>`: `some<pair<a, ...>>`
-    * `empty`: `none`
+* `either<a,b>` is `pair<bit, a|b>` and is one of:
+    * `left<a>`: `pair<0,a>`
+    * `right<b>`: `pair<1,b>`
 
-    Example:
-    `list<a,b,c>` is `cons<a,cons<b,cons<c,empty>>>`.
+    This is a sum-type that stores a value of one of the two possible types.
 
-    To get if the list has items, use `(my_list 0)`.
-    To get the item, use `((my_list 1) 0)`.
-    To get the tail, use `((my_list 1) 1)`.
+* `output_command` is `pair<byte, program>`
 
-* `byte<bit0,bit1,...bit7>` is `list<bit0,bit1,...bit7>`
+    When executing an output command, the interpreter writes the byte to STDOUT
+    and proceeds interpreting the 1st item of the pair.
 
-    This is an unsigned 8-bit integer where `bit0` is the least significant bit.
+* `input_command` is `\optional_input_byte. program`
 
-* `string<byte0,byte1,...byteN>` is `list<byte0,byte1,...byteN>`
+    When executing a read command, the interpreter reads one byte from STDIN,
+    applies it to the `input_command` (or `none` if failed to read from STDIN)
+    and proceeds interpreting the result.
 
-    This is an array of arbitrary binary data where
-    `byte0` is the starting byte.
+* `program` is `optional<either<output_command,input_command>>`
 
-* `program` is either:
-    * `pair<output_string, \input_string.program>`
-    * `pair<output_string, unreachable>` (if the output string is empty)
-
-    The output string tells the interpreter what I/O operation to perform.
-    If it is empty, the program ends and the 1st pair element can be
-    `unreachable`.
-
-### I/O Commands
-
-The first string byte identifies the command number.
-The remaining bytes are the command argument.
-
-#### 0
-
-Print the argument to stdout.
-
-#### 1
-
-Read a character from stdin.
-
-#### 2
-
-Read everything from stdin.
+    If the program is `none`, the interpreter finishes.
+    Otherwise, it executes the given command (either input or output).

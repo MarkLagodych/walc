@@ -1,6 +1,7 @@
 # Minimal WASM examples
 
-Compile with:
+You can compile the examples with e.g.
+[wasm-tools](https://github.com/bytecodealliance/wasm-tools):
 
 ```
 $ wasm-tools parse input.wat -o output.wasm

@@ -9,6 +9,8 @@ fn main() {
 
     let data = std::fs::read(&args.input_file).expect("Failed to read input file");
 
+    let mut ops = Vec::<Operator>::new();
+
     let parser = Parser::new(0);
     for payload in parser.parse_all(&data) {
         match payload.expect("Failed to parse payload") {
@@ -38,13 +40,14 @@ fn main() {
                 }
             }
             Payload::CodeSectionEntry(body) => {
-                println!("Code Section Entry:");
+                // println!("Code Section Entry:");
                 let reader = body
                     .get_operators_reader()
                     .expect("Failed to get operators reader");
                 for op in reader {
                     let op = op.expect("Failed to read operator");
-                    println!("  {:?}", op);
+                    // println!("  {:?}", op);
+                    ops.push(op);
                 }
             }
             _ => {}
