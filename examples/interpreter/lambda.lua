@@ -6,154 +6,82 @@
 -- Copyright (c) 2025 Mark Lagodych
 -- SPDX-License-Identifier: MIT
 
----@alias Lambda Lambda.variable|Lambda.abstraction|Lambda.application
-
----@class Lambda.variable
----@field type "variable"
----@field name string
-
----@param name string
----@return Lambda
-local function var(name)
+local function Var(name)
     return { type = "variable", name = name }
 end
 
----@class Lambda.abstraction
----@field type "abstraction"
----@field variable string
----@field body Lambda
-
----@param variable string
----@param body Lambda
----@return Lambda
-local function abstract(variable, body)
-    return { type = "abstraction", variable = variable, body = body }
+local function Fun(variable, body)
+    return { type = "function", variable = variable, body = body }
 end
 
----@class Lambda.application
----@field type "application"
----@field left Lambda
----@field right Lambda
-
----@param left Lambda
----@param right Lambda
----@return Lambda
-local function apply(left, right)
-    return { type = "application", left = left, right = right }
+local function Call(left, right)
+    return { type = "call", left = left, right = right }
 end
 
 
----@param file file*
----@return "\\"|"."|"("|")"|string|nil
-local function read_token(file)
-    local c = file:read(1)
+local function parse_expr(next_token)
+    local token = next_token()
 
-    -- Skip whitespaces (including comments)
-    while c and c:find("[ \t\v\f\r\n#]") do
-        if c == "#" then
-            while c and c ~= "\n" do
-                c = file:read(1)
-            end
-        end
-
-        c = file:read(1)
+    if token == "?" then
+        return Fun(next_token(), parse_expr(next_token))
+    elseif token == "!" then
+        return Call(parse_expr(next_token), parse_expr(next_token))
+    else
+        return Var(token)
     end
+end
 
-    if not c or c:find("[\\.()]") then
-        return c
-    end
+local function parse(str)
+    -- Replace comments with spaces
+    str = str:gsub("#[^\n]*\n", " ")
 
-    local identifier = ""
-    while c and c:find("[a-zA-Z0-9_]") do
-        identifier = identifier .. c
-        c = file:read(1)
-    end
-    file:seek("cur", -1)
+    -- Add spaces around tokens
+    str = str:gsub("!", " ! ")
+    str = str:gsub("%?", " ? ")
 
-    assert(identifier ~= "", "Unexpected character: " .. c)
-    return identifier
+    -- Split by spaces
+    local next_token = str:gmatch("%S+")
+
+    return parse_expr(next_token)
 end
 
 
----@param file file*
----@return Lambda|nil
-local function parse(file)
-    local token = read_token(file)
-    if not token then return nil end
-
-    if token == "\\" then
-        local id = read_token(file)
-        assert(id and id:find("^[a-zA-Z0-9_]"), "Expected variable identifier")
-
-        token = read_token(file)
-        assert(token == ".", "Expected dot after abstraction variable")
-
-        local body = parse(file)
-        assert(body, "Expected abstraction body")
-
-        return abstract(id, body)
-    end
-
-    if token == "(" then
-        local left = parse(file)
-        assert(left, "Expected left application term")
-
-        local right = parse(file)
-        assert(right, "Expected right application term")
-
-        token = read_token(file)
-        assert(token == ")", "Expected closing parenthesis")
-
-        return apply(left, right)
-    end
-
-    return var(token)
+-- Represents a delayed computation of a lambda expression.
+function Closure(env, expr)
+    return { env = env, expr = expr }
 end
 
+-- Represents a variable binding in a function.
+-- * parent: next environment in the chain
+-- * name: variable name
+-- * value: Closure assigned to the variable
+-- * computed: whether the value has been computed and assigned (can be nil)
+function Env(parent, name, value, computed)
+    return { parent = parent, name = name, value = value, computed = computed }
+end
 
---- Represents a delayed computation of a lambda expression.
----@class Value
----@field env Environment
----@field expression Lambda
+local function run(closure)
+    -- Based on Krivine machine
+    -- Implements an optimization to avoid re-computing variable values
+    -- by updating the env when a variable is computed for the first time.
 
---- Represents a variable binding in an abstraction.
----@class Environment
----@field parent Environment|nil Next item in the environment chain
----@field name string Variable name
----@field value Value Variable value
----@field computed boolean|nil Optimization: if true, value is not recomputed
+    local stack = {}
 
-
----@param value Value
----@return Value
-local function eval(value)
-    -- Based on Krivine machine, but with an optimization to avoid
-    -- recomputing values for variables whose values have already been computed.
-    -- Without the optimization evaluation becomes very slow very quickly.
-
-    local stack = {} ---@type Value[] Data stack
-
-    -- Optimization: stores environments whose values have not been computed yet
-    local uncomputed_envs = {} ---@type Environment[]
-    local compute_locations = {} ---@type number[] Stack locations (sizes)
+    -- Stores envs whose values need to be computed and updated
+    local uncomputed_envs = {}
+    -- Positions in the stack of when those envs were scheduled
+    local compute_locations = {}
 
     while true do
-        if value.expression.type == "application" then
-            table.insert(stack, {
-                env = value.env,
-                expression = value.expression.right
-            })
-
-            value = {
-                env = value.env,
-                expression = value.expression.left
-            }
-        elseif value.expression.type == "abstraction" then
+        if closure.expr.type == "call" then
+            table.insert(stack, Closure(closure.env, closure.expr.right))
+            closure = Closure(closure.env, closure.expr.left)
+        elseif closure.expr.type == "function" then
             -- Optimization: assign the value to the corresponding variables
             while compute_locations[#compute_locations] == #stack do
                 table.remove(compute_locations)
                 local env = table.remove(uncomputed_envs)
-                env.value = value
+                env.value = closure -- Assigns the computed (optimized) value
                 env.computed = true
             end
 
@@ -161,224 +89,141 @@ local function eval(value)
                 break
             end
 
-            value = {
-                env = {
-                    parent = value.env,
-                    name = value.expression.variable,
-                    value = table.remove(stack)
-                },
-                expression = value.expression.body
-            }
-        elseif value.expression.type == "variable" then
-            while value.env and value.env.name ~= value.expression.name do
-                value = {
-                    env = value.env.parent,
-                    expression = value.expression
-                }
+            local argument = table.remove(stack)
+            local env = Env(closure.env, closure.expr.variable, argument)
+            closure = Closure(env, closure.expr.body)
+        elseif closure.expr.type == "variable" then
+            -- Find the environment where the variable is defined
+            local env = closure.env
+            while closure.env and env.name ~= closure.expr.name do
+                env = env.parent
             end
 
-            assert(value.env, "Unbound variable: " .. value.expression.name)
+            assert(env, "Unbound variable: " .. closure.expr.name)
 
             -- Optimization: assign a computed value to the environment later
-            if not value.env.computed then
-                table.insert(uncomputed_envs, value.env)
+            if not env.computed then
+                table.insert(uncomputed_envs, env)
                 table.insert(compute_locations, #stack)
             end
 
-            value = value.env.value
+            closure = env.value
         end
     end
 
-    return value
+    return closure
 end
 
+-- The text ensures that the variable cannot be defined
+local unreachable = Var("unreachable ¯\\_(ツ)_/¯")
 
--- '$' is added to avoid naming conflicts
-local unreachable = abstract("$unreachable", var("$unreachable"))
-local bit0 = abstract("$x0", abstract("$x1", var("$x0")))
-local bit1 = abstract("$x0", abstract("$x1", var("$x1")))
+local bit0 = parse("?x0?x1 x0")
+local bit1 = parse("?x0?x1 x1")
 
----@param value Value
----@return number
-local function decode_bit(value)
-    local expr = apply(apply(value.expression, bit0), bit1)
-    local res = eval({ env = value.env, expression = expr })
-    if res.expression == bit0 then return 0 end
-    if res.expression == bit1 then return 1 end
-    error("Decoding error: not a bit")
+local function bit_getter(bit_index)
+    return parse("?0?1?2?3?4?5?6?7 " .. bit_index)
 end
 
----@param bit number
----@return Lambda
-local function encode_bit(bit)
-    if bit == 0 then return bit0 else return bit1 end
-end
-
----@param value Value
----@return Value first, Value second
-local function decode_pair(value)
-    value = eval(value) -- Pre-compute as much as possible for both items
-
-    local first_expression = apply(value.expression, bit0)
-    local first = eval({ env = value.env, expression = first_expression })
-
-    local second_expression = apply(value.expression, bit1)
-    local second = eval({ env = value.env, expression = second_expression })
-
-    return first, second
-end
-
----@param first Lambda
----@param second Lambda
----@return Lambda
-local function encode_pair(first, second)
-    return abstract("$g", apply(apply(var("$g"), first), second))
-end
-
----@param value Value
----@return Value|nil
-local function decode_optional(value)
-    local has_data, data = decode_pair(value)
-    if decode_bit(has_data) == 1 then return data end
-    return nil
-end
-
----@param lambda Lambda|nil
----@return Lambda
-local function encode_optional(lambda)
-    if lambda then
-        return encode_pair(encode_bit(1), lambda)
+local function decode_bit(closure)
+    local expr = Call(Call(closure.expr, bit0), bit1)
+    local result = run(Closure(closure.env, expr))
+    if result.expr == bit0 then
+        return 0
+    elseif result.expr == bit1 then
+        return 1
     else
-        return encode_pair(encode_bit(0), unreachable)
+        error("Expected bit")
     end
 end
 
----@param value Value
----@return Value[]
-local function decode_list(value)
-    local list = {}
-    local current_node = value
-    while true do
-        local node = decode_optional(current_node)
-        if not node then break end
-
-        local item, next_node = decode_pair(node)
-        table.insert(list, item)
-
-        current_node = next_node
+local function encode_bit(bit)
+    if bit == 0 then
+        return bit0
+    elseif bit == 1 then
+        return bit1
+    else
+        error("Expected bit")
     end
-
-    return list
 end
 
----@param list Lambda[]
----@return Lambda
-local function encode_list(list)
-    local result = encode_optional(nil)
-    for i = #list, 1, -1 do
-        result = encode_optional(encode_pair(list[i], result))
+local function decode_byte(closure)
+    local result = 0
+    for i = 0, 7 do
+        local bit_expr = Call(closure.expr, bit_getter(i))
+        local bit = decode_bit(Closure(closure.env, bit_expr))
+        result = result + (bit * 2 ^ i)
     end
 
     return result
 end
 
----@param value Value
----@return number
-local function decode_number(value)
-    local bits = decode_list(value)
-
-    local number = 0
-    for i = #bits, 1, -1 do
-        number = (number * 2) + decode_bit(bits[i])
+local function encode_byte(byte)
+    local expr = Var("x")
+    for i = 0, 7 do
+        local bit = math.floor(byte / 2 ^ i) % 2
+        expr = Call(expr, encode_bit(bit))
     end
 
-    return number
+    return Fun("x", expr)
 end
 
----@param number number
----@return Lambda
-local function encode_number(number)
-    local bits = {}
-    for i = 1, 8 do
-        table.insert(bits, encode_bit(number % 2))
-        number = math.floor(number / 2)
-    end
+local function decode_pair(closure)
+    -- Avoid duplicate computations when evaluating the items
+    closure = run(closure)
 
-    return encode_list(bits)
+    local item0 = Closure(closure.env, Call(closure.expr, bit0))
+    local item1 = Closure(closure.env, Call(closure.expr, bit1))
+    return item0, item1
 end
 
----@param value Value
----@return string
-local function decode_string(value)
-    local chars = decode_list(value)
-    local str = ""
-    for i = 1, #chars do
-        str = str .. string.char(decode_number(chars[i]))
-    end
-
-    return str
+local function encode_pair(expr0, expr1)
+    return Fun("p", Call(Call(Var("p"), expr0), expr1))
 end
 
----@param program Value
----@return number command, Value payload
-local function decode_command(program)
-    local command, payload = decode_pair(program)
-    return decode_number(command), payload
+local function decode_optional(closure)
+    local has_data, data = decode_pair(closure)
+    return decode_bit(has_data) == 1 and data or nil
 end
 
----@param payload Value
----@return string output, Value continuation
-local function decode_output(payload)
-    local output, continuation = decode_pair(payload)
-    return decode_string(output), continuation
+local function encode_optional(expr)
+    return expr
+        and encode_pair(encode_bit(1), expr)
+        or encode_pair(encode_bit(0), unreachable)
 end
 
----@param input string|nil
----@param continuation Value
----@return Value program
-local function encode_input(input, continuation)
-    local input_lambda
-    if input then
-        input_lambda = encode_optional(encode_number(input:byte()))
-    else
-        input_lambda = encode_optional(nil)
-    end
-
-    return {
-        env = continuation.env,
-        expression = apply(continuation.expression, input_lambda)
-    }
-end
-
+local help_message =
+[[Lambda calculus interpreter based on WALC format
+Run with 'lua' (default), 'luajit', etc.:
+$ [<LUA_INTERPRETER>] ./lambda.lua <FILENAME>]]
 
 local function main()
     if #arg ~= 1 or arg[1] == "--help" then
-        print("Lambda calculus interpreter based on WALC format\n")
-        print("Usage: lambda.lua <FILENAME>")
+        print(help_message)
         return
     end
 
-    local file = io.open(arg[1])
-    assert(file, "Cannot open file " .. arg[1])
+    local source = io.open(arg[1]):read("*a")
+    local program = Closure(nil, parse(source))
 
-    local lambda = parse(file)
-    file:close()
-
-    if not lambda then return end -- Empty/blank file
-
-    local program = { env = nil, expression = lambda }
     while true do
-        local command, payload = decode_command(program)
+        local command = decode_optional(program)
+        if not command then return end
 
-        if command == 0 then
-            local output = decode_string(payload)
-            io.write(output)
-            io.flush()
+        local is_input, data = decode_pair(command)
+
+        if decode_bit(is_input) == 1 then
+            -- Input
+            local in_byte = io.read(1)
+            local input_expr = in_byte and encode_byte(string.byte(in_byte))
+            local input = encode_optional(input_expr)
+            program = Closure(data.env, Call(data.expr, input))
+        else
+            -- Output
+            local output, next_program = decode_pair(data)
+            local out_byte = decode_byte(output)
+            io.write(string.char(out_byte))
+            program = next_program
         end
-
-        if not continuation then break end
-
-        program = encode_input(io.read(1), continuation)
     end
 end
 

@@ -1,25 +1,24 @@
 # This program reads input and echoes it
 
-(\unreachable. (\0. (\1. (\pair. (\none. (\some. (\cons. (\empty. (\byte.
-(\READ_ALL. (\PRINT.
+!?Unreachable !?0 !?1 !?Pair !?None !?Some !?Left !?Right !?End !?Out !?In
 
-    # The program
-    ((pair ((cons READ_ALL) empty))
-        \input. ((pair ((cons PRINT) input))
-            \input. ((pair empty) unreachable)))
+!?program
+    !program program
+?program
+    !In ?input !! !input 0
+        # else
+        End
+        # then
+        !!Out !input 1 !program program
 
-((((((((byte 0)0)0)0)0)0)0)0) )# PRINT
-((((((((byte 0)1)0)0)0)0)0)0) )# READ_ALL
-
-\0.\1.\2.\3.\4.\5.\6.\7.
-    ((cons 0)((cons 1)((cons 2)((cons 3)((cons 4)((cons 5)((cons 6)((cons 7)
-        empty)))))))) )# byte
-
-none )# empty
-\x0.\x1. (some ((pair x0) x1)) )# cons
-\x. ((pair 1) x) )# some
-((pair 0) unreachable) )# none
-\x0.\x1.\g. ((g x0) x1) )# pair
-\x0.\x1.x1 )# 1
-\x0.\x1.x0 )# 0
-\x.x )# unreachable
+?input_handler !Some !Right input_handler # In
+?out_byte?next !Some !Left !!Pair out_byte next # Out
+None  # End
+?x !!Pair 1 x # Right
+?x !!Pair 0 x # Left
+?x !!Pair 1 x # Some
+!!Pair 0 Unreachable # None
+?x0?x1 ?p !!p x0 x1 # Pair
+?x0?x1 x1 # 1
+?x0?x1 x0 # 0
+?_ _ # Unreachable

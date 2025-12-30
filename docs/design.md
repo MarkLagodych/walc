@@ -17,7 +17,7 @@ let x = some_val in use_x<x>
 ```
 corresponds to this:
 ```
-(\x.use_x<x>  some_val)
+(λx.use_x<x>  some_val)
 ```
 
 ### If...else...
@@ -43,7 +43,7 @@ let f<x,y,z> = ...
 ```
 corresponds to:
 ```
-let f = \x.\y.\z. ...
+let f = λx.λy.λz. ...
 ```
 
 The lambda that gets the first argument `x` returns another lambda.
@@ -62,13 +62,13 @@ tuple<a, b, c>
 ```
 corresponds to:
 ```
-\getter. (((getter a) b) c)
+λgetter. (((getter a) b) c)
 ```
 
 The getter function can be either one of these three:
-* `\x0.\x1.\x2.x0`
-* `\x0.\x1.\x2.x1`
-* `\x0.\x1.\x2.x2`
+* `λx0.λx1.λx2.x0`
+* `λx0.λx1.λx2.x1`
+* `λx0.λx1.λx2.x2`
 
 To retrieve the needed item of the tuple, just apply a getter function to it:
 ```
@@ -101,7 +101,7 @@ in
 ```
 corresponds to:
 ```
-let f = \f.\x.\y.\z.
+let f = u3bbf.λx.λy.λz.
     ...use (f f)...
 in
     ... use ((((f f) 1) 2) 3)
@@ -137,7 +137,7 @@ and `next_state`) and `initial_state`:
 # There is no initial input, so put unreachable
 main = (((program program) initial_state) unreachable)
 
-program = \program.\state.\input.
+program = λprogram.λstate.λinput.
     let output, next_state = logic<state, input>
     in pair<output, ((program program) next_state)>
 ```

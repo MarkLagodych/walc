@@ -1,2 +1,2 @@
 # This is a minimal program that does nothing
-\p.((p \x0.\x1.x0) Unreachable)
+?p !!p  ?x0?x1 x0  ?_ _

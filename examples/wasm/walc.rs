@@ -3,33 +3,54 @@
 
 #[link(wasm_import_module = "walc")]
 unsafe extern "C" {
-    #[link_name = "print"]
-    fn walc_print(ptr: *const u8, len: usize);
-    #[link_name = "read"]
-    fn walc_read(ptr: *mut u8, len: usize) -> usize;
+    #[link_name = "output"]
+    fn walc_output(c: u8);
+    #[link_name = "input"]
+    fn walc_input() -> u32;
 }
 
-pub fn print(message: &str) {
-    unsafe { walc_print(message.as_ptr(), message.len()) }
-}
+const INVALID_FLAG: u32 = 0x100;
 
-pub fn read(buffer: &mut [u8]) -> usize {
-    unsafe { walc_read(buffer.as_mut_ptr(), buffer.len()) }
+pub fn print_byte(c: u8) {
+    unsafe { walc_output(c) }
 }
 
 pub fn read_byte() -> Option<u8> {
-    let mut buf = [0u8; 1];
-    match read(&mut buf) {
-        0 => None,
-        _ => Some(buf[0]),
+    let byte = unsafe { walc_input() };
+
+    if byte & INVALID_FLAG != 0 {
+        None
+    } else {
+        Some(byte as u8)
     }
+}
+
+pub fn print_buffer(buffer: &[u8]) {
+    for &byte in buffer {
+        print_byte(byte);
+    }
+}
+
+pub fn read_buffer(buffer: &mut [u8]) -> usize {
+    let mut count = 0;
+    for byte in buffer.iter_mut() {
+        match read_byte() {
+            Some(b) => {
+                *byte = b;
+                count += 1;
+            }
+            None => break,
+        }
+    }
+
+    count
 }
 
 pub fn read_all() -> Vec<u8> {
     let mut data = Vec::new();
     loop {
         let mut buf = [0u8; 1024];
-        let len = read(&mut buf);
+        let len = read_buffer(&mut buf);
         if len == 0 {
             break;
         }
@@ -40,9 +61,12 @@ pub fn read_all() -> Vec<u8> {
     data
 }
 
+pub fn print_string(s: &str) {
+    print_buffer(s.as_bytes());
+}
+
 pub fn read_string() -> Result<String, std::string::FromUtf8Error> {
-    let data = read_all();
-    String::from_utf8(data)
+    String::from_utf8(read_all())
 }
 
 pub fn read_line() -> Result<String, std::string::FromUtf8Error> {
@@ -60,12 +84,12 @@ pub fn read_line() -> Result<String, std::string::FromUtf8Error> {
 macro_rules! print {
     ($($arg:tt)*) => ({
         let s = format!($($arg)*);
-        print(&s);
+        print_string(&s);
     })
 }
 
 macro_rules! println {
-    () => (print("\n"));
+    () => (print_string("\n"));
     ($($arg:tt)*) => ({
         print!($($arg)*);
         println!();

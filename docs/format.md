@@ -4,13 +4,16 @@ This is the text format used by WALC and the interpreters.
 
 ## Syntax
 
+This format uses prefix Polish notation to avoid parentheses
+and make writing by hand easier.
+
 ```ebnf
 whitespace = ' ' | TAB | VT | FF | CR | LF ;
 comment = '#' (not LF)* LF ;
 variable = ('a'-'z' | 'A'-'Z' | '0'-'9' | '_')+ ;
-abstraction = '\' variable '.' term ;
-application = '(' term term ')' ;
-term = variable | function | application ;
+abstraction = '?' variable term ;
+application = '!' term term ;
+term = variable | abstraction | application ;
 ```
 
 Examples:
@@ -18,21 +21,17 @@ Examples:
 ```
 # Comment
 abc _hello_ 123 # Variables
-\x. x            # Abstraction
-(y y)           # Application
+?x y            # Abstraction: λx. y
+!f x            # Application: (f x)
 
-# Y combinator
-\f. ( \x.(f(x x)) \x.(f(x x)) )
+# Y combinator:
+# λf. ((λg. (g g)) (λx. (f (x x))))
+  ?f   !?g  !g g    ?x  !f !x x
+
+# Construct a pair and get the 0th element:
+# ((λp.  p (λf.f) (λg.g)) (λitem0.λitem1.item0))
+  ! ?p !!p  ?f f   ?g g    ?item0 ?item1 item0
 ```
-
-Backslashes `\` are used instead of lambdas `λ` for ASCII compatibility,
-they are simply easier to type on different computers.
-
-Omitting parentheses in applications (writing `x y z` instead of `((x y) z)`)
-is not allowed for ease of parsing.
-
-Notice that putting parentheses around abstractions (`(\x. x)`) is not possible
-because they are reserved for applications.
 
 ## Interpretation
 
@@ -47,22 +46,21 @@ function.
 The angle-bracket notation (e.g. `f<a,b,c>`) denotes a generic definition
 or a substitution into a definition.
 
-* `unreachable` is anything that should not be executed, e.g.
-    `__UNDEFINED_VARIABLE_WAKA_WAKA_1234__`.
+* `unreachable` is anything that should not be executed, e.g. `?_ _`.
 
     This is only used to fill in places that structurally
     require a value when the value is not important.
 
 * `bit` is either:
-    * `0` (`\x0.\x1.x0`)
-    * `1` (`\x0.\x1.x1`).
+    * `0` (`?x0?x1 x0`)
+    * `1` (`?x0?x1 x1`).
 
-* `byte` is `\g. ((((((((g bit0) bit1) bit2) bit3) bit4) bit5) bit6) bit7)`
+* `byte` is `?g !!!!!!!!g bit0 bit1 bit2 bit3 bit4 bit5 bit6 bit7`
 
-* `pair<x0,x1>` is `\f. ((f x0) x1)`.
+* `pair<x0,x1>` is `?f !!f x0 x1`.
 
     To get the 0th or the 1st element of a pair, just apply `0` or `1` to it:
-    `(my_pair 0)`, `(my_pair 1)`.
+    `!my_pair 0`, `!my_pair 1`.
 
 * `optional<a>` is `pair<bit,a>` and is either:
     * `some<a>`: `pair<1,a>`
@@ -79,7 +77,7 @@ or a substitution into a definition.
     When executing an output command, the interpreter writes the byte to STDOUT
     and proceeds interpreting the 1st item of the pair.
 
-* `input_command` is `\optional_input_byte. program`
+* `input_command` is `?optional_input_byte program`
 
     When executing a read command, the interpreter reads one byte from STDIN,
     applies it to the `input_command` (or `none` if failed to read from STDIN)
