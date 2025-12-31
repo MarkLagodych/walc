@@ -33,6 +33,10 @@ abc _hello_ 123 # Variables
   ! ?p !!p  ?f f   ?g g    ?item0 ?item1 item0
 ```
 
+### Syntax highlighting
+
+- [VSCode extension](https://github.com/MarkLagodych/walc-vscode-highlighting)
+
 ## Interpretation
 
 The input lambda expression must evaluate to a `program`.

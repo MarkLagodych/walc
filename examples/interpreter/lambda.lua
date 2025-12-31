@@ -213,15 +213,19 @@ local function main()
 
         if decode_bit(is_input) == 1 then
             -- Input
-            local in_byte = io.read(1)
-            local input_expr = in_byte and encode_byte(string.byte(in_byte))
+            local input_byte = io.read(1)
+
+            local input_expr = nil
+            if input_byte then
+                input_expr = encode_byte(string.byte(input_byte))
+            end
+
             local input = encode_optional(input_expr)
             program = Closure(data.env, Call(data.expr, input))
         else
             -- Output
             local output, next_program = decode_pair(data)
-            local out_byte = decode_byte(output)
-            io.write(string.char(out_byte))
+            io.write(string.char(decode_byte(output)))
             program = next_program
         end
     end

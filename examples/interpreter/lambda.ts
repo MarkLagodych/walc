@@ -1,9 +1,9 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S deno --allow-read
 
-/*  This is a simple lambda calculus interpreter based on the WALC format.
+// This is a simple lambda calculus interpreter based on the WALC format.
 
-    Copyright (c) 2025 Mark Lagodych
-    SPDX-License-Identifier: MIT */
+// Copyright (c) 2025 Mark Lagodych
+// SPDX-License-Identifier: MIT
 
 type Expr = Var | Fun | Call
 class Var { constructor(public name: string) {} }
@@ -176,11 +176,6 @@ function encode_optional(expr: Expr | null): Expr {
 import process from "node:process"
 import * as fs from "node:fs"
 
-const help_message =
-`Lambda calculus interpreter based on WALC format
-Run with 'npx tsx', 'deno --allow-read', 'bun' (default), etc.:
-$ [<TYPESCRIPT_INTERPRETER>] ./lambda.ts <FILENAME>`
-
 const args = process.argv.slice(2)
 
 function read_file(path: string): string {
@@ -196,6 +191,11 @@ function read_byte(): number | null {
     const length = fs.readSync(process.stdin.fd, buffer)
     return length == 1 ? buffer[0] : null
 }
+
+const help_message =
+`Lambda calculus interpreter based on WALC format
+Run with 'deno --allow-read' (default), 'tsx', 'bun', etc.:
+$ [<TYPESCRIPT_INTERPRETER>] ./lambda.ts <FILENAME>`
 
 function main() {
     if (args.length != 1 || args[0] == "--help") {
@@ -215,7 +215,7 @@ function main() {
         if (decode_bit(is_input) == 1) {
             // Input
             const byte = read_byte()
-            const input_expr = byte == null ? null : encode_byte(byte)
+            const input_expr = (byte == null) ? null : encode_byte(byte)
             const input = encode_optional(input_expr)
             program = new Closure(data.env, new Call(data.expr, input))
         } else {

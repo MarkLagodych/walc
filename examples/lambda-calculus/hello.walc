@@ -17,13 +17,13 @@
 ?g !!!!!!!!g 0 0 0 0 0 1 0 0 # space_
 
 ?input_handler !Some !Right input_handler # In
-?out_byte?next !Some !Left !!Pair out_byte next # Out
+?out_byte ?next !Some !Left !!Pair out_byte next # Out
 None  # End
 ?x !!Pair 1 x # Right
 ?x !!Pair 0 x # Left
 ?x !!Pair 1 x # Some
 !!Pair 0 Unreachable # None
-?x0?x1 ?p !!p x0 x1 # Pair
-?x0?x1 x1 # 1
-?x0?x1 x0 # 0
+?x0 ?x1 ?p !!p x0 x1 # Pair
+?x0 ?x1 x1 # 1
+?x0 ?x1 x0 # 0
 ?_ _ # Unreachable

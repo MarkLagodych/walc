@@ -3,21 +3,18 @@
 
 #[link(wasm_import_module = "walc")]
 unsafe extern "C" {
-    #[link_name = "output"]
-    fn walc_output(c: u8);
-    #[link_name = "input"]
-    fn walc_input() -> u32;
+    fn output(c: u8);
+    fn input() -> u32;
 }
 
 const INVALID_FLAG: u32 = 0x100;
 
 pub fn print_byte(c: u8) {
-    unsafe { walc_output(c) }
+    unsafe { output(c) }
 }
 
 pub fn read_byte() -> Option<u8> {
-    let byte = unsafe { walc_input() };
-
+    let byte = unsafe { input() };
     if byte & INVALID_FLAG != 0 {
         None
     } else {

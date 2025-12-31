@@ -1,0 +1,95 @@
+# This program prints "Hello world" 8192 times in a simple loop
+
+!?Unreachable !?0 !?1 !?Pair !?None !?Some !?Left !?Right !?End !?Out !?In
+!?space_ !?newline_ !?H_ !?e_ !?l_ !?o_ !?w_ !?r_ !?d_
+!?print_Hello_world_and_then
+
+!?cons !?empty
+
+!?number !?biteq !?add1 !?eq
+!?initial_state !?max_state !?program
+
+    !!program program  initial_state
+
+?program?state
+    !! !!!eq eq state max_state  # state == max_state?
+        # else
+        !?next_state
+            !print_Hello_world_and_then !!program program next_state
+        !!add1 add1 state  # next_state
+
+        # then
+        End
+ #program
+
+!!!!!!!!!!!!!number 0 0 0 0 0 0 0 0 0 0 0 0 1   # max_state
+!!!!!!!!!!!!!number 0 0 0 0 0 0 0 0 0 0 0 0 0   # initial_state
+
+?eq?a?b
+    !!!a 0 # Are there any bits left?
+        # no
+        1  # Equal
+        # yes
+        !!!!biteq !!a 1 0 !!b 1 0 # If least significant bits are equal
+            0  # else numbers are unequal
+            !!!eq eq !!a 1 1 !!b 1 1     # then compare tails
+ # eq: check if numbers are equal
+
+?add1?num
+    !!!num 0 # Are there any bits left?
+        # no
+        empty
+        # yes
+        !!!!num 1 0 # Is the least significant bit 1?
+            # no
+            !!cons 1 !!num 1 1 # Change the bit to 1 and leave the tail
+            # yes
+            !!cons 0 !!add1 add1 !!num 1 1 # Set to 0 and add 1 to tail
+ # add1: increment state
+
+?a?b
+    !!a
+        # a is 0
+        !!b
+            1   # b is 0
+            0   # b is 1
+        # a is 1
+        !!b
+            0   # b is 0
+            1   # b is 1
+ # biteq
+
+?0?1?2?3?4?5?6?7?8?9?a?b?c
+    !!cons 0 !!cons 1 !!cons 2 !!cons 3 !!cons 4 !!cons 5 !!cons 6
+        !!cons 7 !!cons 8 !!cons 9 !!cons a !!cons b !!cons c empty
+ # number
+
+
+None # empty
+?x ?y !Some !!Pair x y # cons
+
+?next !!Out H_ !!Out e_ !!Out l_ !!Out l_ !!Out o_ !!Out space_
+    !!Out w_ !!Out o_ !!Out r_ !!Out l_ !!Out d_ !!Out newline_ next
+# print_Hello_world_and_then
+
+?g !!!!!!!!g 0 0 1 0 0 1 1 0 # d_
+?g !!!!!!!!g 0 1 0 0 1 1 1 0 # r_
+?g !!!!!!!!g 1 1 1 0 1 1 1 0 # w_
+?g !!!!!!!!g 1 1 1 1 0 1 1 0 # o_
+?g !!!!!!!!g 0 0 1 1 0 1 1 0 # l_
+?g !!!!!!!!g 1 0 1 0 0 1 1 0 # e_
+?g !!!!!!!!g 0 0 0 1 0 0 1 0 # H_
+?g !!!!!!!!g 0 1 0 1 0 0 0 0 # newline_
+?g !!!!!!!!g 0 0 0 0 0 1 0 0 # space_
+
+?input_handler !Some !Right input_handler # In
+?out_byte ?next !Some !Left !!Pair out_byte next # Out
+None  # End
+?x !!Pair 1 x # Right
+?x !!Pair 0 x # Left
+?x !!Pair 1 x # Some
+!!Pair 0 Unreachable # None
+?x0 ?x1 ?p !!p x0 x1 # Pair
+?x0 ?x1 x1 # 1
+?x0 ?x1 x0 # 0
+?_ _ # Unreachable
