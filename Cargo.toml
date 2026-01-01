@@ -8,6 +8,7 @@ description = "WebAssembly to Lambda Calculus compiler"
 
 [dependencies.wasmparser]
 version = "^0.243"
+features = ["std"] # Ignore validation, SIMD, and WASM components
 
 [dependencies.clap]
 version = "^4.5"

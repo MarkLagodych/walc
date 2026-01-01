@@ -13,5 +13,6 @@ pub struct Args {
 }
 
 pub fn parse_args() -> Args {
+    use clap::Parser;
     Args::parse()
 }

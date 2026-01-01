@@ -22,12 +22,6 @@ pub fn read_byte() -> Option<u8> {
     }
 }
 
-pub fn print_buffer(buffer: &[u8]) {
-    for &byte in buffer {
-        print_byte(byte);
-    }
-}
-
 pub fn read_buffer(buffer: &mut [u8]) -> usize {
     let mut count = 0;
     for byte in buffer.iter_mut() {
@@ -43,46 +37,42 @@ pub fn read_buffer(buffer: &mut [u8]) -> usize {
     count
 }
 
-pub fn read_all() -> Vec<u8> {
-    let mut data = Vec::new();
-    loop {
-        let mut buf = [0u8; 1024];
-        let len = read_buffer(&mut buf);
-        if len == 0 {
-            break;
-        }
-
-        data.extend_from_slice(&buf[..len]);
-    }
-
-    data
-}
-
 pub fn print_string(s: &str) {
-    print_buffer(s.as_bytes());
+    for &byte in s.as_bytes() {
+        print_byte(byte);
+    }
 }
 
 pub fn read_string() -> Result<String, std::string::FromUtf8Error> {
-    String::from_utf8(read_all())
-}
-
-pub fn read_line() -> Result<String, std::string::FromUtf8Error> {
-    let mut line = Vec::new();
+    let mut buffer = Vec::new();
     loop {
         match read_byte() {
-            Some(b'\n') => break,
-            Some(byte) => line.push(byte),
+            Some(byte) => buffer.push(byte),
             None => break,
         }
     }
-    String::from_utf8(line)
+
+    String::from_utf8(buffer)
+}
+
+pub fn read_line() -> Result<String, std::string::FromUtf8Error> {
+    let mut buffer = Vec::new();
+    loop {
+        match read_byte() {
+            Some(b'\n') => break,
+            Some(byte) => buffer.push(byte),
+            None => break,
+        }
+    }
+
+    String::from_utf8(buffer)
 }
 
 macro_rules! print {
     ($($arg:tt)*) => ({
         let s = format!($($arg)*);
         print_string(&s);
-    })
+    });
 }
 
 macro_rules! println {
@@ -90,5 +80,28 @@ macro_rules! println {
     ($($arg:tt)*) => ({
         print!($($arg)*);
         println!();
-    })
+    });
+}
+
+macro_rules! eprint {
+    ($($arg:tt)*) => ({
+        println!($($arg)*);
+    });
+}
+
+macro_rules! eprintln {
+    () => {
+        println!()
+    };
+    ($($arg:tt)*) => {{
+        println!($($arg)*);
+    }};
+}
+
+macro_rules! read {
+    () => {{ read_string().expect("Cannot read UTF-8 string") }};
+}
+
+macro_rules! readln {
+    () => {{ read_line().expect("Cannot read UTF-8 string") }};
 }

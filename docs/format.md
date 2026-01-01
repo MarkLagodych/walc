@@ -5,7 +5,8 @@ This is the text format used by WALC and the interpreters.
 ## Syntax
 
 This format uses prefix Polish notation to avoid parentheses
-and make writing by hand easier.
+and make the parser as small as possible.
+Also, this makes writing by hand a bit easier as it is shorter to type.
 
 ```ebnf
 whitespace = ' ' | TAB | VT | FF | CR | LF ;
@@ -16,22 +17,24 @@ application = '!' term term ;
 term = variable | abstraction | application ;
 ```
 
-Examples:
+### Examples
 
 ```
 # Comment
 abc _hello_ 123 # Variables
 ?x y            # Abstraction: λx. y
-!f x            # Application: (f x)
+!f x            # Application: f x
 
 # Y combinator:
 # λf. ((λg. (g g)) (λx. (f (x x))))
   ?f   !?g  !g g    ?x  !f !x x
 
 # Construct a pair and get the 0th element:
-# ((λp.  p (λf.f) (λg.g)) (λitem0.λitem1.item0))
-  ! ?p !!p  ?f f   ?g g    ?item0 ?item1 item0
+# ((λp.  ((p (λf.f)) (λg.g))) (λitem0.λitem1.item0))
+  ! ?p   !!p  ?f f    ?g g     ?item0 ?item1 item0
 ```
+
+See more examples in the [examples directory](../examples/lambda-calculus/).
 
 ### Syntax highlighting
 
@@ -78,16 +81,22 @@ or a substitution into a definition.
 
 * `output_command` is `pair<byte, program>`
 
-    When executing an output command, the interpreter writes the byte to STDOUT
-    and proceeds interpreting the 1st item of the pair.
+    When executing an output command, the interpreter writes the byte (the 0th
+    item of the pair) to STDOUT and proceeds interpreting the 1st item of
+    the pair.
 
 * `input_command` is `?optional_input_byte program`
 
-    When executing a read command, the interpreter reads one byte from STDIN,
-    applies it to the `input_command` (or `none` if failed to read from STDIN)
-    and proceeds interpreting the result.
+    When executing an input command, the interpreter reads one byte from STDIN,
+    constructs an `optional` out of it (or `none` if failed to read from STDIN),
+    applies it to the `input_command` and proceeds interpreting the result.
 
 * `program` is `optional<either<output_command,input_command>>`
 
     If the program is `none`, the interpreter finishes.
     Otherwise, it executes the given command (either input or output).
+
+### Examples
+
+See example interpreters written in several programming languages in
+the [examples directory](../examples/interpreter/).
