@@ -4,43 +4,42 @@ This is the text format used by WALC and the interpreters.
 
 ## Syntax
 
-This format uses prefix Polish notation to avoid parentheses
-and make the parser as small as possible.
-Also, this makes writing by hand a bit easier as it is shorter to type.
+The only special part is that this format uses `[]` for abstractions instead of
+`λ` or `\`.
+That is simpler to parse and easier to debug.
+
+Also, `;` comments are compatible with virtually any Lisp syntax highlighting
+in code editors.
 
 ```ebnf
 whitespace = ' ' | TAB | VT | FF | CR | LF ;
-comment = '#' (not LF)* LF ;
+comment = ';' (not LF)* LF ;
 variable = ('a'-'z' | 'A'-'Z' | '0'-'9' | '_')+ ;
-abstraction = '?' variable term ;
-application = '!' term term ;
+abstraction = '[' variable term ']' ;
+application = '(' term term ')' ;
 term = variable | abstraction | application ;
 ```
 
 ### Examples
 
 ```
-# Comment
-abc _hello_ 123 # Variables
-?x y            # Abstraction: λx. y
-!f x            # Application: f x
+; Comment
+abc _hello_ 123 ; Variables
+[x y]           ; Abstraction: λx. y
+(f x)           ; Application: f x
 
-# Y combinator:
-# λf. ((λg. (g g)) (λx. (f (x x))))
-  ?f   !?g  !g g    ?x  !f !x x
+; Y combinator:
+[f ([g (g g)] [x (f (x x))])]
 
-# Construct a pair and get the 0th element:
-# ((λp.  ((p (λf.f)) (λg.g))) (λitem0.λitem1.item0))
-  ! ?p   !!p  ?f f    ?g g     ?item0 ?item1 item0
+; Construct a pair and get the 0th element:
+([p ((p [foo foo]) (bar bar))] [item0[item1 item0]])
 ```
 
 See more examples in the [examples directory](../examples/lambda-calculus/).
 
-### Syntax highlighting
-
-- [VSCode extension](https://github.com/MarkLagodych/walc-vscode-highlighting)
-
 ## Interpretation
+
+The input lambda expression must not contain unbound variables.
 
 The input lambda expression must evaluate to a `program`.
 
@@ -53,21 +52,21 @@ function.
 The angle-bracket notation (e.g. `f<a,b,c>`) denotes a generic definition
 or a substitution into a definition.
 
-* `unreachable` is anything that should not be executed, e.g. `?_ _`.
+* `unreachable` is anything that should not be executed, e.g. `[_ _]`.
 
     This is only used to fill in places that structurally
     require a value when the value is not important.
 
 * `bit` is either:
-    * `0` (`?x0?x1 x0`)
-    * `1` (`?x0?x1 x1`).
+    * `0` (`[x0[x1 x0]]`)
+    * `1` (`[x0[x1 x1]]`).
 
-* `byte` is `?g !!!!!!!!g bit0 bit1 bit2 bit3 bit4 bit5 bit6 bit7`
+* `byte` is `[g ((((((((g bit0) bit1) bit2) bit3) bit4) bit5) bit6) bit7)]`
 
-* `pair<x0,x1>` is `?f !!f x0 x1`.
+* `pair<x0,x1>` is `[f ((f x0) x1)]`.
 
     To get the 0th or the 1st element of a pair, just apply `0` or `1` to it:
-    `!my_pair 0`, `!my_pair 1`.
+    `(my_pair 0)`, `(my_pair 1)`.
 
 * `optional<a>` is `pair<bit,a>` and is either:
     * `some<a>`: `pair<1,a>`
@@ -85,7 +84,7 @@ or a substitution into a definition.
     item of the pair) to STDOUT and proceeds interpreting the 1st item of
     the pair.
 
-* `input_command` is `?optional_input_byte program`
+* `input_command` is `[optional_input_byte program]`
 
     When executing an input command, the interpreter reads one byte from STDIN,
     constructs an `optional` out of it (or `none` if failed to read from STDIN),

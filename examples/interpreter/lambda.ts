@@ -2,7 +2,7 @@
 
 // This is a simple lambda calculus interpreter based on the WALC format.
 
-// Copyright (c) 2025 Mark Lagodych
+// Copyright (c) 2025-2026 Mark Lagodych
 // SPDX-License-Identifier: MIT
 
 type Expr = Var | Fun | Call
@@ -10,30 +10,37 @@ class Var { constructor(public name: string) {} }
 class Fun { constructor(public variable: string, public body: Expr) {} }
 class Call { constructor(public left: Expr, public right: Expr) {} }
 
-// ( whitespace | comment )* ( "!" | "?" | <identifier> )
-const token_regex = /(\s|(#.*\n))*(?<token>[!?]|\w+)/y
+function parse_expr(next_token: () => string): Expr {
+    const token = next_token()
 
-function parse_token(input: string): string {
-    const match = token_regex.exec(input)
-    if (!match) throw new Error("Expected token")
-    return match.groups!.token
-}
+    if (token == "[") {
+        const variable = next_token()
+        const body = parse_expr(next_token)
+        if (next_token() != "]") throw new Error("Expected ']'")
+        return new Fun(variable, body)
+    }
 
-function parse_expr(input: string): Expr {
-    const token = parse_token(input)
-
-    if (token == "?")
-        return new Fun(parse_token(input), parse_expr(input))
-
-    if (token == "!")
-        return new Call(parse_expr(input), parse_expr(input))
+    if (token == "(") {
+        const left = parse_expr(next_token)
+        const right = parse_expr(next_token)
+        if (next_token() != ")") throw new Error("Expected ')'")
+        return new Call(left, right)
+    }
 
     return new Var(token)
 }
 
 function parse(input: string): Expr {
-    token_regex.lastIndex = 0 // Reset the regex
-    return parse_expr(input)
+    // ( whitespace | comment )* ( "(" | ")" | "[" | "]" | <identifier> )
+    const token_regex = /(\s|(;.*\n))*(?<token>[()\[\]]|\w+)/y
+
+    function next_token(): string {
+        const match = token_regex.exec(input)
+        if (!match) throw new Error("Expected token")
+        return match.groups!.token
+    }
+
+    return parse_expr(next_token)
 }
 
 // Represents a suspended computation of an expression
@@ -51,9 +58,9 @@ class Env {
 }
 
 function run(closure: Closure): Closure {
-    /*  Based on Krivine machine.
-        Implements an optimization to avoid re-computing variable values
-        by updating the env when a variable is computed for the first time. */
+    // Based on Krivine machine.
+    // Implements an optimization to avoid re-computing variable values
+    // by updating the env when a variable is computed for the first time.
 
     const stack: Closure[] = []
 
@@ -76,7 +83,8 @@ function run(closure: Closure): Closure {
                 env.computed = true
             }
 
-            if (stack.length == 0) return closure
+            if (stack.length == 0)
+                break
 
             const argument = stack.pop()!
             const env = new Env(closure.env, closure.expr.variable, argument)
@@ -98,16 +106,18 @@ function run(closure: Closure): Closure {
             closure = env.value
         }
     }
+
+    return closure
 }
 
-// The text ensures that the variable cannot be defined
+// The text ensures that the variable will be undefined and thus cause an error
 const unreachable = new Var("unreachable ¯\\_(ツ)_/¯")
 
-const bit0 = parse("?x0?x1 x0")
-const bit1 = parse("?x0?x1 x1")
+const bit0 = parse("[x0[x1 x0]]")
+const bit1 = parse("[x0[x1 x1]]")
 
 const bit_getter = (bit_index: number): Expr =>
-    parse(`?0?1?2?3?4?5?6?7 ${bit_index}`)
+    parse(`[0[1[2[3[4[5[6[7 ${bit_index}]]]]]]]]`)
 
 function decode_bit(closure: Closure): number {
     const expr = new Call(new Call(closure.expr, bit0), bit1)

@@ -3,7 +3,7 @@
 -- This is a simple lambda calculus interpreter based on the WALC format.
 -- Runs on LuaJIT 2.1 / Lua 5.1.
 
--- Copyright (c) 2025 Mark Lagodych
+-- Copyright (c) 2025-2026 Mark Lagodych
 -- SPDX-License-Identifier: MIT
 
 local function Var(name)
@@ -22,10 +22,16 @@ end
 local function parse_expr(next_token)
     local token = next_token()
 
-    if token == "?" then
-        return Fun(next_token(), parse_expr(next_token))
-    elseif token == "!" then
-        return Call(parse_expr(next_token), parse_expr(next_token))
+    if token == "[" then
+        local variable = next_token()
+        local body = parse_expr(next_token)
+        assert(next_token() == "]", "Expected ']'")
+        return Fun(variable, body)
+    elseif token == "(" then
+        local left = parse_expr(next_token)
+        local right = parse_expr(next_token)
+        assert(next_token() == ")", "Expected ')'")
+        return Call(left, right)
     else
         return Var(token)
     end
@@ -33,11 +39,13 @@ end
 
 local function parse(str)
     -- Replace comments with spaces
-    str = str:gsub("#[^\n]*\n", " ")
+    str = str:gsub(";[^\n]*\n", " ")
 
-    -- Add spaces around tokens
-    str = str:gsub("!", " ! ")
-    str = str:gsub("%?", " ? ")
+    -- Add spaces around brackets
+    str = str:gsub("%(", " ( ")
+    str = str:gsub("%)", " ) ")
+    str = str:gsub("%[", " [ ")
+    str = str:gsub("%]", " ] ")
 
     -- Split by spaces
     local next_token = str:gmatch("%S+")
@@ -95,7 +103,7 @@ local function run(closure)
         elseif closure.expr.type == "variable" then
             -- Find the environment where the variable is defined
             local env = closure.env
-            while closure.env and env.name ~= closure.expr.name do
+            while env and env.name ~= closure.expr.name do
                 env = env.parent
             end
 
@@ -114,14 +122,14 @@ local function run(closure)
     return closure
 end
 
--- The text ensures that the variable cannot be defined
+-- The text ensures that the variable will be undefined and thus cause an error
 local unreachable = Var("unreachable ¯\\_(ツ)_/¯")
 
-local bit0 = parse("?x0?x1 x0")
-local bit1 = parse("?x0?x1 x1")
+local bit0 = parse("[x0[x1 x0]]")
+local bit1 = parse("[x0[x1 x1]]")
 
 local function bit_getter(bit_index)
-    return parse("?0?1?2?3?4?5?6?7 " .. bit_index)
+    return parse("[0[1[2[3[4[5[6[7 " .. bit_index .. "]]]]]]]]")
 end
 
 local function decode_bit(closure)

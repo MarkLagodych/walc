@@ -1,22 +1,22 @@
-# This program prints "λ" (lambda symbol) encoded in UTF-8
+; This program prints "λ" (lambda symbol) encoded in UTF-8
 
-!?Unreachable !?0 !?1 !?Pair !?None !?Some !?Left !?Right !?End !?Out !?In
-!?newline_ !?0xCE !?0xBB
+([Unreachable ([0 ([1 ([Pair ([None ([Some ([Left ([Right ([End ([Out ([In
+([newline_ ([0xCE ([0xBB
 
-    !!Out 0xCE !!Out 0xBB !!Out newline_ End
+    ((Out 0xCE) ((Out 0xBB) ((Out newline_) End)))
 
-?g !!!!!!!!g 1 1 0 1 1 1 0 1 # 0xBB
-?g !!!!!!!!g 0 1 1 1 0 0 1 1 # 0xCE
-?g !!!!!!!!g 0 1 0 1 0 0 0 0 # newline_
+] [g ((((((((g 1)1)0)1)1)1)0)1)] ) ; 0xBB
+] [g ((((((((g 0)1)1)1)0)0)1)1)] ) ; 0xCE
+] [g ((((((((g 0)1)0)1)0)0)0)0)] ) ; newline_
 
-?input_handler !Some !Right input_handler # In
-?out_byte ?next !Some !Left !!Pair out_byte next # Out
-None  # End
-?x !!Pair 1 x # Right
-?x !!Pair 0 x # Left
-?x !!Pair 1 x # Some
-!!Pair 0 Unreachable # None
-?x0 ?x1 ?p !!p x0 x1 # Pair
-?x0 ?x1 x1 # 1
-?x0 ?x1 x0 # 0
-?_ _ # Unreachable
+] [input_handler (Some (Right input_handler))] ) ; In
+] [out_byte [next (Some (Left ((Pair out_byte) next)))]] ) ; Out
+] None ) ; End
+] [x ((Pair 1) x)] ) ; Right
+] [x ((Pair 0) x)] ) ; Left
+] [x ((Pair 1) x)] ) ; Some
+] ((Pair 0) Unreachable) ) ; None
+] [x0 [x1 [p ((p x0) x1)]]] ) ; Pair
+] [x0 [x1 x1]] ) ; 1
+] [x0 [x1 x0]] ) ; 0
+] [_ _] ) ; Unreachable

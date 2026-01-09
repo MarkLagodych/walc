@@ -1,24 +1,24 @@
-# This program reads input and echoes it
+; This program reads input and echoes it
 
-!?Unreachable !?0 !?1 !?Pair !?None !?Some !?Left !?Right !?End !?Out !?In
+([Unreachable ([0 ([1 ([Pair ([None ([Some ([Left ([Right ([End ([Out ([In
 
-!?program
-    !program program
-?program
-    !In ?input !! !input 0
-        # else
-        End
-        # then
-        !!Out !input 1 !program program
+([program
+    (program program)
+] [program
+    (In [input (( (input 0)
+        ; else
+        End)
+        ; then
+        ((Out (input 1)) (program program)))])] ) ; program
 
-?input_handler !Some !Right input_handler # In
-?out_byte?next !Some !Left !!Pair out_byte next # Out
-None  # End
-?x !!Pair 1 x # Right
-?x !!Pair 0 x # Left
-?x !!Pair 1 x # Some
-!!Pair 0 Unreachable # None
-?x0?x1 ?p !!p x0 x1 # Pair
-?x0?x1 x1 # 1
-?x0?x1 x0 # 0
-?_ _ # Unreachable
+] [input_handler (Some (Right input_handler))] ) ; In
+] [out_byte [next (Some (Left ((Pair out_byte) next)))]] ) ; Out
+] None ) ; End
+] [x ((Pair 1) x)] ) ; Right
+] [x ((Pair 0) x)] ) ; Left
+] [x ((Pair 1) x)] ) ; Some
+] ((Pair 0) Unreachable) ) ; None
+] [x0 [x1 [p ((p x0) x1)]]] ) ; Pair
+] [x0 [x1 x1]] ) ; 1
+] [x0 [x1 x0]] ) ; 0
+] [_ _] ) ; Unreachable

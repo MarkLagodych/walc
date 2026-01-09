@@ -1,93 +1,94 @@
-# This program prints "Hello world" 1024 times with an O(N^2) algorithm
-# Its state is initially an empty list.
-# On each iteration it:
-# 1. appends an item to the list
-# 2. compares the list to a long predefined list with 1024 items (in O(N) time)
-# If the lists are not equal, it prints "Hello world" and continues
-# When the lists get equal, it terminates
+; This program prints "Hello world" 1024 times with an O(N^2) algorithm
+; Its state is initially an empty list.
+; On each iteration it:
+; 1. appends an item to the list
+; 2. compares the list to a long predefined list with 1024 items (in O(N) time)
+; If the lists are not equal, it prints "Hello world" and continues
+; When the lists get equal, it terminates
 
-!?Unreachable !?0 !?1 !?Pair !?None !?Some !?Left !?Right !?End !?Out !?In
-!?space_ !?newline_ !?H_ !?e_ !?l_ !?o_ !?w_ !?r_ !?d_
-!?print_Hello_world_and_then
+([Unreachable ([0 ([1 ([Pair ([None ([Some ([Left ([Right ([End ([Out ([In
+([space_ ([newline_ ([H_ ([e_ ([l_ ([o_ ([w_ ([r_ ([d_
+([print_Hello_world_and_then
 
-!?cons !?empty
+([cons ([empty
 
-!?lists_not_eq
+([lists_not_eq
 
-!?append1 !?append2 !?append4 !?append8 !?append16 !?append32 !?append64
-!?append128 !?append256 !?append512 !?append1024
+([append1 ([append2 ([append4 ([append8 ([append16 ([append32 ([append64
+([append128 ([append256 ([append512 ([append1024
 
-!?very_long_list
+([very_long_list
 
-!?initial_state !?iterate !?should_continue
+([initial_state ([iterate ([should_continue
 
-!?program
+([program
 
-    # Entrypoint
-    !!program program initial_state
+    ; Entrypoint
+    ((program program) initial_state)
 
-?program ?state
-    !! !should_continue state
-        # else
-        End
-        # then
-        !print_Hello_world_and_then !!program program !iterate state
-# program
+] [program [state
+    (( (should_continue state)
+        ; else
+        End)
+        ; then
+        (print_Hello_world_and_then ((program program) (iterate state))))]]
+); program
 
-?state !!!lists_not_eq lists_not_eq state very_long_list # should_continue
-?state !!cons 1 state # iterate: append 1 item
-empty # initial_state: no items
+] [state (((lists_not_eq lists_not_eq) state) very_long_list)] );should_continue
+] [state ((cons 1) state)] ) ; iterate: append 1 item
+] empty ) ; initial_state: no items
 
-!append1024 empty # very_long_list
-?list !append512 !append512 list # append1024
-?list !append256 !append256 list # append512
-?list !append128 !append128 list # append256
-?list !append64 !append64 list # append128
-?list !append32 !append32 list # append64
-?list !append16 !append16 list # append32
-?list !append8 !append8 list # append16
-?list !append4 !append4 list # append8
-?list !append2 !append2 list # append4
-?list !append1 !append1 list # append2
-?list !!cons 1 list # append1
+] (append1024 empty) ) ; very_long_list
+] [list (append512  (append512  list))] ) ; append1024
+] [list (append256  (append256  list))] ) ; append512
+] [list (append128  (append128  list))] ) ; append256
+] [list (append64   (append64   list))] ) ; append128
+] [list (append32   (append32   list))] ) ; append64
+] [list (append16   (append16   list))] ) ; append32
+] [list (append8    (append8    list))] ) ; append16
+] [list (append4    (append4    list))] ) ; append8
+] [list (append2    (append2    list))] ) ; append4
+] [list (append1    (append1    list))] ) ; append2
+] [list ((cons 1) list)] ) ; append1
 
-?lists_not_eq ?left ?right # This assumes that right cannot be shorter
-    !! !left 0 # Does left have items?
-        # no
-        !! !right 0 # Does right have items?
-            # no
-            0 # The lists are equal
-            # yes
-            1 # Right is longer
-        # yes
-        !!!lists_not_eq lists_not_eq !!left 1 1 !!right 1 1 # compare tails
-# lists_not_eq
+] [lists_not_eq [left [right ; This assumes that right cannot be shorter
+    (( (left 0) ; Does left have items?
+        ; no
+        (( (right 0) ; Does right have items?
+            ; no
+            0) ; The lists are equal
+            ; yes
+            1)) ; Right is longer
+        ; yes
+        ; compare tails
+        (((lists_not_eq lists_not_eq) ((left 1) 1)) ((right 1) 1)))]]]
+) ; lists_not_eq
 
-None # empty
-?x ?y !Some !!Pair x y # cons
+] None ) ; empty
+] [x [y (Some ((Pair x) y))]] ) ; cons
 
-?next !!Out H_ !!Out e_ !!Out l_ !!Out l_ !!Out o_ !!Out space_
-    !!Out w_ !!Out o_ !!Out r_ !!Out l_ !!Out d_ !!Out newline_ next
-# print_Hello_world_and_then
+] [next ((Out H_) ((Out e_) ((Out l_) ((Out l_) ((Out o_) ((Out space_)
+    ((Out w_) ((Out o_) ((Out r_) ((Out l_) ((Out d_) ((Out newline_) next)
+        )))))))))))] ) ; print_Hello_world_and_then
 
-?g !!!!!!!!g 0 0 1 0 0 1 1 0 # d_
-?g !!!!!!!!g 0 1 0 0 1 1 1 0 # r_
-?g !!!!!!!!g 1 1 1 0 1 1 1 0 # w_
-?g !!!!!!!!g 1 1 1 1 0 1 1 0 # o_
-?g !!!!!!!!g 0 0 1 1 0 1 1 0 # l_
-?g !!!!!!!!g 1 0 1 0 0 1 1 0 # e_
-?g !!!!!!!!g 0 0 0 1 0 0 1 0 # H_
-?g !!!!!!!!g 0 1 0 1 0 0 0 0 # newline_
-?g !!!!!!!!g 0 0 0 0 0 1 0 0 # space_
+] [g ((((((((g 0)0)1)0)0)1)1)0)] ); d_
+] [g ((((((((g 0)1)0)0)1)1)1)0)] ); r_
+] [g ((((((((g 1)1)1)0)1)1)1)0)] ); w_
+] [g ((((((((g 1)1)1)1)0)1)1)0)] ); o_
+] [g ((((((((g 0)0)1)1)0)1)1)0)] ); l_
+] [g ((((((((g 1)0)1)0)0)1)1)0)] ); e_
+] [g ((((((((g 0)0)0)1)0)0)1)0)] ); H_
+] [g ((((((((g 0)1)0)1)0)0)0)0)] ); newline_
+] [g ((((((((g 0)0)0)0)0)1)0)0)] ); space_
 
-?input_handler !Some !Right input_handler # In
-?out_byte ?next !Some !Left !!Pair out_byte next # Out
-None  # End
-?x !!Pair 1 x # Right
-?x !!Pair 0 x # Left
-?x !!Pair 1 x # Some
-!!Pair 0 Unreachable # None
-?x0 ?x1 ?p !!p x0 x1 # Pair
-?x0 ?x1 x1 # 1
-?x0 ?x1 x0 # 0
-?_ _ # Unreachable
+] [input_handler (Some (Right input_handler))] ) ; In
+] [out_byte [next (Some (Left ((Pair out_byte) next)))]] ) ; Out
+] None ) ; End
+] [x ((Pair 1) x)] ) ; Right
+] [x ((Pair 0) x)] ) ; Left
+] [x ((Pair 1) x)] ) ; Some
+] ((Pair 0) Unreachable) ) ; None
+] [x0 [x1 [p ((p x0) x1)]]] ) ; Pair
+] [x0 [x1 x1]] ) ; 1
+] [x0 [x1 x0]] ) ; 0
+] [_ _] ) ; Unreachable

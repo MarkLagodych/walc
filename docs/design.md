@@ -13,11 +13,11 @@ functional programming languages like ML, OCaml, or Haskell.
 ### Define a variable
 
 ```
-let x = some_val in use_x<x>
+let x = some_val in do_something<x>
 ```
 corresponds to this:
 ```
-(λx.use_x<x>  some_val)
+([x do_something<x>] some_val)
 ```
 
 ### If...else...
@@ -43,7 +43,7 @@ let f<x,y,z> = ...
 ```
 corresponds to:
 ```
-let f = λx.λy.λz. ...
+let f = [x[y[z ...]]]
 ```
 
 The lambda that gets the first argument `x` returns another lambda.
@@ -66,9 +66,9 @@ corresponds to:
 ```
 
 The getter function can be either one of these three:
-* `λx0.λx1.λx2.x0`
-* `λx0.λx1.λx2.x1`
-* `λx0.λx1.λx2.x2`
+* `[x0[x1[x2 x0]]]`
+* `[x0[x1[x2 x1]]]`
+* `[x0[x1[x2 x2]]]`
 
 To retrieve the needed item of the tuple, just apply a getter function to it:
 ```
@@ -101,8 +101,8 @@ in
 ```
 corresponds to:
 ```
-let f = u3bbf.λx.λy.λz.
-    ...use (f f)...
+let f = [f[x[y[z
+    ...use (f f)...]]]]
 in
     ... use ((((f f) 1) 2) 3)
 ```
@@ -118,12 +118,9 @@ Assuming that we have `next_state<prev_state,i>`, `should_break<state>`:
 ```
 let loop<state, i, max> =
     if i = max then
-        state   # stop
+        state   ; break
     else
-        if should_break<state> then
-            state   # break
-        else
-            loop<next_state<state,i>, i+1, max>  # continue
+        loop<next_state<state,i>, i+1, max>  ; continue
 ```
 
 To compute the loop, simply use `loop<initial_state, 0, max>`.
@@ -183,12 +180,9 @@ To remove from a tree, just assign its element to `none`.
 
 ### Code
 
-Every WASM program is a list of instructions that are executed sequentially.
-Thus code instructions are stored in a linked list.
+TODO
 
-However, there exist branching instructions that can jump to (almost) arbitrary
-other instructions.
-To be able to efficiently jump, the compiler stores all addressable
+To be able to efficiently jump, the compiler stores all backward-addressable
 instructions in variables and constructs an array of them that is then
 addressed by branching instructions at runtime.
 

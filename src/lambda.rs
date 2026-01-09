@@ -17,10 +17,10 @@ impl std::fmt::Display for Lambda {
         match self {
             Lambda::Variable { name } => write!(f, "{}", name),
             Lambda::Abstraction { variable, body } => {
-                write!(f, "?{} {}", variable, body)
+                write!(f, "[{} {}]", variable, body)
             }
             Lambda::Apply { left, right } => {
-                write!(f, "!{} {}", left, right)
+                write!(f, "({} {})", left, right)
             }
         }
     }
