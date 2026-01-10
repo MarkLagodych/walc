@@ -14,8 +14,8 @@ panic = "abort"
 
 [[bin]]
 name = "hello"
-path = "src/hello.rs"
+path = "hello.rs"
 
 [[bin]]
 name = "echo"
-path = "src/echo.rs"
+path = "echo.rs"
