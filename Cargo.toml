@@ -6,9 +6,9 @@ authors = ["Mark Lagodych"]
 license = "MIT"
 description = "WebAssembly to Lambda Calculus compiler"
 
-[dependencies.wasmparser]
-version = "^0.243"
-features = ["std"] # Ignore validation, SIMD, and WASM components
+[dependencies.wasmbin]
+version = "^0.8"
+features = [] # Ignore validation, SIMD, and WASM components
 
 [dependencies.clap]
 version = "^4.5"

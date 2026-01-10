@@ -4,5 +4,5 @@ Build:
 
 ```sh
 rustup target add wasm32-unknown-unknown
-cargo build --target wasm32-unknown-unknown --profile release
+cargo install --path . --root . --profile release --target wasm32-unknown-unknown --no-track
 ```

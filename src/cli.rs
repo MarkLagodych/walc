@@ -9,7 +9,7 @@ pub struct Args {
 
     /// Output lambda calculus file
     #[arg(short)]
-    pub output_file: Option<String>,
+    pub output_file: String,
 }
 
 pub fn parse_args() -> Args {

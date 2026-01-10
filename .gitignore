@@ -9,19 +9,8 @@
 *.swp
 
 # Build/output directories and files
-*.out
-*.o
-*.obj
-*.exe
-out/
-build/
-build-*/
-_build/
 target/
 node_modules/
-dist/
-bin/
 __*__/
-*.wasm
 
 examples/wasm/Cargo.lock
