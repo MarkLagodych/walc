@@ -1,20 +1,21 @@
 #![allow(dead_code)]
+#![allow(unused)]
 #![macro_use]
 
 #[link(wasm_import_module = "walc")]
 unsafe extern "C" {
-    fn output(c: u8);
-    fn input() -> u32;
+    safe fn output(c: u8);
+    safe fn input() -> u32;
 }
 
 const INVALID_FLAG: u32 = 0x100;
 
 pub fn print_byte(c: u8) {
-    unsafe { output(c) }
+    output(c)
 }
 
 pub fn read_byte() -> Option<u8> {
-    let byte = unsafe { input() };
+    let byte = input();
     if byte & INVALID_FLAG != 0 {
         None
     } else {
@@ -37,6 +38,16 @@ pub fn read_buffer(buffer: &mut [u8]) -> usize {
     count
 }
 
+pub fn read_allocated() -> Vec<u8> {
+    let mut buffer = Vec::new();
+
+    while let Some(byte) = read_byte() {
+        buffer.push(byte);
+    }
+
+    buffer
+}
+
 pub fn print_string(s: &str) {
     for &byte in s.as_bytes() {
         print_byte(byte);
@@ -44,25 +55,17 @@ pub fn print_string(s: &str) {
 }
 
 pub fn read_string() -> Result<String, std::string::FromUtf8Error> {
-    let mut buffer = Vec::new();
-    loop {
-        match read_byte() {
-            Some(byte) => buffer.push(byte),
-            None => break,
-        }
-    }
-
-    String::from_utf8(buffer)
+    String::from_utf8(read_allocated())
 }
 
 pub fn read_line() -> Result<String, std::string::FromUtf8Error> {
     let mut buffer = Vec::new();
-    loop {
-        match read_byte() {
-            Some(b'\n') => break,
-            Some(byte) => buffer.push(byte),
-            None => break,
+
+    while let Some(byte) = read_byte() {
+        if byte == b'\n' {
+            break;
         }
+        buffer.push(byte);
     }
 
     String::from_utf8(buffer)
@@ -96,12 +99,4 @@ macro_rules! eprintln {
     ($($arg:tt)*) => {{
         println!($($arg)*);
     }};
-}
-
-macro_rules! read {
-    () => {{ read_string().expect("Cannot read UTF-8 string") }};
-}
-
-macro_rules! readln {
-    () => {{ read_line().expect("Cannot read UTF-8 string") }};
 }

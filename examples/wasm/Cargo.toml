@@ -15,3 +15,7 @@ panic = "abort"
 [[bin]]
 name = "hello"
 path = "hello.rs"
+
+[[bin]]
+name = "echo"
+path = "echo.rs"
