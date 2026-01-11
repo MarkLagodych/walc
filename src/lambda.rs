@@ -1,6 +1,3 @@
-#![allow(clippy::let_and_return)]
-#![allow(clippy::just_underscores_and_digits)]
-
 #[derive(Debug, Clone)]
 pub enum Lambda {
     Variable {
@@ -50,24 +47,9 @@ pub fn call(function: Lambda, argument: Lambda) -> Lambda {
     }
 }
 
-pub fn funx(variables: &[&str], body: Lambda) -> Lambda {
-    let mut result = body;
-    for &variable in variables.iter().rev() {
-        result = fun(variable, result);
-    }
-    result
-}
-
-pub fn callx(function: Lambda, arguments: impl Iterator<Item = Lambda>) -> Lambda {
-    let mut result = function;
-    for argument in arguments {
-        result = call(result, argument);
-    }
-    result
-}
-
-pub fn call_recursive(function: Lambda, argument: Lambda) -> Lambda {
-    callx(function.clone(), [function, argument].into_iter())
+/// Applies the function to itself so that it can be called recursively
+pub fn rec(function: Lambda) -> Lambda {
+    call(function.clone(), function)
 }
 
 pub fn define(root: Lambda, variable: &str, value: Lambda) -> Lambda {
@@ -87,14 +69,14 @@ pub fn bit(b: bool) -> Lambda {
 }
 
 pub fn cond(condition: Lambda, then_branch: Lambda, else_branch: Lambda) -> Lambda {
-    callx(condition, [else_branch, then_branch].into_iter())
+    call(call(condition, else_branch), then_branch)
 }
 
 pub mod pair {
     use super::*;
 
     pub fn new(first: Lambda, second: Lambda) -> Lambda {
-        fun("P", callx(var("P"), [first, second].into_iter()))
+        fun("P", call(call(var("P"), first), second))
     }
 
     pub fn get_first(pair: Lambda) -> Lambda {
@@ -146,64 +128,104 @@ pub mod optional {
     }
 }
 
-fn number_const(le_bytes: &[u8]) -> Lambda {
-    let mut result = var("N");
-    for byte in le_bytes {
-        let mut byte = *byte;
-        for _ in 0..8 {
-            result = call(result, bit(byte & 1 == 1));
-            byte >>= 1;
+pub mod number {
+    use super::*;
+
+    fn number_const(le_bytes: &[u8]) -> Lambda {
+        let mut result = var("N");
+        for byte in le_bytes {
+            let mut byte = *byte;
+            for _ in 0..8 {
+                result = call(result, bit(byte & 1 == 1));
+                byte >>= 1;
+            }
         }
+
+        fun("N", result)
     }
 
-    fun("N", result)
+    pub fn u8_const(n: u8) -> Lambda {
+        number_const(&n.to_le_bytes())
+    }
+
+    pub fn u32_const(n: u32) -> Lambda {
+        number_const(&n.to_le_bytes())
+    }
+
+    pub fn u64_const(n: u64) -> Lambda {
+        number_const(&n.to_le_bytes())
+    }
+
+    pub fn f32_const(n: f32) -> Lambda {
+        number_const(&n.to_le_bytes())
+    }
+
+    pub fn f64_const(n: f64) -> Lambda {
+        number_const(&n.to_le_bytes())
+    }
+
+    pub fn to_bit_list_be32(number: Lambda) -> Lambda {
+        call(var("ToBitsBE32"), number)
+    }
 }
 
-pub fn u8_const(n: u8) -> Lambda {
-    number_const(&n.to_le_bytes())
+pub mod list {
+    use super::*;
+
+    pub fn empty() -> Lambda {
+        optional::none()
+    }
+
+    pub fn cons(head: Lambda, tail: Lambda) -> Lambda {
+        optional::some(pair::new(head, tail))
+    }
+
+    pub fn is_not_empty(list: Lambda) -> Lambda {
+        optional::is_some(list)
+    }
+
+    pub fn head(list: Lambda) -> Lambda {
+        pair::get_first(optional::unwrap(list))
+    }
+
+    pub fn tail(list: Lambda) -> Lambda {
+        pair::get_second(optional::unwrap(list))
+    }
 }
 
-pub fn u32_const(n: u32) -> Lambda {
-    number_const(&n.to_le_bytes())
+pub mod tree {
+    use super::*;
+
+    pub fn new(left: Lambda, right: Lambda) -> Lambda {
+        pair::new(left, right)
+    }
+
+    pub fn get_left(tree: Lambda) -> Lambda {
+        pair::get_first(tree)
+    }
+
+    pub fn get_right(tree: Lambda) -> Lambda {
+        pair::get_second(tree)
+    }
 }
 
-pub fn u64_const(n: u64) -> Lambda {
-    number_const(&n.to_le_bytes())
+pub mod array {
+    use super::*;
+
+    pub fn new() -> Lambda {
+        var("Array32")
+    }
+
+    pub fn index(array: Lambda, index: Lambda) -> Lambda {
+        call(index, array)
+    }
+
+    pub fn insert(array: Lambda, index: Lambda, value: Lambda) -> Lambda {
+        call(call(var("ArrayInsert"), index), call(array, value))
+    }
 }
 
-pub fn f32_const(n: f32) -> Lambda {
-    number_const(&n.to_le_bytes())
-}
-
-pub fn f64_const(n: f64) -> Lambda {
-    number_const(&n.to_le_bytes())
-}
-
-pub fn define_prelude(root: Lambda) -> Lambda {
-    let _0 = funx(&["x0", "x1"], var("x0"));
-    let _1 = funx(&["x0", "x1"], var("x1"));
-
-    let _end = optional::none();
-
-    let _out = funx(
-        &["out_byte", "next"],
-        optional::some(either::left(pair::new(var("out_byte"), var("next")))),
-    );
-
-    let _in = fun(
-        "input_handler",
-        optional::some(either::right(var("input_handler"))),
-    );
-
-    let root = define(root, "In", _in);
-    let root = define(root, "Out", _out);
-    let root = define(root, "End", _end);
-    let root = define(root, "1", _1);
-    let root = define(root, "0", _0);
-    root
-}
-
-pub mod walc {
+pub mod walc_command {
     use super::*;
 
     pub fn end() -> Lambda {
@@ -211,7 +233,7 @@ pub mod walc {
     }
 
     pub fn output(root: Lambda, out_byte: Lambda) -> Lambda {
-        callx(var("Out"), [out_byte, root].into_iter())
+        call(call(var("Out"), out_byte), root)
     }
 
     pub fn input(root_input_handler: Lambda) -> Lambda {
@@ -219,14 +241,125 @@ pub mod walc {
     }
 }
 
-pub fn compile_wasm(m: crate::wasm::Module) -> Lambda {
-    let root = walc::end();
-    let root = walc::output(root, u8_const(b'o'));
-    let root = walc::output(root, u8_const(b'l'));
-    let root = walc::output(root, u8_const(b'l'));
-    let root = walc::output(root, u8_const(b'e'));
-    let root = walc::output(root, u8_const(b'H'));
+pub fn define_prelude(mut root: Lambda) -> Lambda {
+    root = define_array_utils(root);
+    root = define_walc_commands(root);
+    root = define_number_utils(root);
+    root = define_bits(root);
+    root
+}
 
-    let root = define_prelude(root);
+fn define_bits(mut root: Lambda) -> Lambda {
+    root = define(root, "0", fun("x0", fun("x1", var("x0"))));
+    root = define(root, "1", fun("x0", fun("x1", var("x1"))));
+    root
+}
+
+fn define_number_utils(mut root: Lambda) -> Lambda {
+    root = define_to_bits_be32(root);
+
+    root
+}
+
+fn define_to_bits_be32(mut root: Lambda) -> Lambda {
+    let mut expr = list::empty();
+
+    for i in 0..32 {
+        let bit_name = format!("b{}", i);
+        expr = list::cons(var(&bit_name), expr);
+    }
+
+    for i in (0..32).rev() {
+        let bit_name = format!("b{}", i);
+        expr = fun(&bit_name, expr);
+    }
+
+    root = define(root, "ToBitsBE32", expr);
+
+    root
+}
+
+fn define_walc_commands(mut root: Lambda) -> Lambda {
+    let expr = optional::some(either::right(var("input_handler")));
+    let expr = fun("input_handler", expr);
+    root = define(root, "In", expr);
+
+    let expr = optional::some(either::left(pair::new(var("out_byte"), var("next"))));
+    let expr = fun("out_byte", fun("next", expr));
+    root = define(root, "Out", expr);
+
+    root = define(root, "End", optional::none());
+
+    root
+}
+
+fn define_array_utils(mut root: Lambda) -> Lambda {
+    root = define_array_templates(root);
+    root = define_array_insert(root);
+
+    root
+}
+
+fn define_array_templates(mut root: Lambda) -> Lambda {
+    // Array numbers represent the number of bits used to address them.
+    // Array1 is addressable by 1 bit (2 elements)
+    // Array17 is addressable by 17 bits
+    // Array32 is addressable by 32 bits
+
+    for i in (2..32).rev() {
+        let array_name = format!("Array{}", i);
+        let smaller_array_name = format!("Array{}", i - 1);
+
+        root = define(
+            root,
+            &array_name,
+            tree::new(var(&smaller_array_name), var(&smaller_array_name)),
+        );
+    }
+
+    root = define(
+        root,
+        "Array1",
+        tree::new(var("ArrayDefaultItem_"), var("ArrayDefaultItem_")),
+    );
+
+    root = define(root, "ArrayDefaultItem_", number::u8_const(0));
+
+    root
+}
+
+fn define_array_insert(mut root: Lambda) -> Lambda {
+    let call_array_insert_rec =
+        |array, index, value| call(call(call(rec(var("ArrayInsert_")), array), index), value);
+
+    let expr = cond(
+        list::is_not_empty(var("index")),
+        cond(
+            list::head(var("index")),
+            call_array_insert_rec(
+                tree::get_left(var("array")),
+                list::tail(var("index")),
+                var("value"),
+            ),
+            call_array_insert_rec(
+                tree::get_right(var("array")),
+                list::tail(var("index")),
+                var("value"),
+            ),
+        ),
+        var("value"),
+    );
+
+    let expr = fun("array", fun("index", fun("value", expr)));
+    root = define_recursive(root, "ArrayInsert_", expr);
+
+    let expr = call_array_insert_rec(
+        var("array"),
+        number::to_bit_list_be32(var("index")),
+        var("value"),
+    );
+    let expr = fun("array", fun("index", fun("value", expr)));
+    root = define(root, "ArrayInsert", expr);
+
     root
 }

@@ -1,48 +1,34 @@
-use wasmbin::{Module as Wasm, indices::*, sections::*};
+use crate::lambda::{self, Lambda};
 
-#[derive(Debug)]
-pub struct Module {
-    pub main: FuncId,
-    pub functions: Vec<FuncBody>,
-}
+use wasmbin::{indices::*, instructions::*, sections::*, *};
 
-impl Module {
-    pub fn decode(wasm_source: &[u8]) -> Self {
-        let module = Wasm::decode_from(wasm_source).unwrap();
+fn find_main(m: &Module) -> FuncId {
+    for section in &m.sections {
+        if let Section::Export(exports) = section {
+            let exports = exports.try_contents().unwrap();
 
-        let mut functions = vec![];
-        let mut main = None;
-
-        for section in module.sections {
-            match section {
-                Section::Export(exports) => {
-                    let exports = exports.try_contents().unwrap();
-
-                    for export in exports {
-                        if export.name == "main"
-                            && let ExportDesc::Func(func_id) = export.desc
-                        {
-                            main = Some(func_id);
-                        }
-                    }
+            for export in exports {
+                if export.name == "main"
+                    && let ExportDesc::Func(func_id) = export.desc
+                {
+                    return func_id;
                 }
-
-                Section::Code(code_section) => {
-                    let code_section = code_section.try_contents().unwrap();
-
-                    for function_body in code_section {
-                        let function_body = function_body.try_contents().unwrap().clone();
-                        functions.push(function_body);
-                    }
-                }
-
-                _ => {}
             }
         }
-
-        Self {
-            main: main.expect("no main function found"),
-            functions,
-        }
     }
+
+    panic!("no main function found");
+}
+
+pub fn compile(m: &Module) -> Lambda {
+    let mut root = lambda::walc_command::end();
+    root = lambda::walc_command::output(root, lambda::number::u8_const(b'o'));
+    root = lambda::walc_command::output(root, lambda::number::u8_const(b'l'));
+    root = lambda::walc_command::output(root, lambda::number::u8_const(b'l'));
+    root = lambda::walc_command::output(root, lambda::number::u8_const(b'e'));
+    root = lambda::walc_command::output(root, lambda::number::u8_const(b'H'));
+
+    root = lambda::define_prelude(root);
+
+    root
 }
