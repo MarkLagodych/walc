@@ -131,8 +131,20 @@ pub mod optional {
 pub mod number {
     use super::*;
 
+    fn bytes_to_hex_string(le_bytes: &[u8]) -> String {
+        String::from("0x")
+            + &le_bytes
+                .iter()
+                .rev()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join("")
+    }
+
     fn number_const(le_bytes: &[u8]) -> Lambda {
-        let mut result = var("N");
+        let hex_string = bytes_to_hex_string(le_bytes);
+
+        let mut result = var(&hex_string);
         for byte in le_bytes {
             let mut byte = *byte;
             for _ in 0..8 {
@@ -141,7 +153,7 @@ pub mod number {
             }
         }
 
-        fun("N", result)
+        fun(&hex_string, result)
     }
 
     pub fn u8_const(n: u8) -> Lambda {
