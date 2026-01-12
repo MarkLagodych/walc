@@ -1,3 +1,5 @@
+#![macro_use]
+
 #[derive(Debug, Clone)]
 pub enum Lambda {
     Variable {
@@ -33,35 +35,57 @@ pub fn var(name: &str) -> Lambda {
     }
 }
 
-pub fn fun(variable: &str, body: Lambda) -> Lambda {
+fn fun(variable: &str, body: Lambda) -> Lambda {
     Lambda::Abstraction {
         variable: variable.to_string(),
         body: Box::new(body),
     }
 }
 
-pub fn call(function: Lambda, argument: Lambda) -> Lambda {
+macro_rules! fun {
+    ($var1:expr, $var2:expr, $($rest:expr),+ ) => {
+        fun($var1, fun!($var2, $($rest),+))
+    };
+    ($var:expr, $body:expr) => {
+        fun($var, $body)
+    };
+}
+
+fn call(function: Lambda, argument: Lambda) -> Lambda {
     Lambda::Application {
         left: Box::new(function),
         right: Box::new(argument),
     }
 }
 
+macro_rules! call {
+    ($func:expr, $arg:expr, $($rest:expr),+) => {
+        call!(call($func, $arg), $($rest),+)
+    };
+    ($func:expr, $arg:expr) => {
+        call($func, $arg)
+    };
+}
+
 /// Applies the function to itself so that it can be called recursively
 pub fn rec(function: Lambda) -> Lambda {
-    call(function.clone(), function)
+    call!(function.clone(), function)
 }
 
 pub fn define(root: Lambda, variable: &str, value: Lambda) -> Lambda {
-    call(fun(variable, root), value)
+    call!(fun!(variable, root), value)
 }
 
-pub fn define_recursive(root: Lambda, variable: &str, value: Lambda) -> Lambda {
-    call(fun(variable, root), fun(variable, value))
+pub fn define_recursive(root: Lambda, function_name: &str, body: Lambda) -> Lambda {
+    call!(fun!(function_name, root), fun!(function_name, body))
 }
 
 pub fn unreachable() -> Lambda {
-    fun("_", var("_"))
+    if cfg!(feature = "unbound-unreachable") {
+        var("__UNREACHABLE__")
+    } else {
+        fun!("_", var("_"))
+    }
 }
 
 pub fn bit(b: bool) -> Lambda {
@@ -69,22 +93,22 @@ pub fn bit(b: bool) -> Lambda {
 }
 
 pub fn cond(condition: Lambda, then_branch: Lambda, else_branch: Lambda) -> Lambda {
-    call(call(condition, else_branch), then_branch)
+    call!(condition, else_branch, then_branch)
 }
 
 pub mod pair {
     use super::*;
 
     pub fn new(first: Lambda, second: Lambda) -> Lambda {
-        fun("P", call(call(var("P"), first), second))
+        fun!("P", call!(var("P"), first, second))
     }
 
-    pub fn get_first(pair: Lambda) -> Lambda {
-        call(pair, var("0"))
+    pub fn get_left(pair: Lambda) -> Lambda {
+        call!(pair, var("0"))
     }
 
-    pub fn get_second(pair: Lambda) -> Lambda {
-        call(pair, var("1"))
+    pub fn get_right(pair: Lambda) -> Lambda {
+        call!(pair, var("1"))
     }
 }
 
@@ -100,11 +124,11 @@ pub mod either {
     }
 
     pub fn is_right(either: Lambda) -> Lambda {
-        pair::get_first(either)
+        pair::get_left(either)
     }
 
     pub fn unwrap(either: Lambda) -> Lambda {
-        pair::get_second(either)
+        pair::get_right(either)
     }
 }
 
@@ -148,7 +172,7 @@ pub mod number {
         for byte in le_bytes {
             let mut byte = *byte;
             for _ in 0..8 {
-                result = call(result, bit(byte & 1 == 1));
+                result = call!(result, bit(byte & 1 == 1));
                 byte >>= 1;
             }
         }
@@ -177,18 +201,18 @@ pub mod number {
     }
 
     pub fn to_bit_list_be32(number: Lambda) -> Lambda {
-        call(var("ToBitsBE32"), number)
+        call!(var("ToBitsBE32"), number)
     }
 }
 
-pub mod list {
+pub mod dyn_list {
     use super::*;
 
     pub fn empty() -> Lambda {
         optional::none()
     }
 
-    pub fn cons(head: Lambda, tail: Lambda) -> Lambda {
+    pub fn node(head: Lambda, tail: Lambda) -> Lambda {
         optional::some(pair::new(head, tail))
     }
 
@@ -196,48 +220,69 @@ pub mod list {
         optional::is_some(list)
     }
 
-    pub fn head(list: Lambda) -> Lambda {
-        pair::get_first(optional::unwrap(list))
+    pub fn get_head(list: Lambda) -> Lambda {
+        pair::get_left(optional::unwrap(list))
     }
 
-    pub fn tail(list: Lambda) -> Lambda {
-        pair::get_second(optional::unwrap(list))
-    }
-}
-
-pub mod tree {
-    use super::*;
-
-    pub fn new(left: Lambda, right: Lambda) -> Lambda {
-        pair::new(left, right)
-    }
-
-    pub fn get_left(tree: Lambda) -> Lambda {
-        pair::get_first(tree)
-    }
-
-    pub fn get_right(tree: Lambda) -> Lambda {
-        pair::get_second(tree)
+    pub fn get_tail(list: Lambda) -> Lambda {
+        pair::get_right(optional::unwrap(list))
     }
 }
 
-pub mod array {
+pub mod list {
     use super::*;
 
-    pub fn new() -> Lambda {
+    pub fn empty() -> Lambda {
+        unreachable()
+    }
+
+    pub fn node(head: Lambda, tail: Lambda) -> Lambda {
+        pair::new(head, tail)
+    }
+
+    pub fn get_head(list: Lambda) -> Lambda {
+        pair::get_left(list)
+    }
+
+    pub fn get_tail(list: Lambda) -> Lambda {
+        pair::get_right(list)
+    }
+}
+
+pub mod array_tree {
+    use super::*;
+
+    pub fn default() -> Lambda {
         var("Array32")
     }
 
+    pub fn node(left: Lambda, right: Lambda) -> Lambda {
+        pair::new(left, right)
+    }
+
+    pub fn get_left(array: Lambda) -> Lambda {
+        pair::get_left(array)
+    }
+
+    pub fn get_right(array: Lambda) -> Lambda {
+        pair::get_right(array)
+    }
+
     pub fn index(array: Lambda, index: Lambda) -> Lambda {
-        call(index, array)
+        call!(index, array)
     }
 
     pub fn insert(array: Lambda, index: Lambda, value: Lambda) -> Lambda {
-        call(call(var("ArrayInsert"), index), call(array, value))
+        call!(
+            var("ArrayInsert32"),
+            array,
+            number::to_bit_list_be32(index),
+            value
+        )
     }
 }
 
-pub mod walc_command {
+pub mod walc_io {
     use super::*;
 
     pub fn end() -> Lambda {
@@ -245,25 +290,25 @@ pub mod walc_command {
     }
 
     pub fn output(root: Lambda, out_byte: Lambda) -> Lambda {
-        call(call(var("Out"), out_byte), root)
+        call!(var("Out"), out_byte, root)
     }
 
     pub fn input(root_input_handler: Lambda) -> Lambda {
-        call(var("In"), root_input_handler)
+        call!(var("In"), root_input_handler)
     }
 }
 
 pub fn define_prelude(mut root: Lambda) -> Lambda {
     root = define_array_utils(root);
-    root = define_walc_commands(root);
+    root = define_walc_io(root);
     root = define_number_utils(root);
     root = define_bits(root);
     root
 }
 
 fn define_bits(mut root: Lambda) -> Lambda {
-    root = define(root, "0", fun("x0", fun("x1", var("x0"))));
-    root = define(root, "1", fun("x0", fun("x1", var("x1"))));
+    root = define(root, "0", fun!("x0", "x1", var("x0")));
+    root = define(root, "1", fun!("x0", "x1", var("x1")));
     root
 }
 
@@ -278,7 +323,7 @@ fn define_to_bits_be32(mut root: Lambda) -> Lambda {
 
     for i in 0..32 {
         let bit_name = format!("b{}", i);
-        expr = list::cons(var(&bit_name), expr);
+        expr = list::node(var(&bit_name), expr);
     }
 
     for i in (0..32).rev() {
@@ -291,14 +336,25 @@ fn define_to_bits_be32(mut root: Lambda) -> Lambda {
     root
 }
 
-fn define_walc_commands(mut root: Lambda) -> Lambda {
-    let expr = optional::some(either::right(var("input_handler")));
-    let expr = fun("input_handler", expr);
-    root = define(root, "In", expr);
+fn define_walc_io(mut root: Lambda) -> Lambda {
+    root = define(
+        root,
+        "In",
+        fun!(
+            "input_handler",
+            optional::some(either::right(var("input_handler")))
+        ),
+    );
 
-    let expr = optional::some(either::left(pair::new(var("out_byte"), var("next"))));
-    let expr = fun("out_byte", fun("next", expr));
-    root = define(root, "Out", expr);
+    root = define(
+        root,
+        "Out",
+        fun!(
+            "out_byte",
+            "next",
+            optional::some(either::left(pair::new(var("out_byte"), var("next"))))
+        ),
+    );
 
     root = define(root, "End", optional::none());
 
@@ -313,65 +369,63 @@ fn define_array_utils(mut root: Lambda) -> Lambda {
 }
 
 fn define_array_templates(mut root: Lambda) -> Lambda {
-    // Array numbers represent the number of bits used to address them.
-    // Array1 is addressable by 1 bit (2 elements)
-    // Array17 is addressable by 17 bits
-    // Array32 is addressable by 32 bits
+    // The number indicates the depth of the tree, i.e. the number of bits in the index
 
-    for i in (2..32).rev() {
-        let array_name = format!("Array{}", i);
-        let smaller_array_name = format!("Array{}", i - 1);
-
+    for i in (1..=32).rev() {
         root = define(
             root,
-            &array_name,
-            tree::new(var(&smaller_array_name), var(&smaller_array_name)),
+            &format!("Array{}", i),
+            array_tree::node(
+                var(&format!("Array{}", i - 1)),
+                var(&format!("Array{}", i - 1)),
+            ),
         );
     }
 
-    root = define(
-        root,
-        "Array1",
-        tree::new(var("ArrayDefaultItem_"), var("ArrayDefaultItem_")),
-    );
-
-    root = define(root, "ArrayDefaultItem_", number::u8_const(0));
+    root = define(root, "Array0", number::u8_const(b'a'));
 
     root
 }
 
 fn define_array_insert(mut root: Lambda) -> Lambda {
-    let call_array_insert_rec =
-        |array, index, value| call(call(call(rec(var("ArrayInsert_")), array), index), value);
-
-    let expr = cond(
-        list::is_not_empty(var("index")),
-        cond(
-            list::head(var("index")),
-            call_array_insert_rec(
-                tree::get_left(var("array")),
-                list::tail(var("index")),
-                var("value"),
+    for i in (1..=32).rev() {
+        root = define(
+            root,
+            &format!("ArrayInsert{}", i),
+            fun!(
+                "array",
+                "index",
+                "value",
+                cond(
+                    list::get_head(var("index")),
+                    array_tree::node(
+                        array_tree::get_left(var("array")),
+                        call!(
+                            var(&format!("ArrayInsert{}", i - 1)),
+                            array_tree::get_right(var("array")),
+                            list::get_tail(var("index")),
+                            var("value")
+                        )
+                    ),
+                    array_tree::node(
+                        call!(
+                            var(&format!("ArrayInsert{}", i - 1)),
+                            array_tree::get_left(var("array")),
+                            list::get_tail(var("index")),
+                            var("value")
+                        ),
+                        array_tree::get_right(var("array")),
+                    ),
+                )
             ),
-            call_array_insert_rec(
-                tree::get_right(var("array")),
-                list::tail(var("index")),
-                var("value"),
-            ),
-        ),
-        var("value"),
-    );
+        );
+    }
 
-    let expr = fun("array", fun("index", fun("value", expr)));
-    root = define_recursive(root, "ArrayInsert_", expr);
-
-    let expr = call_array_insert_rec(
-        var("array"),
-        number::to_bit_list_be32(var("index")),
-        var("value"),
+    root = define(
+        root,
+        "ArrayInsert0",
+        fun!("array", "index", "value", var("value")),
     );
-    let expr = fun("array", fun("index", fun("value", expr)));
-    root = define(root, "ArrayInsert", expr);
 
     root
 }
