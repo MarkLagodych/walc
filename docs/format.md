@@ -61,7 +61,7 @@ or a substitution into a definition.
     * `0` (`[x0[x1 x0]]`)
     * `1` (`[x0[x1 x1]]`).
 
-* `byte` is `[g ((((((((g bit0) bit1) bit2) bit3) bit4) bit5) bit6) bit7)]`
+* `byte` is `[g ((((((((g bit7) bit6) bit5) bit4) bit3) bit2) bit1) bit0)]`
 
 * `pair<x0,x1>` is `[f ((f x0) x1)]`.
 

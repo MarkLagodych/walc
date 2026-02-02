@@ -1,11 +1,12 @@
 ; This program prints "Hello world", but the code is slightly obfuscated :D
 
-([o([O([Q([c([C((Q[g((((((((g o)o)o)O)o)o)O)o)])
-((Q[g((((((((g O)o)O)o)o)O)O)o)])((Q c)((Q c)((Q
-C)((Q[g((((((((g o)o)o)o)o)O)o)o)])((Q[g((((((((
-g O)O)O)o)O)O)O)o)])((Q C)((Q[g((((((((g o)O)o)o
-)O)O)O)o)])((Q c)((Q[g((((((((g o)o)O)o)o)O)O)o)
-])((Q[g((((((((g o)O)o)O)o)o)o)o)])[q((q o)[o o]
-)]))))))))))))][g((((((((g O)O)O)O)o)O)O)o)])][g
-((((((((g o)o)O)O)o)O)O)o)])][e[a[q((q O)[q((q o
+([o([O([Q([c([C((Q[g((((((((g o)O)o)o)O)o)o)o)])
+((Q[g((((((((g o)O)O)o)o)O)o)O)])((Q c)((Q c)((Q
+C)((Q[g((((((((g o)o)O)o)o)o)o)o)])((Q[g((((((((
+g o)O)O)O)o)O)O)O)])((Q C)((Q[g((((((((g o)O)O)O
+)o)o)O)o)])((Q c)((Q[g((((((((g o)O)O)o)o)O)o)o)
+])((Q[g((((((((g o)o)o)o)O)o)O)o)])[q((q o)[o o]
+)]))))))))))))][g((((((((g o)O)O)o)O)O)O)O)])][g
+((((((((g o)O)O)o)O)O)o)o)])][e[a[q((q O)[q((q o
 )[q((q e)a)])])]]])][o[O O]])][o[O o]])
+

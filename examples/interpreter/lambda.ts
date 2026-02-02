@@ -117,7 +117,7 @@ const bit0 = parse("[x0[x1 x0]]")
 const bit1 = parse("[x0[x1 x1]]")
 
 const bit_getter = (bit_index: number): Expr =>
-    parse(`[0[1[2[3[4[5[6[7 ${bit_index}]]]]]]]]`)
+    parse(`[7[6[5[4[3[2[1[0 ${bit_index}]]]]]]]]`)
 
 function decode_bit(closure: Closure): number {
     const expr = new Call(new Call(closure.expr, bit0), bit1)
@@ -150,7 +150,7 @@ function decode_byte(closure: Closure): number {
 
 function encode_byte(byte: number): Expr {
     let expr: Expr = new Var("x")
-    for (let i = 0; i <= 7; i++) {
+    for (let i = 7; i >= 0; i--) {
         const bit = (byte >> i) & 1
         expr = new Call(expr, encode_bit(bit))
     }

@@ -6,12 +6,12 @@ use clap::*;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Args {
-    /// Input WebAssembly/WASI file
+    /// Input WebAssembly module
     #[arg()]
     pub input_file: String,
 
     /// Output lambda calculus file
-    #[arg(short)]
+    #[arg(short = 'o')]
     pub output_file: String,
 }
 
@@ -20,9 +20,7 @@ fn main() {
 
     let source = std::fs::read(&args.input_file).expect("Failed to read input file");
 
-    let module = wasmbin::Module::decode_from(source.as_slice()).unwrap();
-
-    let lambda = crate::wasm::compile(&module);
+    let lambda = crate::wasm::compile(&source);
 
     std::fs::write(&args.output_file, lambda.to_string()).expect("Failed to write output file");
 }

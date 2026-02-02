@@ -123,13 +123,13 @@ local function run(closure)
 end
 
 -- The text ensures that the variable will be undefined and thus cause an error
-local unreachable = Var("unreachable ¯\\_(ツ)_/¯")
+local unreachable = Var([[unreachable ¯\_(ツ)_/¯]])
 
 local bit0 = parse("[x0[x1 x0]]")
 local bit1 = parse("[x0[x1 x1]]")
 
 local function bit_getter(bit_index)
-    return parse("[0[1[2[3[4[5[6[7 " .. bit_index .. "]]]]]]]]")
+    return parse("[7[6[5[4[3[2[1[0 " .. bit_index .. "]]]]]]]]")
 end
 
 local function decode_bit(closure)
@@ -167,7 +167,7 @@ end
 
 local function encode_byte(byte)
     local expr = Var("x")
-    for i = 0, 7 do
+    for i = 7, 0, -1 do
         local bit = math.floor(byte / 2 ^ i) % 2
         expr = Call(expr, encode_bit(bit))
     end

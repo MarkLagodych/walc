@@ -1,51 +1,54 @@
 use crate::lambda::{self, Lambda};
 
-use wasmbin::{indices::*, instructions::*, sections::*, *};
+use wasmparser as wasm;
 
-fn find_main(m: &Module) -> FuncId {
-    for section in &m.sections {
-        if let Section::Export(exports) = section {
-            let exports = exports.try_contents().unwrap();
-
-            for export in exports {
-                if export.name == "main"
-                    && let ExportDesc::Func(func_id) = export.desc
-                {
-                    return func_id;
-                }
-            }
-        }
-    }
-
-    panic!("no main function found");
-}
-
-pub fn compile(m: &Module) -> Lambda {
+pub fn compile(source: &[u8]) -> Lambda {
     // let mut root = lambda::walc_io::end();
-    // root = lambda::walc_io::output(root, lambda::number::u8_const(b'o'));
-    // root = lambda::walc_io::output(root, lambda::number::u8_const(b'l'));
-    // root = lambda::walc_io::output(root, lambda::number::u8_const(b'l'));
-    // root = lambda::walc_io::output(root, lambda::number::u8_const(b'e'));
-    // root = lambda::walc_io::output(root, lambda::number::u8_const(b'H'));
-    let mut root = lambda::walc_io::end();
+    // root = lambda::walc_io::output(lambda::number::u8_const(b'o'), root);
+    // root = lambda::walc_io::output(lambda::number::u8_const(b'l'), root);
+    // root = lambda::walc_io::output(lambda::number::u8_const(b'l'), root);
+    // root = lambda::walc_io::output(lambda::number::u8_const(b'e'), root);
+    // root = lambda::walc_io::output(lambda::number::u8_const(b'H'), root);
 
-    root = lambda::walc_io::output(root, lambda::number::u8_const(b'\n'));
-
-    root = lambda::walc_io::output(
-        root,
-        lambda::array_tree::index(lambda::var("arr"), lambda::number::u32_const(3)),
+    let mut root = lambda::def(
+        [
+            ("arr", lambda::tree_list::default()),
+            (
+                "arr",
+                lambda::tree_list::insert(
+                    lambda::var("arr"),
+                    lambda::number::u32_const(3),
+                    lambda::number::u8_const(b'X'),
+                ),
+            ),
+            (
+                "byte",
+                lambda::tree_list::index(lambda::var("arr"), lambda::number::u32_const(3)),
+            ),
+            // ("arr", lambda::var("Arr2")),
+            // (
+            //     "arr",
+            //     lambda::apply(
+            //         lambda::var("ArrInsert2"),
+            //         [
+            //             lambda::var("arr"),
+            //             lambda::list::from([lambda::bit(false), lambda::bit(true)].into_iter()),
+            //             lambda::number::u8_const(b'A'),
+            //         ]
+            //         .into_iter(),
+            //     ),
+            // ),
+            // (
+            //     "byte",
+            //     lambda::apply(
+            //         lambda::var("arr"),
+            //         [lambda::bit(true), lambda::bit(true)].into_iter(),
+            //     ),
+            // ),
+        ]
+        .into_iter(),
+        lambda::walc_io::output(lambda::var("byte"), lambda::walc_io::end()),
     );
-
-    root = lambda::define(
-        root,
-        "arr",
-        lambda::array_tree::insert(
-            lambda::var("arr"),
-            lambda::number::u32_const(3),
-            lambda::number::u8_const(b'X'),
-        ),
-    );
-    root = lambda::define(root, "arr", lambda::array_tree::default());
 
     root = lambda::define_prelude(root);
 
