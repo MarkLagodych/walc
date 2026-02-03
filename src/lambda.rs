@@ -98,7 +98,7 @@ pub fn unreachable() -> Expr {
     if cfg!(feature = "debug-unreachable") {
         var("__UNREACHABLE__")
     } else {
-        abs(["U"], var("U"))
+        abs(["_"], var("_"))
     }
 }
 
