@@ -29,15 +29,20 @@ impl std::fmt::Display for Lambda {
     }
 }
 
-pub fn var(name: &str) -> Lambda {
+pub fn var(name: impl ToString) -> Lambda {
     Lambda::Variable {
         name: name.to_string(),
     }
 }
 
-pub fn abs(vars: &[&str], body: Lambda) -> Lambda {
+pub fn abs<ToStr, Vars>(vars: Vars, body: Lambda) -> Lambda
+where
+    ToStr: ToString,
+    Vars: IntoIterator<Item = ToStr>,
+    Vars::IntoIter: DoubleEndedIterator<Item = ToStr>,
+{
     let mut result = body;
-    for var in vars.iter().rev() {
+    for var in vars.into_iter().rev() {
         result = Lambda::Abstraction {
             variable: var.to_string(),
             body: Box::new(result),
@@ -46,7 +51,7 @@ pub fn abs(vars: &[&str], body: Lambda) -> Lambda {
     result
 }
 
-pub fn apply(func: Lambda, args: impl Iterator<Item = Lambda>) -> Lambda {
+pub fn apply(func: Lambda, args: impl IntoIterator<Item = Lambda>) -> Lambda {
     let mut result = func;
     for arg in args {
         result = Lambda::Application {
@@ -57,31 +62,46 @@ pub fn apply(func: Lambda, args: impl Iterator<Item = Lambda>) -> Lambda {
     result
 }
 
-pub fn def<'a, Defs>(definitions: Defs, body: Lambda) -> Lambda
-where
-    Defs: DoubleEndedIterator<Item = (&'a str, Lambda)>,
-{
-    let mut result = body;
-    for (var, value) in definitions.rev() {
-        result = apply(abs(&[var], result), [value].into_iter());
+pub fn def(var: impl ToString, value: Lambda, body: Lambda) -> Lambda {
+    apply(abs([var], body), [value])
+}
+
+pub struct DefinitionBuilder {
+    defs: Vec<(String, Lambda)>,
+}
+
+impl DefinitionBuilder {
+    pub fn new() -> Self {
+        Self { defs: vec![] }
     }
-    result
+
+    pub fn def(&mut self, var: impl ToString, value: Lambda) {
+        self.defs.push((var.to_string(), value));
+    }
+
+    pub fn build(self, body: Lambda) -> Lambda {
+        let mut result = body;
+        for (var, value) in self.defs.into_iter().rev() {
+            result = def(var, value, result);
+        }
+        result
+    }
 }
 
 pub fn cond(condition: Lambda, then_branch: Lambda, else_branch: Lambda) -> Lambda {
-    apply(condition, [else_branch, then_branch].into_iter())
+    apply(condition, [else_branch, then_branch])
 }
 
 pub fn unreachable() -> Lambda {
     if cfg!(feature = "debug-unreachable") {
         var("__UNREACHABLE__")
     } else {
-        abs(&["U"], var("U"))
+        abs(["U"], var("U"))
     }
 }
 
 pub fn rec(func: Lambda) -> Lambda {
-    apply(func.clone(), [func].into_iter())
+    apply(func.clone(), [func])
 }
 
 pub fn bit(b: bool) -> Lambda {
@@ -92,15 +112,15 @@ pub mod pair {
     use super::*;
 
     pub fn new(first: Lambda, second: Lambda) -> Lambda {
-        abs(&["P"], apply(var("P"), [first, second].into_iter()))
+        abs(["P"], apply(var("P"), [first, second]))
     }
 
     pub fn get_first(pair: Lambda) -> Lambda {
-        apply(pair, [var("0")].into_iter())
+        apply(pair, [var("0")])
     }
 
     pub fn get_second(pair: Lambda) -> Lambda {
-        apply(pair, [var("1")].into_iter())
+        apply(pair, [var("1")])
     }
 }
 
@@ -144,60 +164,7 @@ pub mod optional {
     }
 }
 
-pub mod number {
-    use super::*;
-
-    fn bytes_to_hex_string(be_bytes: &[u8]) -> String {
-        String::from("0x")
-            + &be_bytes
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<Vec<String>>()
-                .join("")
-    }
-
-    fn number_const(be_bytes: &[u8]) -> Lambda {
-        let var_name = bytes_to_hex_string(be_bytes);
-
-        let mut result = var(&var_name);
-        for byte in be_bytes {
-            for i in (0..=7).rev() {
-                let bit = bit((byte >> i) & 1 != 0);
-                result = apply(result, [bit].into_iter());
-            }
-        }
-
-        abs(&[&var_name], result)
-    }
-
-    pub fn u8_const(n: u8) -> Lambda {
-        number_const(&n.to_be_bytes())
-    }
-
-    pub fn u32_const(n: u32) -> Lambda {
-        number_const(&n.to_be_bytes())
-    }
-
-    pub fn u64_const(n: u64) -> Lambda {
-        number_const(&n.to_be_bytes())
-    }
-
-    pub fn f32_const(n: f32) -> Lambda {
-        number_const(&n.to_be_bytes())
-    }
-
-    pub fn f64_const(n: f64) -> Lambda {
-        number_const(&n.to_be_bytes())
-    }
-
-    pub fn to_bit_list_be32(number: Lambda) -> Lambda {
-        // I debugged this for two weeks :X
-        // Yes, you really call a number with a function, not the other way around.
-        apply(number, [var("ToBitsBE32")].into_iter())
-    }
-}
-
-pub mod dyn_list {
+pub mod safe_list {
     use super::*;
 
     pub fn empty() -> Lambda {
@@ -206,6 +173,14 @@ pub mod dyn_list {
 
     pub fn node(head: Lambda, tail: Lambda) -> Lambda {
         optional::some(pair::new(head, tail))
+    }
+
+    pub fn from(items: impl DoubleEndedIterator<Item = Lambda>) -> Lambda {
+        let mut result = empty();
+        for item in items.rev() {
+            result = node(item, result);
+        }
+        result
     }
 
     pub fn is_not_empty(list: Lambda) -> Lambda {
@@ -269,11 +244,11 @@ pub mod tree_list {
     }
 
     pub fn index(array: Lambda, index: Lambda) -> Lambda {
-        apply(index, [array].into_iter())
+        apply(index, [array])
     }
 
     pub fn insert(array: Lambda, index: Lambda, value: Lambda) -> Lambda {
-        apply(var("ArrInsert"), [array, index, value].into_iter())
+        apply(var("ArrInsert"), [array, index, value])
     }
 }
 
@@ -285,215 +260,168 @@ pub mod walc_io {
     }
 
     pub fn output(out_byte: Lambda, next: Lambda) -> Lambda {
-        apply(var("Out"), [out_byte, next].into_iter())
+        apply(var("Out"), [out_byte, next])
     }
 
     pub fn input(root_input_handler: Lambda) -> Lambda {
-        apply(var("In"), [root_input_handler].into_iter())
+        apply(var("In"), [root_input_handler])
     }
 }
 
-pub fn define_prelude(mut root: Lambda) -> Lambda {
-    fn apply1(func: Lambda, arg: Lambda) -> Lambda {
-        apply(func, [arg].into_iter())
+pub mod number {
+    use super::*;
+
+    fn bytes_to_hex_string(be_bytes: &[u8]) -> String {
+        String::from("0x")
+            + &be_bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<String>>()
+                .join("")
     }
 
-    root = def(
-        [
-            ("0", abs(&["x0", "x1"], var("x0"))),
-            ("1", abs(&["x0", "x1"], var("x1"))),
-            ////////////////////////////////////////////////////////////////////////////
-            (
-                "Out",
-                abs(
-                    &["out_byte", "next"],
-                    optional::some(either::first(pair::new(var("out_byte"), var("next")))),
-                ),
+    fn number_const(be_bytes: &[u8]) -> Lambda {
+        let var_name = bytes_to_hex_string(be_bytes);
+
+        let ith_bit = |byte: u8, i: usize| -> Lambda { bit((byte >> i) & 1 != 0) };
+
+        abs(
+            [var_name.clone()],
+            apply(
+                var(var_name),
+                be_bytes
+                    .iter()
+                    .flat_map(|byte| (0..8).rev().map(|i| ith_bit(*byte, i))),
             ),
-            (
-                "In",
-                abs(
-                    &["input_handler"],
-                    optional::some(either::second(var("input_handler"))),
-                ),
-            ),
-            ("End", optional::none()),
-            ////////////////////////////////////////////////////////////////////////////
-            (
-                "ToBitsBE32",
-                abs(
-                    &[
-                        "b31", "b30", "b29", "b28", "b27", "b26", "b25", "b24", "b23", "b22",
-                        "b21", "b20", "b19", "b18", "b17", "b16", "b15", "b14", "b13", "b12",
-                        "b11", "b10", "b9", "b8", "b7", "b6", "b5", "b4", "b3", "b2", "b1", "b0",
-                    ],
-                    list::from(
-                        [
-                            var("b31"),
-                            var("b30"),
-                            var("b29"),
-                            var("b28"),
-                            var("b27"),
-                            var("b26"),
-                            var("b25"),
-                            var("b24"),
-                            var("b23"),
-                            var("b22"),
-                            var("b21"),
-                            var("b20"),
-                            var("b19"),
-                            var("b18"),
-                            var("b17"),
-                            var("b16"),
-                            var("b15"),
-                            var("b14"),
-                            var("b13"),
-                            var("b12"),
-                            var("b11"),
-                            var("b10"),
-                            var("b9"),
-                            var("b8"),
-                            var("b7"),
-                            var("b6"),
-                            var("b5"),
-                            var("b4"),
-                            var("b3"),
-                            var("b2"),
-                            var("b1"),
-                            var("b0"),
-                        ]
-                        .into_iter(),
-                    ),
-                ),
-            ),
-            /////////////////////////////////////////////////////////////////////////////
-            ("DefItem", number::u8_const(0)),
-            // Indexable by 1 bit
-            ("Arr1", tree_list::node(var("DefItem"), var("DefItem"))),
-            ("Arr2", tree_list::node(var("Arr1"), var("Arr1"))),
-            ("Arr3", tree_list::node(var("Arr2"), var("Arr2"))),
-            ("Arr4", tree_list::node(var("Arr3"), var("Arr3"))),
-            ("Arr5", tree_list::node(var("Arr4"), var("Arr4"))),
-            ("Arr6", tree_list::node(var("Arr5"), var("Arr5"))),
-            ("Arr7", tree_list::node(var("Arr6"), var("Arr6"))),
-            ("Arr8", tree_list::node(var("Arr7"), var("Arr7"))),
-            ("Arr9", tree_list::node(var("Arr8"), var("Arr8"))),
-            ("Arr10", tree_list::node(var("Arr9"), var("Arr9"))),
-            ("Arr11", tree_list::node(var("Arr10"), var("Arr10"))),
-            ("Arr12", tree_list::node(var("Arr11"), var("Arr11"))),
-            ("Arr13", tree_list::node(var("Arr12"), var("Arr12"))),
-            ("Arr14", tree_list::node(var("Arr13"), var("Arr13"))),
-            ("Arr15", tree_list::node(var("Arr14"), var("Arr14"))),
-            ("Arr16", tree_list::node(var("Arr15"), var("Arr15"))),
-            ("Arr17", tree_list::node(var("Arr16"), var("Arr16"))),
-            ("Arr18", tree_list::node(var("Arr17"), var("Arr17"))),
-            ("Arr19", tree_list::node(var("Arr18"), var("Arr18"))),
-            ("Arr20", tree_list::node(var("Arr19"), var("Arr19"))),
-            ("Arr21", tree_list::node(var("Arr20"), var("Arr20"))),
-            ("Arr22", tree_list::node(var("Arr21"), var("Arr21"))),
-            ("Arr23", tree_list::node(var("Arr22"), var("Arr22"))),
-            ("Arr24", tree_list::node(var("Arr23"), var("Arr23"))),
-            ("Arr25", tree_list::node(var("Arr24"), var("Arr24"))),
-            ("Arr26", tree_list::node(var("Arr25"), var("Arr25"))),
-            ("Arr27", tree_list::node(var("Arr26"), var("Arr26"))),
-            ("Arr28", tree_list::node(var("Arr27"), var("Arr27"))),
-            ("Arr29", tree_list::node(var("Arr28"), var("Arr28"))),
-            ("Arr30", tree_list::node(var("Arr29"), var("Arr29"))),
-            ("Arr31", tree_list::node(var("Arr30"), var("Arr30"))),
-            // Indexable by 32 bits
-            ("Arr", tree_list::node(var("Arr31"), var("Arr31"))),
-            /////////////////////////////////////////////////////////////////////////////
-            (
-                "ArrInsert_",
-                abs(
-                    &["insert", "array", "index", "value"],
-                    cond(
-                        list::get_head(var("index")),
-                        tree_list::node(
-                            tree_list::get_left(var("array")),
-                            apply(
-                                var("insert"),
-                                [
-                                    tree_list::get_right(var("array")),
-                                    list::get_tail(var("index")),
-                                    var("value"),
-                                ]
-                                .into_iter(),
-                            ),
-                        ),
-                        tree_list::node(
-                            apply(
-                                var("insert"),
-                                [
-                                    tree_list::get_left(var("array")),
-                                    list::get_tail(var("index")),
-                                    var("value"),
-                                ]
-                                .into_iter(),
-                            ),
-                            tree_list::get_right(var("array")),
-                        ),
-                    ),
-                ),
-            ),
-            // Consumes 0 bits of index
-            (
-                "ArrInsert0",
-                abs(&["array", "index", "value"], var("value")),
-            ),
-            // Consumes 1 bit of index
-            ("ArrInsert1", apply1(var("ArrInsert_"), var("ArrInsert0"))),
-            ("ArrInsert2", apply1(var("ArrInsert_"), var("ArrInsert1"))),
-            ("ArrInsert3", apply1(var("ArrInsert_"), var("ArrInsert2"))),
-            ("ArrInsert4", apply1(var("ArrInsert_"), var("ArrInsert3"))),
-            ("ArrInsert5", apply1(var("ArrInsert_"), var("ArrInsert4"))),
-            ("ArrInsert6", apply1(var("ArrInsert_"), var("ArrInsert5"))),
-            ("ArrInsert7", apply1(var("ArrInsert_"), var("ArrInsert6"))),
-            ("ArrInsert8", apply1(var("ArrInsert_"), var("ArrInsert7"))),
-            ("ArrInsert9", apply1(var("ArrInsert_"), var("ArrInsert8"))),
-            ("ArrInsert10", apply1(var("ArrInsert_"), var("ArrInsert9"))),
-            ("ArrInsert11", apply1(var("ArrInsert_"), var("ArrInsert10"))),
-            ("ArrInsert12", apply1(var("ArrInsert_"), var("ArrInsert11"))),
-            ("ArrInsert13", apply1(var("ArrInsert_"), var("ArrInsert12"))),
-            ("ArrInsert14", apply1(var("ArrInsert_"), var("ArrInsert13"))),
-            ("ArrInsert15", apply1(var("ArrInsert_"), var("ArrInsert14"))),
-            ("ArrInsert16", apply1(var("ArrInsert_"), var("ArrInsert15"))),
-            ("ArrInsert17", apply1(var("ArrInsert_"), var("ArrInsert16"))),
-            ("ArrInsert18", apply1(var("ArrInsert_"), var("ArrInsert17"))),
-            ("ArrInsert19", apply1(var("ArrInsert_"), var("ArrInsert18"))),
-            ("ArrInsert20", apply1(var("ArrInsert_"), var("ArrInsert19"))),
-            ("ArrInsert21", apply1(var("ArrInsert_"), var("ArrInsert20"))),
-            ("ArrInsert22", apply1(var("ArrInsert_"), var("ArrInsert21"))),
-            ("ArrInsert23", apply1(var("ArrInsert_"), var("ArrInsert22"))),
-            ("ArrInsert24", apply1(var("ArrInsert_"), var("ArrInsert23"))),
-            ("ArrInsert25", apply1(var("ArrInsert_"), var("ArrInsert24"))),
-            ("ArrInsert26", apply1(var("ArrInsert_"), var("ArrInsert25"))),
-            ("ArrInsert27", apply1(var("ArrInsert_"), var("ArrInsert26"))),
-            ("ArrInsert28", apply1(var("ArrInsert_"), var("ArrInsert27"))),
-            ("ArrInsert29", apply1(var("ArrInsert_"), var("ArrInsert28"))),
-            ("ArrInsert30", apply1(var("ArrInsert_"), var("ArrInsert29"))),
-            ("ArrInsert31", apply1(var("ArrInsert_"), var("ArrInsert30"))),
-            // Consumes 32 bits of index
-            ("ArrInsert32", apply1(var("ArrInsert_"), var("ArrInsert31"))),
-            (
-                "ArrInsert",
-                abs(
-                    &["array", "index", "value"],
-                    apply(
-                        var("ArrInsert32"),
-                        [
-                            var("array"),
-                            number::to_bit_list_be32(var("index")),
-                            var("value"),
-                        ]
-                        .into_iter(),
-                    ),
-                ),
-            ),
-        ]
-        .into_iter(),
-        root,
+        )
+    }
+
+    pub fn u8_const(n: u8) -> Lambda {
+        number_const(&n.to_be_bytes())
+    }
+
+    pub fn u32_const(n: u32) -> Lambda {
+        number_const(&n.to_be_bytes())
+    }
+
+    pub fn u64_const(n: u64) -> Lambda {
+        number_const(&n.to_be_bytes())
+    }
+
+    pub fn f32_const(n: f32) -> Lambda {
+        number_const(&n.to_be_bytes())
+    }
+
+    pub fn f64_const(n: f64) -> Lambda {
+        number_const(&n.to_be_bytes())
+    }
+
+    pub fn to_bit_list_be32(number: Lambda) -> Lambda {
+        // I debugged this for two weeks :X
+        // Yes, you really call a number with a function, not the other way around.
+        apply(number, [var("ToBitsBE32")])
+    }
+}
+
+pub fn prelude() -> DefinitionBuilder {
+    let mut b = DefinitionBuilder::new();
+
+    b.def("0", abs(["x0", "x1"], var("x0")));
+    b.def("1", abs(["x0", "x1"], var("x1")));
+    b.def(
+        "Out",
+        abs(
+            ["out_byte", "next"],
+            optional::some(either::first(pair::new(var("out_byte"), var("next")))),
+        ),
     );
 
-    root
+    b.def(
+        "In",
+        abs(
+            ["input_handler"],
+            optional::some(either::second(var("input_handler"))),
+        ),
+    );
+
+    b.def("End", optional::none());
+
+    b.def(
+        "ToBitsBE32",
+        abs(
+            (0..32).rev().map(|i| i.to_string()),
+            list::from((0..32).rev().map(|i| var(i.to_string()))),
+        ),
+    );
+
+    // Default item, indexable by 0 bits (i.e. not indexable)
+    b.def("Arr0", number::u8_const(0));
+
+    // Every node is indexable by i bits
+    for i in 1..=32 {
+        let node_name = format!("Arr{}", i);
+        let item_name = format!("Arr{}", i - 1);
+        b.def(node_name, tree_list::node(var(&item_name), var(&item_name)));
+    }
+
+    b.def("Arr", var("Arr32"));
+
+    b.def(
+        "ArrInsert_",
+        abs(
+            ["insert", "array", "index", "value"],
+            cond(
+                list::get_head(var("index")),
+                tree_list::node(
+                    tree_list::get_left(var("array")),
+                    apply(
+                        var("insert"),
+                        [
+                            tree_list::get_right(var("array")),
+                            list::get_tail(var("index")),
+                            var("value"),
+                        ],
+                    ),
+                ),
+                tree_list::node(
+                    apply(
+                        var("insert"),
+                        [
+                            tree_list::get_left(var("array")),
+                            list::get_tail(var("index")),
+                            var("value"),
+                        ],
+                    ),
+                    tree_list::get_right(var("array")),
+                ),
+            ),
+        ),
+    );
+
+    b.def("ArrInsert0", abs(["array", "index", "value"], var("value")));
+
+    // Each insertion function consumes i bits of the index
+    for i in 1..=32 {
+        b.def(
+            format!("ArrInsert{}", i),
+            apply(var("ArrInsert_"), [var(format!("ArrInsert{}", i - 1))]),
+        );
+    }
+
+    b.def(
+        "ArrInsert",
+        abs(
+            ["array", "index", "value"],
+            apply(
+                var("ArrInsert32"),
+                [
+                    var("array"),
+                    number::to_bit_list_be32(var("index")),
+                    var("value"),
+                ],
+            ),
+        ),
+    );
+
+    b
 }
