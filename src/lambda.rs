@@ -1,41 +1,43 @@
+///! WALC code generator
+
 #[derive(Debug, Clone)]
-pub enum Lambda {
+pub enum Expr {
     Variable {
         name: String,
     },
     Abstraction {
         variable: String,
-        body: Box<Lambda>,
+        body: Box<Expr>,
     },
     Application {
-        function: Box<Lambda>,
-        argument: Box<Lambda>,
+        function: Box<Expr>,
+        argument: Box<Expr>,
     },
 }
 
-impl std::fmt::Display for Lambda {
+impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Lambda::Variable { name } => {
+            Expr::Variable { name } => {
                 write!(f, "{}", name)
             }
-            Lambda::Abstraction { variable, body } => {
+            Expr::Abstraction { variable, body } => {
                 write!(f, "[{} {}]", variable, body)
             }
-            Lambda::Application { function, argument } => {
+            Expr::Application { function, argument } => {
                 write!(f, "({} {})", function, argument)
             }
         }
     }
 }
 
-pub fn var(name: impl ToString) -> Lambda {
-    Lambda::Variable {
+pub fn var(name: impl ToString) -> Expr {
+    Expr::Variable {
         name: name.to_string(),
     }
 }
 
-pub fn abs<ToStr, Vars>(vars: Vars, body: Lambda) -> Lambda
+pub fn abs<ToStr, Vars>(vars: Vars, body: Expr) -> Expr
 where
     ToStr: ToString,
     Vars: IntoIterator<Item = ToStr>,
@@ -43,7 +45,7 @@ where
 {
     let mut result = body;
     for var in vars.into_iter().rev() {
-        result = Lambda::Abstraction {
+        result = Expr::Abstraction {
             variable: var.to_string(),
             body: Box::new(result),
         };
@@ -51,10 +53,10 @@ where
     result
 }
 
-pub fn apply(func: Lambda, args: impl IntoIterator<Item = Lambda>) -> Lambda {
+pub fn apply(func: Expr, args: impl IntoIterator<Item = Expr>) -> Expr {
     let mut result = func;
     for arg in args {
-        result = Lambda::Application {
+        result = Expr::Application {
             function: Box::new(result),
             argument: Box::new(arg),
         };
@@ -62,12 +64,12 @@ pub fn apply(func: Lambda, args: impl IntoIterator<Item = Lambda>) -> Lambda {
     result
 }
 
-pub fn def(var: impl ToString, value: Lambda, body: Lambda) -> Lambda {
+pub fn def(var: impl ToString, value: Expr, body: Expr) -> Expr {
     apply(abs([var], body), [value])
 }
 
 pub struct DefinitionBuilder {
-    defs: Vec<(String, Lambda)>,
+    defs: Vec<(String, Expr)>,
 }
 
 impl DefinitionBuilder {
@@ -75,11 +77,11 @@ impl DefinitionBuilder {
         Self { defs: vec![] }
     }
 
-    pub fn def(&mut self, var: impl ToString, value: Lambda) {
+    pub fn def(&mut self, var: impl ToString, value: Expr) {
         self.defs.push((var.to_string(), value));
     }
 
-    pub fn build(self, body: Lambda) -> Lambda {
+    pub fn build(self, body: Expr) -> Expr {
         let mut result = body;
         for (var, value) in self.defs.into_iter().rev() {
             result = def(var, value, result);
@@ -88,11 +90,11 @@ impl DefinitionBuilder {
     }
 }
 
-pub fn cond(condition: Lambda, then_branch: Lambda, else_branch: Lambda) -> Lambda {
+pub fn cond(condition: Expr, then_branch: Expr, else_branch: Expr) -> Expr {
     apply(condition, [else_branch, then_branch])
 }
 
-pub fn unreachable() -> Lambda {
+pub fn unreachable() -> Expr {
     if cfg!(feature = "debug-unreachable") {
         var("__UNREACHABLE__")
     } else {
@@ -100,26 +102,26 @@ pub fn unreachable() -> Lambda {
     }
 }
 
-pub fn rec(func: Lambda) -> Lambda {
+pub fn rec(func: Expr) -> Expr {
     apply(func.clone(), [func])
 }
 
-pub fn bit(b: bool) -> Lambda {
+pub fn bit(b: bool) -> Expr {
     if b { var("1") } else { var("0") }
 }
 
 pub mod pair {
     use super::*;
 
-    pub fn new(first: Lambda, second: Lambda) -> Lambda {
+    pub fn new(first: Expr, second: Expr) -> Expr {
         abs(["P"], apply(var("P"), [first, second]))
     }
 
-    pub fn get_first(pair: Lambda) -> Lambda {
+    pub fn get_first(pair: Expr) -> Expr {
         apply(pair, [var("0")])
     }
 
-    pub fn get_second(pair: Lambda) -> Lambda {
+    pub fn get_second(pair: Expr) -> Expr {
         apply(pair, [var("1")])
     }
 }
@@ -127,19 +129,19 @@ pub mod pair {
 pub mod either {
     use super::*;
 
-    pub fn first(value: Lambda) -> Lambda {
+    pub fn first(value: Expr) -> Expr {
         pair::new(var("0"), value)
     }
 
-    pub fn second(value: Lambda) -> Lambda {
+    pub fn second(value: Expr) -> Expr {
         pair::new(var("1"), value)
     }
 
-    pub fn is_second(either: Lambda) -> Lambda {
+    pub fn is_second(either: Expr) -> Expr {
         pair::get_first(either)
     }
 
-    pub fn unwrap(either: Lambda) -> Lambda {
+    pub fn unwrap(either: Expr) -> Expr {
         pair::get_second(either)
     }
 }
@@ -147,19 +149,19 @@ pub mod either {
 pub mod optional {
     use super::*;
 
-    pub fn none() -> Lambda {
+    pub fn none() -> Expr {
         either::first(unreachable())
     }
 
-    pub fn some(value: Lambda) -> Lambda {
+    pub fn some(value: Expr) -> Expr {
         either::second(value)
     }
 
-    pub fn is_some(optional: Lambda) -> Lambda {
+    pub fn is_some(optional: Expr) -> Expr {
         either::is_second(optional)
     }
 
-    pub fn unwrap(optional: Lambda) -> Lambda {
+    pub fn unwrap(optional: Expr) -> Expr {
         either::unwrap(optional)
     }
 }
@@ -167,15 +169,15 @@ pub mod optional {
 pub mod safe_list {
     use super::*;
 
-    pub fn empty() -> Lambda {
+    pub fn empty() -> Expr {
         optional::none()
     }
 
-    pub fn node(head: Lambda, tail: Lambda) -> Lambda {
+    pub fn node(head: Expr, tail: Expr) -> Expr {
         optional::some(pair::new(head, tail))
     }
 
-    pub fn from(items: impl DoubleEndedIterator<Item = Lambda>) -> Lambda {
+    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> Expr {
         let mut result = empty();
         for item in items.rev() {
             result = node(item, result);
@@ -183,15 +185,15 @@ pub mod safe_list {
         result
     }
 
-    pub fn is_not_empty(list: Lambda) -> Lambda {
+    pub fn is_not_empty(list: Expr) -> Expr {
         optional::is_some(list)
     }
 
-    pub fn get_head(list: Lambda) -> Lambda {
+    pub fn get_head(list: Expr) -> Expr {
         pair::get_first(optional::unwrap(list))
     }
 
-    pub fn get_tail(list: Lambda) -> Lambda {
+    pub fn get_tail(list: Expr) -> Expr {
         pair::get_second(optional::unwrap(list))
     }
 }
@@ -199,15 +201,15 @@ pub mod safe_list {
 pub mod list {
     use super::*;
 
-    pub fn empty() -> Lambda {
+    pub fn empty() -> Expr {
         unreachable()
     }
 
-    pub fn node(head: Lambda, tail: Lambda) -> Lambda {
+    pub fn node(head: Expr, tail: Expr) -> Expr {
         pair::new(head, tail)
     }
 
-    pub fn from(items: impl DoubleEndedIterator<Item = Lambda>) -> Lambda {
+    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> Expr {
         let mut result = empty();
         for item in items.rev() {
             result = node(item, result);
@@ -215,55 +217,55 @@ pub mod list {
         result
     }
 
-    pub fn get_head(list: Lambda) -> Lambda {
+    pub fn get_head(list: Expr) -> Expr {
         pair::get_first(list)
     }
 
-    pub fn get_tail(list: Lambda) -> Lambda {
+    pub fn get_tail(list: Expr) -> Expr {
         pair::get_second(list)
     }
 }
 
-pub mod tree_list {
+pub mod tree {
     use super::*;
 
-    pub fn default() -> Lambda {
-        var("Arr")
+    pub fn new(default_item: Expr) -> Expr {
+        apply(var("TreeOf"), [default_item])
     }
 
-    pub fn node(left: Lambda, right: Lambda) -> Lambda {
+    pub fn node(left: Expr, right: Expr) -> Expr {
         pair::new(left, right)
     }
 
-    pub fn get_left(array: Lambda) -> Lambda {
+    pub fn get_left(array: Expr) -> Expr {
         pair::get_first(array)
     }
 
-    pub fn get_right(array: Lambda) -> Lambda {
+    pub fn get_right(array: Expr) -> Expr {
         pair::get_second(array)
     }
 
-    pub fn index(array: Lambda, index: Lambda) -> Lambda {
+    pub fn index(array: Expr, index: Expr) -> Expr {
         apply(index, [array])
     }
 
-    pub fn insert(array: Lambda, index: Lambda, value: Lambda) -> Lambda {
-        apply(var("ArrInsert"), [array, index, value])
+    pub fn insert(array: Expr, index: Expr, value: Expr) -> Expr {
+        apply(var("TreeInsert"), [array, index, value])
     }
 }
 
 pub mod walc_io {
     use super::*;
 
-    pub fn end() -> Lambda {
+    pub fn end() -> Expr {
         var("End")
     }
 
-    pub fn output(out_byte: Lambda, next: Lambda) -> Lambda {
+    pub fn output(out_byte: Expr, next: Expr) -> Expr {
         apply(var("Out"), [out_byte, next])
     }
 
-    pub fn input(root_input_handler: Lambda) -> Lambda {
+    pub fn input(root_input_handler: Expr) -> Expr {
         apply(var("In"), [root_input_handler])
     }
 }
@@ -280,10 +282,12 @@ pub mod number {
                 .join("")
     }
 
-    fn number_const(be_bytes: &[u8]) -> Lambda {
+    fn number_const(be_bytes: &[u8]) -> Expr {
         let var_name = bytes_to_hex_string(be_bytes);
 
-        let ith_bit = |byte: u8, i: usize| -> Lambda { bit((byte >> i) & 1 != 0) };
+        fn ith_bit(byte: u8, i: u8) -> Expr {
+            bit((byte >> i) & 1u8 != 0)
+        }
 
         abs(
             [var_name.clone()],
@@ -296,36 +300,34 @@ pub mod number {
         )
     }
 
-    pub fn u8_const(n: u8) -> Lambda {
+    pub fn u8_const(n: u8) -> Expr {
         number_const(&n.to_be_bytes())
     }
 
-    pub fn u32_const(n: u32) -> Lambda {
+    pub fn u32_const(n: u32) -> Expr {
         number_const(&n.to_be_bytes())
     }
 
-    pub fn u64_const(n: u64) -> Lambda {
+    pub fn u64_const(n: u64) -> Expr {
         number_const(&n.to_be_bytes())
     }
 
-    pub fn f32_const(n: f32) -> Lambda {
+    pub fn f32_const(n: f32) -> Expr {
         number_const(&n.to_be_bytes())
     }
 
-    pub fn f64_const(n: f64) -> Lambda {
+    pub fn f64_const(n: f64) -> Expr {
         number_const(&n.to_be_bytes())
     }
 
-    pub fn to_bit_list_be32(number: Lambda) -> Lambda {
+    pub fn to_bit_list_be32(number: Expr) -> Expr {
         // I debugged this for two weeks :X
         // Yes, you really call a number with a function, not the other way around.
         apply(number, [var("ToBitsBE32")])
     }
 }
 
-pub fn prelude() -> DefinitionBuilder {
-    let mut b = DefinitionBuilder::new();
-
+pub fn define_prelude(b: &mut DefinitionBuilder) {
     b.def("0", abs(["x0", "x1"], var("x0")));
     b.def("1", abs(["x0", "x1"], var("x1")));
     b.def(
@@ -354,66 +356,66 @@ pub fn prelude() -> DefinitionBuilder {
         ),
     );
 
-    // Default item, indexable by 0 bits (i.e. not indexable)
-    b.def("Arr0", number::u8_const(0));
-
+    // Indexable by 0 bits (i.e. not indexable)
+    b.def("T0", abs(["x"], var("x")));
     // Every node is indexable by i bits
     for i in 1..=32 {
-        let node_name = format!("Arr{}", i);
-        let item_name = format!("Arr{}", i - 1);
-        b.def(node_name, tree_list::node(var(&item_name), var(&item_name)));
+        let node_name = format!("T{}", i);
+        let item_name = format!("T{}", i - 1);
+        let item = apply(var(item_name), [var("x")]);
+        b.def(node_name, abs(["x"], tree::node(item.clone(), item)));
     }
 
-    b.def("Arr", var("Arr32"));
+    b.def("TreeOf", var("T32"));
 
     b.def(
-        "ArrInsert_",
+        "TIns_",
         abs(
             ["insert", "array", "index", "value"],
             cond(
                 list::get_head(var("index")),
-                tree_list::node(
-                    tree_list::get_left(var("array")),
+                tree::node(
+                    tree::get_left(var("array")),
                     apply(
                         var("insert"),
                         [
-                            tree_list::get_right(var("array")),
+                            tree::get_right(var("array")),
                             list::get_tail(var("index")),
                             var("value"),
                         ],
                     ),
                 ),
-                tree_list::node(
+                tree::node(
                     apply(
                         var("insert"),
                         [
-                            tree_list::get_left(var("array")),
+                            tree::get_left(var("array")),
                             list::get_tail(var("index")),
                             var("value"),
                         ],
                     ),
-                    tree_list::get_right(var("array")),
+                    tree::get_right(var("array")),
                 ),
             ),
         ),
     );
 
-    b.def("ArrInsert0", abs(["array", "index", "value"], var("value")));
+    b.def("TIns0", abs(["array", "index", "value"], var("value")));
 
     // Each insertion function consumes i bits of the index
     for i in 1..=32 {
         b.def(
-            format!("ArrInsert{}", i),
-            apply(var("ArrInsert_"), [var(format!("ArrInsert{}", i - 1))]),
+            format!("TIns{}", i),
+            apply(var("TIns_"), [var(format!("TIns{}", i - 1))]),
         );
     }
 
     b.def(
-        "ArrInsert",
+        "TreeInsert",
         abs(
             ["array", "index", "value"],
             apply(
-                var("ArrInsert32"),
+                var("TIns32"),
                 [
                     var("array"),
                     number::to_bit_list_be32(var("index")),
@@ -422,6 +424,4 @@ pub fn prelude() -> DefinitionBuilder {
             ),
         ),
     );
-
-    b
 }
