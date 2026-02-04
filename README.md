@@ -1,6 +1,6 @@
 # WebAssembly to Lambda Calculus compiler
 
-WALC /wɑːlts/ compiles stand-alone [WebAssembly 3](https://webassembly.org/)
+WALC /wɑlts/ compiles stand-alone [WebAssembly 1.0](https://webassembly.org/)
 modules into pure untyped lambda expressions.
 
 The input modules are only allowed to use custom WALC functions for standard

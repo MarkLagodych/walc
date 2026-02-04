@@ -1,4 +1,4 @@
-#!/usr/bin/env lua
+#!/usr/bin/env luajit
 
 -- This is a simple lambda calculus interpreter based on the WALC format.
 -- Runs on LuaJIT 2.1 / Lua 5.1.
@@ -201,7 +201,7 @@ end
 
 local help_message =
 [[Lambda calculus interpreter based on WALC format
-Run with 'lua' (default), 'luajit', etc.:
+Run with 'luajit' (default), 'lua', etc.:
 $ [<LUA_INTERPRETER>] ./lambda.lua <FILENAME>]]
 
 local function main()

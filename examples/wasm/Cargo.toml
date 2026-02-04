@@ -6,8 +6,12 @@ edition = "2024"
 [profile.release]
 strip = "debuginfo"
 lto = "fat"
-#panic = "abort"
 
+# Memory allocator
+[dependencies.talc]
+version = "^4.4"
+default-features = false
+features = ["lock_api"]
 
 [[bin]]
 name = "hello"

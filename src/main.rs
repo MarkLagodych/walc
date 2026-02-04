@@ -1,7 +1,7 @@
-mod lambda;
-mod wasm;
+mod codegen;
+mod walc;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::*;
 
 #[derive(Parser, Debug)]
@@ -16,17 +16,9 @@ pub struct Args {
     pub output_file: String,
 }
 
-#[derive(thiserror::Error, Debug)]
-enum IoError {
-    #[error("Cannot read input file: {0}")]
-    CannotReadInput(std::io::Error),
-    #[error("Cannot write output file: {0}")]
-    CannotWriteOutput(std::io::Error),
-}
-
 fn main() {
     if let Err(e) = run() {
-        eprintln!("Error: {:#}", e);
+        eprintln!("Error: {e}");
         std::process::exit(1);
     }
 }
@@ -34,11 +26,13 @@ fn main() {
 fn run() -> Result<()> {
     let args = Args::parse();
 
-    let source = std::fs::read(&args.input_file).map_err(IoError::CannotReadInput)?;
+    let source =
+        std::fs::read(&args.input_file).map_err(|e| anyhow!("Cannot read input file: {e}"))?;
 
-    let expr = crate::wasm::compile(&source)?;
+    let expr = walc::compile(&source)?;
 
-    std::fs::write(&args.output_file, expr.to_string()).map_err(IoError::CannotWriteOutput)?;
+    std::fs::write(&args.output_file, expr.to_string())
+        .map_err(|e| anyhow!("Cannot write output file: {e}"))?;
 
     Ok(())
 }

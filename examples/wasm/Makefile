@@ -7,7 +7,7 @@ all:
 		--root . \
 		--no-track \
 		--profile release \
-		--target wasm32-unknown-unknown
+		--target wasm32v1-none
 
 clean:
 	rm -rf bin
