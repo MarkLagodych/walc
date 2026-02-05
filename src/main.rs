@@ -29,7 +29,7 @@ fn run() -> Result<()> {
     let source =
         std::fs::read(&args.input_file).map_err(|e| anyhow!("Cannot read input file: {e}"))?;
 
-    let expr = walc::compile(&source)?;
+    let expr = walc::compile_module(&source)?;
 
     std::fs::write(&args.output_file, expr.to_string())
         .map_err(|e| anyhow!("Cannot write output file: {e}"))?;

@@ -12,7 +12,7 @@ debug-unreachable = []
 
 [dependencies.wasmparser]
 version = "^0.244"
-features = ["std", "features"] # Ignore validation, SIMD, and WASM components
+features = ["std", "features", "validate"] # Ignore SIMD and WASM components
 
 [dependencies.clap]
 version = "^4.5"

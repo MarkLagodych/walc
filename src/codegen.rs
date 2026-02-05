@@ -1,4 +1,5 @@
 /// WALC code generator
+use anyhow::{Result, anyhow};
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -24,7 +25,7 @@ impl std::fmt::Display for Expr {
             Expr::Abstraction { variable, body } => {
                 write!(f, "[{}", variable)?;
 
-                if let Expr::Variable { .. } = **body {
+                if matches!(**body, Expr::Variable { .. }) {
                     write!(f, " ")?;
                 }
 
@@ -33,8 +34,8 @@ impl std::fmt::Display for Expr {
             Expr::Application { function, argument } => {
                 write!(f, "({}", function)?;
 
-                if let Expr::Variable { .. } = **function
-                    && let Expr::Variable { .. } = **argument
+                if matches!(**function, Expr::Abstraction { .. })
+                    && matches!(**argument, Expr::Variable { .. })
                 {
                     write!(f, " ")?;
                 }
@@ -130,6 +131,14 @@ fn bit_define_prelude(b: &mut DefinitionBuilder) {
     b.def("1", abs(["x0", "x1"], var("x1")));
 }
 
+pub fn define_prelude(b: &mut DefinitionBuilder) {
+    bit_define_prelude(b);
+    walc_io::define_prelude(b);
+    list::define_prelude(b);
+    number::define_prelude(b);
+    tree::define_prelude(b);
+}
+
 pub mod pair {
     use super::*;
 
@@ -186,7 +195,40 @@ pub mod optional {
     }
 }
 
-pub mod safe_list {
+pub mod chain {
+    use super::*;
+
+    pub fn empty() -> Expr {
+        unreachable()
+    }
+
+    pub fn node(head: Expr, tail: Expr) -> Expr {
+        // TODO Should unsafe list also use a predefined cons(tructor) like the safe list?
+        pair::new(head, tail)
+    }
+
+    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> Expr {
+        let mut result = empty();
+        for item in items.rev() {
+            result = node(item, result);
+        }
+        result
+    }
+
+    pub fn from_bytes(store: &mut number::ConstantStore, bytes: &[u8]) -> Expr {
+        from(bytes.iter().map(|b| store.i8_const(*b)))
+    }
+
+    pub fn get_head(list: Expr) -> Expr {
+        pair::get_first(list)
+    }
+
+    pub fn get_tail(list: Expr) -> Expr {
+        pair::get_second(list)
+    }
+}
+
+pub mod list {
     use super::*;
 
     pub fn empty() -> Expr {
@@ -206,7 +248,7 @@ pub mod safe_list {
     }
 
     pub fn from_bytes(store: &mut number::ConstantStore, bytes: &[u8]) -> Expr {
-        from(bytes.iter().map(|b| store.byte_const(*b)))
+        from(bytes.iter().map(|b| store.i8_const(*b)))
     }
 
     pub fn is_not_empty(list: Expr) -> Expr {
@@ -230,39 +272,6 @@ pub mod safe_list {
             // head, tail
             abs(["h", "t"], optional::some(pair::new(var("h"), var("t")))),
         );
-    }
-}
-
-pub mod list {
-    use super::*;
-
-    pub fn empty() -> Expr {
-        unreachable()
-    }
-
-    pub fn node(head: Expr, tail: Expr) -> Expr {
-        // TODO Should unsafe list also use a predefined cons(tructor) like the safe list?
-        pair::new(head, tail)
-    }
-
-    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> Expr {
-        let mut result = empty();
-        for item in items.rev() {
-            result = node(item, result);
-        }
-        result
-    }
-
-    pub fn from_bytes(store: &mut number::ConstantStore, bytes: &[u8]) -> Expr {
-        from(bytes.iter().map(|b| store.byte_const(*b)))
-    }
-
-    pub fn get_head(list: Expr) -> Expr {
-        pair::get_first(list)
-    }
-
-    pub fn get_tail(list: Expr) -> Expr {
-        pair::get_second(list)
     }
 }
 
@@ -311,7 +320,7 @@ pub mod number {
     /// reduce the resulting code size.
     #[derive(Default)]
     pub struct ConstantStore {
-        byte_set: HashSet<u8>,
+        i8_set: HashSet<u8>,
         i32_set: HashSet<u32>,
         i64_set: HashSet<u64>,
     }
@@ -322,7 +331,7 @@ pub mod number {
         }
 
         pub fn define_constants(&self, b: &mut DefinitionBuilder) {
-            for &c in &self.byte_set {
+            for &c in &self.i8_set {
                 b.def(format!("{:02x}", c), number_const(&c.to_be_bytes()));
             }
             for &c in &self.i32_set {
@@ -333,8 +342,8 @@ pub mod number {
             }
         }
 
-        pub fn byte_const(&mut self, n: u8) -> Expr {
-            self.byte_set.insert(n);
+        pub fn i8_const(&mut self, n: u8) -> Expr {
+            self.i8_set.insert(n);
             var(format!("{:02x}", n))
         }
 
@@ -376,7 +385,7 @@ pub mod number {
             "ToBitsBE32",
             abs(
                 (0..32).rev().map(|i| i.to_string()),
-                list::from((0..32).rev().map(|i| var(i.to_string()))),
+                chain::from((0..32).rev().map(|i| var(i.to_string()))),
             ),
         );
     }
@@ -427,14 +436,14 @@ pub mod tree {
             abs(
                 ["insert", "array", "index", "value"],
                 cond(
-                    list::get_head(var("index")),
+                    chain::get_head(var("index")),
                     tree::node(
                         tree::get_left(var("array")),
                         apply(
                             var("insert"),
                             [
                                 tree::get_right(var("array")),
-                                list::get_tail(var("index")),
+                                chain::get_tail(var("index")),
                                 var("value"),
                             ],
                         ),
@@ -444,7 +453,7 @@ pub mod tree {
                             var("insert"),
                             [
                                 tree::get_left(var("array")),
-                                list::get_tail(var("index")),
+                                chain::get_tail(var("index")),
                                 var("value"),
                             ],
                         ),
@@ -481,10 +490,40 @@ pub mod tree {
     }
 }
 
-pub fn define_prelude(b: &mut DefinitionBuilder) {
-    bit_define_prelude(b);
-    walc_io::define_prelude(b);
-    safe_list::define_prelude(b);
-    number::define_prelude(b);
-    tree::define_prelude(b);
+pub mod op {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Eq, Clone)]
+    pub enum ValueRepr {
+        I32,
+        I64,
+    }
+
+    pub struct FunctionBuilder {
+        ops: Vec<Expr>,
+    }
+
+    impl FunctionBuilder {
+        pub fn new(param_count: usize, result_count: usize, local_reprs: &[ValueRepr]) -> Self {
+            let mut me = Self { ops: Vec::new() };
+
+            // TODO
+
+            me
+        }
+
+        pub fn build(mut self) -> Result<Expr> {
+            let mut result = self.ops.pop().ok_or(anyhow!("Empty function"))?;
+
+            for op in self.ops.into_iter().rev() {
+                result = apply(op, [result]);
+            }
+
+            Ok(result)
+        }
+    }
+
+    pub fn local() -> Expr {
+        todo!()
+    }
 }

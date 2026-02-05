@@ -4,6 +4,9 @@ use anyhow::{Result, anyhow};
 
 use wasmparser::*;
 
+type FuncId = u32;
+type TypeId = u32;
+
 #[derive(Default)]
 struct Compiler {
     defs: codegen::DefinitionBuilder,
@@ -15,11 +18,17 @@ struct Compiler {
 
 #[derive(Default)]
 struct FunctionInfo {
-    next_id: u32,
-    walc_input_id: Option<u32>,
-    walc_output_id: Option<u32>,
-    walc_exit_id: Option<u32>,
-    main_id: u32,
+    next_id: FuncId,
+
+    main_id: FuncId,
+    walc_input_id: Option<FuncId>,
+    walc_output_id: Option<FuncId>,
+    walc_exit_id: Option<FuncId>,
+    start_id: Option<FuncId>,
+
+    type_infos: std::collections::HashMap<TypeId, FunctionTypeInfo>,
+    /// Indexed by function IDs
+    function_types: Vec<TypeId>,
 }
 
 impl FunctionInfo {
@@ -28,6 +37,18 @@ impl FunctionInfo {
         self.next_id += 1;
         id
     }
+
+    fn get_function_type_info(&self, func_id: FuncId) -> FunctionTypeInfo {
+        let type_id = self.function_types[func_id as usize];
+        self.type_infos[&type_id].clone()
+    }
+}
+
+#[derive(Clone)]
+
+struct FunctionTypeInfo {
+    param_count: usize,
+    result_count: usize,
 }
 
 struct ActiveDataSegmentInfo {
@@ -35,23 +56,26 @@ struct ActiveDataSegmentInfo {
     offset_expr: codegen::Expr,
 }
 
-pub fn compile(source: &[u8]) -> Result<codegen::Expr> {
+const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1;
+
+pub fn compile_module(source: &[u8]) -> Result<codegen::Expr> {
+    Validator::new_with_features(SUPPORTED_FEATURES)
+        .validate_all(source)
+        .map_err(|e| anyhow!("failed to validate the module: {}", e))?;
+
     let mut compiler = Compiler::new();
+    compiler.parse_module(source)?;
+    Ok(compiler.assemble())
+}
 
-    let mut parser = Parser::new(0);
-    parser.set_features(WasmFeatures::WASM1);
-
-    for payload in parser.parse_all(source) {
-        match payload? {
-            Payload::Version { encoding, .. } => compiler.handle_version(encoding)?,
-            Payload::ImportSection(section) => compiler.handle_imports(section)?,
-            Payload::ExportSection(section) => compiler.handle_exports(section)?,
-            Payload::DataSection(section) => compiler.handle_data(section)?,
-            _ => {}
-        }
+/// Retrieves the underlying representation for a WASM value type.
+fn val_type_repr(val_type: ValType) -> Result<codegen::op::ValueRepr> {
+    use codegen::op::ValueRepr;
+    match val_type {
+        ValType::I32 | ValType::F32 => Ok(ValueRepr::I32),
+        ValType::I64 | ValType::F64 => Ok(ValueRepr::I64),
+        _ => Err(anyhow!("Unsupported local type: {:?}", val_type)),
     }
-
-    Ok(compiler.result())
 }
 
 impl Compiler {
@@ -59,11 +83,46 @@ impl Compiler {
         Self::default()
     }
 
-    fn handle_version(&self, encoding: Encoding) -> Result<()> {
-        match encoding {
-            Encoding::Module => Ok(()),
-            Encoding::Component => Err(anyhow!("WASM components are not supported")),
+    fn parse_module(&mut self, source: &[u8]) -> Result<()> {
+        let mut parser = Parser::new(0);
+        parser.set_features(SUPPORTED_FEATURES);
+
+        for payload in parser.parse_all(source) {
+            match payload? {
+                Payload::TypeSection(section) => self.handle_types(section)?,
+                Payload::ImportSection(section) => self.handle_imports(section)?,
+                Payload::FunctionSection(section) => self.handle_function_types(section)?,
+                Payload::TableSection(section) => self.handle_table(section)?,
+                Payload::GlobalSection(section) => self.handle_globals(section)?,
+                Payload::ExportSection(section) => self.handle_exports(section)?,
+                Payload::StartSection { func, .. } => self.handle_start(func)?,
+                Payload::ElementSection(section) => self.handle_elements(section)?,
+                Payload::CodeSectionEntry(function) => self.handle_function(function)?,
+                Payload::DataSection(section) => self.handle_data(section)?,
+
+                Payload::Version { encoding, .. } => {
+                    if matches!(encoding, Encoding::Component) {
+                        Err(anyhow!("WASM components are not supported"))?
+                    }
+                }
+
+                Payload::CodeSectionStart { .. } => {
+                    // This section start marker is ignored because it only contains
+                    // the function count, which is not important
+                }
+
+                Payload::MemorySection(_section) => {
+                    // This section is ignored because:
+                    // 1. WASM 1.0 modules can only have one memory
+                    // 2. WALC memory is lazy and always has the size of 4 GiB,
+                    //    so the initial memory size is irrelevant
+                }
+
+                payload => Err(anyhow!("Unsupported section: {:?}", payload))?,
+            }
         }
+
+        Ok(())
     }
 
     fn handle_imports(&mut self, section: ImportSectionReader) -> Result<()> {
@@ -71,12 +130,16 @@ impl Compiler {
             let import = import?;
 
             if import.module != "walc" {
-                Err(anyhow!("Only imports from the 'walc' module are supported"))?
+                Err(anyhow!("Only imports from the 'walc' module are allowed"))?
             }
 
             match import.ty {
-                TypeRef::Func(_type_id) | TypeRef::FuncExact(_type_id) => {
-                    // The types of the built-in functions are not checked for simplicity
+                TypeRef::Func(type_id) | TypeRef::FuncExact(type_id) => {
+                    // TODO check built-in function types?
+
+                    // Imported functions' types must be recorded so that indexes of the function
+                    // type list will match function IDs
+                    self.function_info.function_types.push(type_id);
                 }
                 _ => Err(anyhow!("Only function imports are supported"))?,
             }
@@ -91,10 +154,18 @@ impl Compiler {
                 "exit" => {
                     self.function_info.walc_exit_id = Some(self.function_info.next_id());
                 }
-                _ => Err(anyhow!("Unknown import: {}", import.name))?,
+                _ => Err(anyhow!(
+                    "Unknown import: {} (only 'input', 'output', and 'exit' are allowed)",
+                    import.name
+                ))?,
             }
         }
 
+        Ok(())
+    }
+
+    fn handle_start(&mut self, func: u32) -> Result<()> {
+        self.function_info.start_id = Some(func);
         Ok(())
     }
 
@@ -118,7 +189,7 @@ impl Compiler {
 
             self.defs.def(
                 format!("DATA{data_segment_id}"),
-                codegen::safe_list::from_bytes(&mut self.consts, data_segment.data),
+                codegen::list::from_bytes(&mut self.consts, data_segment.data),
             );
 
             if let DataKind::Active { offset_expr, .. } = data_segment.kind {
@@ -137,10 +208,7 @@ impl Compiler {
     fn translate_const(&mut self, expr: &ConstExpr) -> Result<codegen::Expr> {
         let mut operators = expr.get_operators_reader().into_iter();
 
-        let result = match operators
-            .next()
-            .ok_or(anyhow!("Empty constant expression"))??
-        {
+        let result = match operators.next().unwrap()? {
             Operator::I32Const { value } => self.consts.i32_const(value as u32),
             Operator::I64Const { value } => self.consts.i64_const(value as u64),
             Operator::F32Const { value } => self.consts.i32_const(value.bits()),
@@ -148,11 +216,9 @@ impl Compiler {
             op => Err(anyhow!("Unsupported constant expression: {:?}", op))?,
         };
 
-        match operators
-            .next()
-            .ok_or(anyhow!("Constant expression missing end operator"))??
-        {
+        match operators.next().unwrap()? {
             Operator::End => {}
+
             op => Err(anyhow!(
                 "Unexpected operator in constant expression: {:?}",
                 op
@@ -162,12 +228,104 @@ impl Compiler {
         Ok(result)
     }
 
-    fn result(self) -> codegen::Expr {
-        let root = codegen::walc_io::end();
+    fn read_function_types(section: TypeSectionReader) -> impl Iterator<Item = Result<FuncType>> {
+        section
+            .into_iter()
+            .map(|recursive_type_group| -> Result<FuncType> {
+                let mut subtypes = recursive_type_group?.into_types();
+                let first = subtypes.nth(0).unwrap();
+                match first.composite_type.inner {
+                    CompositeInnerType::Func(func_type) => Ok(func_type),
+                    _ => Err(anyhow!("Only function types are supported")),
+                }
+            })
+    }
+
+    fn handle_types(&mut self, section: TypeSectionReader) -> Result<()> {
+        for (type_id, ty) in Self::read_function_types(section).enumerate() {
+            let ty = ty?;
+
+            self.function_info.type_infos.insert(
+                type_id as TypeId,
+                FunctionTypeInfo {
+                    param_count: ty.params().len(),
+                    result_count: ty.results().len(),
+                },
+            );
+        }
+
+        Ok(())
+    }
+
+    fn handle_function_types(&mut self, section: FunctionSectionReader) -> Result<()> {
+        for type_id in section.into_iter() {
+            let type_id = type_id?;
+
+            self.function_info.function_types.push(type_id);
+        }
+
+        Ok(())
+    }
+
+    fn get_function_local_reprs(
+        &mut self,
+        func: &FunctionBody,
+    ) -> Result<Vec<codegen::op::ValueRepr>> {
+        let mut local_reprs = Vec::<codegen::op::ValueRepr>::new();
+
+        for local_declaration in func.get_locals_reader()?.into_iter() {
+            let (count, val_type) = local_declaration?;
+            local_reprs.extend(std::iter::repeat_n(
+                val_type_repr(val_type)?,
+                count as usize,
+            ));
+        }
+
+        Ok(local_reprs)
+    }
+
+    fn handle_function(&mut self, func: FunctionBody) -> Result<()> {
+        let func_id = self.function_info.next_id();
+
+        let func_type_info = self.function_info.get_function_type_info(func_id);
+
+        let mut function_builder = codegen::op::FunctionBuilder::new(
+            func_type_info.param_count,
+            func_type_info.result_count,
+            &self.get_function_local_reprs(&func)?,
+        );
+
+        for op in func.get_operators_reader()?.into_iter() {
+            let op = op?;
+
+            // TODO read operators
+        }
+
+        Ok(())
+    }
+
+    fn handle_table(&mut self, _section: TableSectionReader) -> Result<()> {
+        // TODO
+        Ok(())
+    }
+
+    fn handle_globals(&mut self, _section: GlobalSectionReader) -> Result<()> {
+        // TODO
+        Ok(())
+    }
+
+    fn handle_elements(&mut self, _section: ElementSectionReader) -> Result<()> {
+        // TODO
+        Ok(())
+    }
+
+    fn assemble(self) -> codegen::Expr {
+        // TODO
+        let root_expr = codegen::walc_io::end();
 
         let mut toplevel = codegen::DefinitionBuilder::new();
         codegen::define_prelude(&mut toplevel);
         self.consts.define_constants(&mut toplevel);
-        toplevel.build(self.defs.build(root))
+        toplevel.build(self.defs.build(root_expr))
     }
 }
