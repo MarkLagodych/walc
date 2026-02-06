@@ -8,7 +8,10 @@ description = "WebAssembly to Lambda Calculus compiler"
 
 [features]
 default = []
-debug-unreachable = []
+
+# Only for development testing and debugging: makes the compiler
+# emit an unbound variable in place of unreachable code
+unbound-unreachable = []
 
 [dependencies.wasmparser]
 version = "^0.244"

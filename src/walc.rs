@@ -50,9 +50,9 @@ struct ActiveDataSegmentInfo {
     offset_expr: codegen::Expr,
 }
 
-/// Maximum ID for functions, globals, locals, etc.
+/// Maximum ID for functions, globals, and locals
 const MAX_ID: u32 = u16::MAX as u32;
-/// Maximum count for functions, globals, locals, etc.
+/// Maximum count for functions, globals, and locals
 const MAX_COUNT: u32 = MAX_ID + 1;
 
 const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1;
@@ -84,27 +84,19 @@ impl Module {
                 Payload::TableSection(section) => self.handle_table(section)?,
                 Payload::GlobalSection(section) => self.handle_globals(section)?,
                 Payload::ExportSection(section) => self.handle_exports(section)?,
-                Payload::StartSection { func: func_id, .. } => self.handle_start(func_id)?,
+                Payload::StartSection { func, .. } => self.handle_start(func)?,
                 Payload::ElementSection(section) => self.handle_elements(section)?,
                 Payload::CodeSectionEntry(function) => self.handle_function(function)?,
                 Payload::DataSection(section) => self.handle_data(section)?,
 
-                Payload::Version { .. } => {
-                    // Checked by the validator
-                }
+                // Memory section is ignored because:
+                // - WASM 1.0 modules can only have one memory
+                // - WALC memory is lazy and always has a virtual size of 4 GiB,
+                //   so the initial memory size is irrelevant
+                Payload::MemorySection(_section) => {}
 
-                Payload::CodeSectionStart { .. } => {
-                    // No useful data to process here
-                }
-
-                Payload::MemorySection(_section) => {
-                    // This section is ignored because:
-                    // 1. WASM 1.0 modules can only have one memory
-                    // 2. WALC memory is lazy and always has the size of 4 GiB,
-                    //    so the initial memory size is irrelevant
-                }
-
-                payload => Err(anyhow!("Unsupported section: {:?}", payload))?,
+                // Other stuff is checked by the validator
+                _ => {}
             }
         }
 
@@ -374,7 +366,7 @@ impl Module {
         let root_expr = codegen::walc_io::end();
 
         let mut toplevel = codegen::DefinitionBuilder::new();
-        codegen::define_prelude(&mut toplevel);
+        toplevel.define_prelude();
         self.consts.define_constants(&mut toplevel);
         let expr = toplevel.build(self.defs.build(root_expr));
 

@@ -1,4 +1,16 @@
 /// WALC code generator
+pub mod chain;
+pub mod either;
+pub mod list;
+pub mod memory;
+pub mod number;
+pub mod op;
+pub mod optional;
+pub mod pair;
+pub mod table;
+pub mod tree;
+pub mod walc_io;
+
 use anyhow::{Result, anyhow};
 
 #[derive(Debug, Clone)]
@@ -83,6 +95,26 @@ pub fn def(var: impl ToString, value: Expr, body: Expr) -> Expr {
     apply(abs([var], body), [value])
 }
 
+pub fn cond(condition: Expr, then_branch: Expr, else_branch: Expr) -> Expr {
+    apply(condition, [else_branch, then_branch])
+}
+
+pub fn rec(func: Expr) -> Expr {
+    apply(func.clone(), [func])
+}
+
+pub fn unreachable() -> Expr {
+    if cfg!(feature = "unbound-unreachable") {
+        var("__UNREACHABLE__")
+    } else {
+        abs(["_"], var("_"))
+    }
+}
+
+pub fn bit(b: bool) -> Expr {
+    if b { var("1") } else { var("0") }
+}
+
 #[derive(Default)]
 pub struct DefinitionBuilder {
     defs: Vec<(String, Expr)>,
@@ -104,437 +136,14 @@ impl DefinitionBuilder {
         }
         result
     }
-}
 
-pub fn cond(condition: Expr, then_branch: Expr, else_branch: Expr) -> Expr {
-    apply(condition, [else_branch, then_branch])
-}
-
-pub fn unreachable() -> Expr {
-    if cfg!(feature = "debug-unreachable") {
-        var("__UNREACHABLE__")
-    } else {
-        abs(["_"], var("_"))
-    }
-}
-
-pub fn rec(func: Expr) -> Expr {
-    apply(func.clone(), [func])
-}
-
-pub fn bit(b: bool) -> Expr {
-    if b { var("1") } else { var("0") }
-}
-
-fn bit_define_prelude(b: &mut DefinitionBuilder) {
-    b.def("0", abs(["x0", "x1"], var("x0")));
-    b.def("1", abs(["x0", "x1"], var("x1")));
-}
-
-pub fn define_prelude(b: &mut DefinitionBuilder) {
-    bit_define_prelude(b);
-    walc_io::define_prelude(b);
-    list::define_prelude(b);
-    number::define_prelude(b);
-    tree::define_prelude(b);
-}
-
-pub mod pair {
-    use super::*;
-
-    pub fn new(first: Expr, second: Expr) -> Expr {
-        abs(["P"], apply(var("P"), [first, second]))
-    }
-
-    pub fn get_first(pair: Expr) -> Expr {
-        apply(pair, [var("0")])
-    }
-
-    pub fn get_second(pair: Expr) -> Expr {
-        apply(pair, [var("1")])
-    }
-}
-
-pub mod either {
-    use super::*;
-
-    pub fn first(value: Expr) -> Expr {
-        pair::new(var("0"), value)
-    }
-
-    pub fn second(value: Expr) -> Expr {
-        pair::new(var("1"), value)
-    }
-
-    pub fn is_second(either: Expr) -> Expr {
-        pair::get_first(either)
-    }
-
-    pub fn unwrap(either: Expr) -> Expr {
-        pair::get_second(either)
-    }
-}
-
-pub mod optional {
-    use super::*;
-
-    pub fn none() -> Expr {
-        either::first(unreachable())
-    }
-
-    pub fn some(value: Expr) -> Expr {
-        either::second(value)
-    }
-
-    pub fn is_some(optional: Expr) -> Expr {
-        either::is_second(optional)
-    }
-
-    pub fn unwrap(optional: Expr) -> Expr {
-        either::unwrap(optional)
-    }
-}
-
-pub mod chain {
-    use super::*;
-
-    pub fn empty() -> Expr {
-        unreachable()
-    }
-
-    pub fn node(head: Expr, tail: Expr) -> Expr {
-        // TODO Should unsafe list also use a predefined cons(tructor) like the safe list?
-        pair::new(head, tail)
-    }
-
-    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> Expr {
-        let mut result = empty();
-        for item in items.rev() {
-            result = node(item, result);
-        }
-        result
-    }
-
-    pub fn from_bytes(store: &mut number::ConstantStore, bytes: &[u8]) -> Expr {
-        from(bytes.iter().map(|b| store.byte_const(*b)))
-    }
-
-    pub fn get_head(list: Expr) -> Expr {
-        pair::get_first(list)
-    }
-
-    pub fn get_tail(list: Expr) -> Expr {
-        pair::get_second(list)
-    }
-}
-
-pub mod list {
-    use super::*;
-
-    pub fn empty() -> Expr {
-        var("Empty")
-    }
-
-    pub fn node(head: Expr, tail: Expr) -> Expr {
-        apply(var("C"), [head, tail])
-    }
-
-    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> Expr {
-        let mut result = empty();
-        for item in items.rev() {
-            result = node(item, result);
-        }
-        result
-    }
-
-    pub fn from_bytes(store: &mut number::ConstantStore, bytes: &[u8]) -> Expr {
-        from(bytes.iter().map(|b| store.byte_const(*b)))
-    }
-
-    pub fn is_not_empty(list: Expr) -> Expr {
-        optional::is_some(list)
-    }
-
-    pub fn get_head(list: Expr) -> Expr {
-        pair::get_first(optional::unwrap(list))
-    }
-
-    pub fn get_tail(list: Expr) -> Expr {
-        pair::get_second(optional::unwrap(list))
-    }
-
-    pub fn define_prelude(b: &mut DefinitionBuilder) {
-        b.def("Empty", optional::none());
-
-        b.def(
-            // Cons (list constructor)
-            "C",
-            // head, tail
-            abs(["h", "t"], optional::some(pair::new(var("h"), var("t")))),
-        );
-    }
-}
-
-pub mod walc_io {
-    use super::*;
-
-    pub fn end() -> Expr {
-        var("End")
-    }
-
-    pub fn output(out_byte: Expr, next: Expr) -> Expr {
-        apply(var("Out"), [out_byte, next])
-    }
-
-    pub fn input(root_input_handler: Expr) -> Expr {
-        apply(var("In"), [root_input_handler])
-    }
-
-    pub fn define_prelude(b: &mut DefinitionBuilder) {
-        b.def("End", optional::none());
-
-        b.def(
-            "Out",
-            abs(
-                ["out_byte", "next"],
-                optional::some(either::first(pair::new(var("out_byte"), var("next")))),
-            ),
-        );
-
-        b.def(
-            "In",
-            abs(
-                ["input_handler"],
-                optional::some(either::second(var("input_handler"))),
-            ),
-        );
-    }
-}
-
-pub mod number {
-    use super::*;
-
-    // An ordered set makes the resulting code slightly nicer: the constants are defined in order
-    use std::collections::BTreeSet as Set;
-
-    /// This struct accumulates all numeric constants throughout the WASM module in order to
-    /// reduce the resulting code size.
-    #[derive(Default)]
-    pub struct ConstantStore {
-        bytes: Set<u8>,
-        ids: Set<u16>,
-        i32s: Set<u32>,
-        i64s: Set<u64>,
-    }
-
-    impl ConstantStore {
-        pub fn new() -> Self {
-            Self::default()
-        }
-
-        pub fn define_constants(&self, b: &mut DefinitionBuilder) {
-            for &n in &self.bytes {
-                b.def(format!("{:02x}", n), Self::byte_expr(n));
-            }
-            for &n in &self.ids {
-                b.def(format!("{:04x}", n), Self::number_expr(&n.to_be_bytes()));
-            }
-            for &n in &self.i32s {
-                b.def(format!("{:08x}", n), Self::number_expr(&n.to_be_bytes()));
-            }
-            for &n in &self.i64s {
-                b.def(format!("{:016x}", n), Self::number_expr(&n.to_be_bytes()));
-            }
-        }
-
-        fn byte_expr(byte: u8) -> Expr {
-            let ith_bit = |i: u8| -> Expr { bit((byte >> i) & 1 != 0) };
-
-            abs(["x"], apply(var("x"), (0..8).rev().map(ith_bit)))
-        }
-
-        fn number_expr(be_bytes: &[u8]) -> Expr {
-            let mut expr = var("n");
-            for &byte in be_bytes {
-                expr = apply(var(format!("{:02x}", byte)), [expr]);
-            }
-            abs(["n"], expr)
-        }
-
-        pub fn byte_const(&mut self, byte: u8) -> Expr {
-            self.bytes.insert(byte);
-            var(format!("{:02x}", byte))
-        }
-
-        pub fn id_const(&mut self, id: u16) -> Expr {
-            self.ids.insert(id);
-            self.bytes.extend(id.to_be_bytes());
-            var(format!("{:04x}", id))
-        }
-
-        pub fn i32_const(&mut self, n: u32) -> Expr {
-            self.i32s.insert(n);
-            self.bytes.extend(n.to_be_bytes());
-            var(format!("{:08x}", n))
-        }
-
-        pub fn i64_const(&mut self, n: u64) -> Expr {
-            self.i64s.insert(n);
-            self.bytes.extend(n.to_be_bytes());
-            var(format!("{:016x}", n))
-        }
-    }
-
-    pub fn to_bit_list_be32(number: Expr) -> Expr {
-        // I debugged this for two weeks :X
-        // Yes, you really call a number with a function, not the other way around.
-        apply(number, [var("ToBitsBE32")])
-    }
-
-    pub fn define_prelude(b: &mut DefinitionBuilder) {
-        b.def(
-            "ToBitsBE32",
-            abs(
-                (0..32).rev().map(|i| i.to_string()),
-                chain::from((0..32).rev().map(|i| var(i.to_string()))),
-            ),
-        );
-    }
-}
-
-pub mod tree {
-    use super::*;
-
-    pub fn new(default_item: Expr) -> Expr {
-        apply(var("TreeOf"), [default_item])
-    }
-
-    pub fn node(left: Expr, right: Expr) -> Expr {
-        pair::new(left, right)
-    }
-
-    pub fn get_left(array: Expr) -> Expr {
-        pair::get_first(array)
-    }
-
-    pub fn get_right(array: Expr) -> Expr {
-        pair::get_second(array)
-    }
-
-    pub fn index(array: Expr, index: Expr) -> Expr {
-        apply(index, [array])
-    }
-
-    pub fn insert(array: Expr, index: Expr, value: Expr) -> Expr {
-        apply(var("TreeInsert"), [array, index, value])
-    }
-
-    pub fn define_prelude(b: &mut DefinitionBuilder) {
-        // Indexable by 0 bits (i.e. not indexable)
-        b.def("T0", abs(["x"], var("x")));
-        // Every node is indexable by i bits
-        for i in 1..=32 {
-            let node_name = format!("T{}", i);
-            let item_name = format!("T{}", i - 1);
-            let item = apply(var(item_name), [var("x")]);
-            b.def(node_name, abs(["x"], tree::node(item.clone(), item)));
-        }
-
-        b.def("TreeOf", var("T32"));
-
-        b.def(
-            "TIns_",
-            abs(
-                ["insert", "array", "index", "value"],
-                cond(
-                    chain::get_head(var("index")),
-                    tree::node(
-                        tree::get_left(var("array")),
-                        apply(
-                            var("insert"),
-                            [
-                                tree::get_right(var("array")),
-                                chain::get_tail(var("index")),
-                                var("value"),
-                            ],
-                        ),
-                    ),
-                    tree::node(
-                        apply(
-                            var("insert"),
-                            [
-                                tree::get_left(var("array")),
-                                chain::get_tail(var("index")),
-                                var("value"),
-                            ],
-                        ),
-                        tree::get_right(var("array")),
-                    ),
-                ),
-            ),
-        );
-
-        b.def("TIns0", abs(["array", "index", "value"], var("value")));
-
-        // Each insertion function consumes i bits of the index
-        for i in 1..=32 {
-            b.def(
-                format!("TIns{}", i),
-                apply(var("TIns_"), [var(format!("TIns{}", i - 1))]),
-            );
-        }
-
-        b.def(
-            "TreeInsert",
-            abs(
-                ["array", "index", "value"],
-                apply(
-                    var("TIns32"),
-                    [
-                        var("array"),
-                        number::to_bit_list_be32(var("index")),
-                        var("value"),
-                    ],
-                ),
-            ),
-        );
-    }
-}
-
-pub mod op {
-    use super::*;
-
-    #[derive(Debug, PartialEq, Eq, Clone)]
-    pub enum ValueRepr {
-        I32,
-        I64,
-    }
-
-    pub struct FunctionBuilder {
-        ops: Vec<Expr>,
-    }
-
-    impl FunctionBuilder {
-        pub fn new(param_count: usize, result_count: usize, local_reprs: &[ValueRepr]) -> Self {
-            let mut me = Self { ops: Vec::new() };
-
-            // TODO
-
-            me
-        }
-
-        pub fn build(mut self) -> Result<Expr> {
-            let mut result = self.ops.pop().ok_or(anyhow!("Empty function"))?;
-
-            for op in self.ops.into_iter().rev() {
-                result = apply(op, [result]);
-            }
-
-            Ok(result)
-        }
-    }
-
-    pub fn local() -> Expr {
-        todo!()
+    pub fn define_prelude(&mut self) {
+        self.def("0", abs(["x0", "x1"], var("x0")));
+        self.def("1", abs(["x0", "x1"], var("x1")));
+
+        walc_io::define_prelude(self);
+        list::define_prelude(self);
+        number::define_prelude(self);
+        tree::define_prelude(self);
     }
 }
