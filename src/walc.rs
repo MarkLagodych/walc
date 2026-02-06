@@ -8,7 +8,7 @@ type FuncId = u32;
 type TypeId = u32;
 
 #[derive(Default)]
-struct Compiler {
+struct Module {
     defs: codegen::DefinitionBuilder,
     consts: codegen::number::ConstantStore,
 
@@ -20,41 +20,40 @@ struct Compiler {
 struct FunctionInfo {
     next_id: FuncId,
 
-    main_id: FuncId,
+    main_id: Option<FuncId>,
     walc_input_id: Option<FuncId>,
     walc_output_id: Option<FuncId>,
     walc_exit_id: Option<FuncId>,
     start_id: Option<FuncId>,
 
-    type_infos: std::collections::HashMap<TypeId, FunctionTypeInfo>,
-    /// Indexed by function IDs
-    function_types: Vec<TypeId>,
+    /// Indexed by TypeId
+    types: Vec<FuncType>,
+    /// Indexed by FuncId
+    type_map: Vec<TypeId>,
 }
 
 impl FunctionInfo {
-    fn next_id(&mut self) -> u32 {
+    fn next_id(&mut self) -> FuncId {
         let id = self.next_id;
         self.next_id += 1;
         id
     }
 
-    fn get_function_type_info(&self, func_id: FuncId) -> FunctionTypeInfo {
-        let type_id = self.function_types[func_id as usize];
-        self.type_infos[&type_id].clone()
+    fn get_type(&self, func_id: FuncId) -> &FuncType {
+        let type_id = self.type_map[func_id as usize];
+        &self.types[type_id as usize]
     }
-}
-
-#[derive(Clone)]
-
-struct FunctionTypeInfo {
-    param_count: usize,
-    result_count: usize,
 }
 
 struct ActiveDataSegmentInfo {
     data_segment_id: u32,
     offset_expr: codegen::Expr,
 }
+
+/// Maximum ID for functions, globals, locals, etc.
+const MAX_ID: u32 = u16::MAX as u32;
+/// Maximum count for functions, globals, locals, etc.
+const MAX_COUNT: u32 = MAX_ID + 1;
 
 const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1;
 
@@ -63,27 +62,17 @@ pub fn compile_module(source: &[u8]) -> Result<codegen::Expr> {
         .validate_all(source)
         .map_err(|e| anyhow!("failed to validate the module: {}", e))?;
 
-    let mut compiler = Compiler::new();
-    compiler.parse_module(source)?;
-    Ok(compiler.assemble())
+    let mut module = Module::new();
+    module.parse(source)?;
+    module.assemble()
 }
 
-/// Retrieves the underlying representation for a WASM value type.
-fn val_type_repr(val_type: ValType) -> Result<codegen::op::ValueRepr> {
-    use codegen::op::ValueRepr;
-    match val_type {
-        ValType::I32 | ValType::F32 => Ok(ValueRepr::I32),
-        ValType::I64 | ValType::F64 => Ok(ValueRepr::I64),
-        _ => Err(anyhow!("Unsupported local type: {:?}", val_type)),
-    }
-}
-
-impl Compiler {
+impl Module {
     fn new() -> Self {
         Self::default()
     }
 
-    fn parse_module(&mut self, source: &[u8]) -> Result<()> {
+    fn parse(&mut self, source: &[u8]) -> Result<()> {
         let mut parser = Parser::new(0);
         parser.set_features(SUPPORTED_FEATURES);
 
@@ -95,20 +84,17 @@ impl Compiler {
                 Payload::TableSection(section) => self.handle_table(section)?,
                 Payload::GlobalSection(section) => self.handle_globals(section)?,
                 Payload::ExportSection(section) => self.handle_exports(section)?,
-                Payload::StartSection { func, .. } => self.handle_start(func)?,
+                Payload::StartSection { func: func_id, .. } => self.handle_start(func_id)?,
                 Payload::ElementSection(section) => self.handle_elements(section)?,
                 Payload::CodeSectionEntry(function) => self.handle_function(function)?,
                 Payload::DataSection(section) => self.handle_data(section)?,
 
-                Payload::Version { encoding, .. } => {
-                    if matches!(encoding, Encoding::Component) {
-                        Err(anyhow!("WASM components are not supported"))?
-                    }
+                Payload::Version { .. } => {
+                    // Checked by the validator
                 }
 
                 Payload::CodeSectionStart { .. } => {
-                    // This section start marker is ignored because it only contains
-                    // the function count, which is not important
+                    // No useful data to process here
                 }
 
                 Payload::MemorySection(_section) => {
@@ -133,26 +119,40 @@ impl Compiler {
                 Err(anyhow!("Only imports from the 'walc' module are allowed"))?
             }
 
-            match import.ty {
-                TypeRef::Func(type_id) | TypeRef::FuncExact(type_id) => {
-                    // TODO check built-in function types?
-
-                    // Imported functions' types must be recorded so that indexes of the function
-                    // type list will match function IDs
-                    self.function_info.function_types.push(type_id);
-                }
+            let type_id = match import.ty {
+                TypeRef::Func(type_id) | TypeRef::FuncExact(type_id) => type_id,
                 _ => Err(anyhow!("Only function imports are supported"))?,
-            }
+            };
+
+            // Imported functions' types must be recorded so that indexes of the function
+            // type list will match function IDs
+            self.function_info.type_map.push(type_id);
+
+            let func_id = self.function_info.next_id();
+
+            let func_type = self.function_info.types.get(type_id as usize).unwrap();
 
             match import.name {
                 "input" => {
-                    self.function_info.walc_input_id = Some(self.function_info.next_id());
+                    if !(func_type.params().is_empty() && func_type.results() == [ValType::I32]) {
+                        Err(anyhow!("walc.input must have type () -> (i32)"))?
+                    }
+
+                    self.function_info.walc_input_id = Some(func_id);
                 }
                 "output" => {
-                    self.function_info.walc_output_id = Some(self.function_info.next_id());
+                    if !(func_type.params() == [ValType::I32] && func_type.results().is_empty()) {
+                        Err(anyhow!("walc.output must have type (i32) -> ()"))?
+                    }
+
+                    self.function_info.walc_output_id = Some(func_id);
                 }
                 "exit" => {
-                    self.function_info.walc_exit_id = Some(self.function_info.next_id());
+                    if !(func_type.params().is_empty() && func_type.results().is_empty()) {
+                        Err(anyhow!("walc.exit must have type () -> ()"))?
+                    }
+
+                    self.function_info.walc_exit_id = Some(func_id);
                 }
                 _ => Err(anyhow!(
                     "Unknown import: {} (only 'input', 'output', and 'exit' are allowed)",
@@ -174,7 +174,13 @@ impl Compiler {
             let export = export?;
 
             if export.name == "main" {
-                self.function_info.main_id = export.index;
+                self.function_info.main_id = Some(export.index);
+
+                let func_type = self.function_info.get_type(export.index);
+
+                if !(func_type.params().is_empty() && func_type.results().is_empty()) {
+                    Err(anyhow!("'main' must have type () -> ()"))?
+                }
             }
 
             // Other exports are ignored because they will not be used in any way
@@ -242,16 +248,16 @@ impl Compiler {
     }
 
     fn handle_types(&mut self, section: TypeSectionReader) -> Result<()> {
-        for (type_id, ty) in Self::read_function_types(section).enumerate() {
-            let ty = ty?;
+        if section.count() > MAX_COUNT {
+            Err(anyhow!(
+                "Too many functions: {} (max is {})",
+                section.count(),
+                MAX_COUNT
+            ))?
+        }
 
-            self.function_info.type_infos.insert(
-                type_id as TypeId,
-                FunctionTypeInfo {
-                    param_count: ty.params().len(),
-                    result_count: ty.results().len(),
-                },
-            );
+        for func_type in Self::read_function_types(section) {
+            self.function_info.types.push(func_type?);
         }
 
         Ok(())
@@ -259,12 +265,20 @@ impl Compiler {
 
     fn handle_function_types(&mut self, section: FunctionSectionReader) -> Result<()> {
         for type_id in section.into_iter() {
-            let type_id = type_id?;
-
-            self.function_info.function_types.push(type_id);
+            self.function_info.type_map.push(type_id?);
         }
 
         Ok(())
+    }
+
+    /// Retrieves the underlying representation for a WASM value type.
+    fn val_type_repr(val_type: ValType) -> Result<codegen::op::ValueRepr> {
+        use codegen::op::ValueRepr;
+        match val_type {
+            ValType::I32 | ValType::F32 => Ok(ValueRepr::I32),
+            ValType::I64 | ValType::F64 => Ok(ValueRepr::I64),
+            _ => Err(anyhow!("Unsupported local type: {:?}", val_type)),
+        }
     }
 
     fn get_function_local_reprs(
@@ -276,7 +290,7 @@ impl Compiler {
         for local_declaration in func.get_locals_reader()?.into_iter() {
             let (count, val_type) = local_declaration?;
             local_reprs.extend(std::iter::repeat_n(
-                val_type_repr(val_type)?,
+                Self::val_type_repr(val_type)?,
                 count as usize,
             ));
         }
@@ -287,12 +301,23 @@ impl Compiler {
     fn handle_function(&mut self, func: FunctionBody) -> Result<()> {
         let func_id = self.function_info.next_id();
 
-        let func_type_info = self.function_info.get_function_type_info(func_id);
+        let local_reprs = self.get_function_local_reprs(&func)?;
 
-        let mut function_builder = codegen::op::FunctionBuilder::new(
-            func_type_info.param_count,
-            func_type_info.result_count,
-            &self.get_function_local_reprs(&func)?,
+        if local_reprs.len() > (MAX_COUNT as usize) {
+            Err(anyhow!(
+                "Too many locals in function {}: {} (max is {})",
+                func_id,
+                local_reprs.len(),
+                MAX_COUNT
+            ))?;
+        }
+
+        let func_type = self.function_info.get_type(func_id);
+
+        let mut func_builder = codegen::op::FunctionBuilder::new(
+            func_type.params().len(),
+            func_type.results().len(),
+            &local_reprs,
         );
 
         for op in func.get_operators_reader()?.into_iter() {
@@ -304,28 +329,55 @@ impl Compiler {
         Ok(())
     }
 
-    fn handle_table(&mut self, _section: TableSectionReader) -> Result<()> {
+    fn handle_table(&mut self, section: TableSectionReader) -> Result<()> {
         // TODO
         Ok(())
     }
 
-    fn handle_globals(&mut self, _section: GlobalSectionReader) -> Result<()> {
+    fn handle_globals(&mut self, section: GlobalSectionReader) -> Result<()> {
+        if section.count() > MAX_COUNT {
+            Err(anyhow!(
+                "Too many globals: {} (max is {})",
+                section.count(),
+                MAX_COUNT
+            ))?;
+        }
+
+        for global in section.into_iter() {
+            let global = global?;
+
+            let init_expr = self.translate_const(&global.init_expr)?;
+
+            // TODO
+        }
+
+        Ok(())
+    }
+
+    fn handle_elements(&mut self, section: ElementSectionReader) -> Result<()> {
         // TODO
         Ok(())
     }
 
-    fn handle_elements(&mut self, _section: ElementSectionReader) -> Result<()> {
-        // TODO
-        Ok(())
-    }
+    fn assemble(self) -> Result<codegen::Expr> {
+        if self.function_info.main_id.is_none() {
+            Err(anyhow!("The module must export a 'main' function"))?
+        }
 
-    fn assemble(self) -> codegen::Expr {
+        if let Some(start_id) = self.function_info.start_id {
+            // TODO
+        }
+
+        // TODO handle active data segments
+
         // TODO
         let root_expr = codegen::walc_io::end();
 
         let mut toplevel = codegen::DefinitionBuilder::new();
         codegen::define_prelude(&mut toplevel);
         self.consts.define_constants(&mut toplevel);
-        toplevel.build(self.defs.build(root_expr))
+        let expr = toplevel.build(self.defs.build(root_expr));
+
+        Ok(expr)
     }
 }

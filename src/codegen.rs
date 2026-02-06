@@ -216,7 +216,7 @@ pub mod chain {
     }
 
     pub fn from_bytes(store: &mut number::ConstantStore, bytes: &[u8]) -> Expr {
-        from(bytes.iter().map(|b| store.i8_const(*b)))
+        from(bytes.iter().map(|b| store.byte_const(*b)))
     }
 
     pub fn get_head(list: Expr) -> Expr {
@@ -248,7 +248,7 @@ pub mod list {
     }
 
     pub fn from_bytes(store: &mut number::ConstantStore, bytes: &[u8]) -> Expr {
-        from(bytes.iter().map(|b| store.i8_const(*b)))
+        from(bytes.iter().map(|b| store.byte_const(*b)))
     }
 
     pub fn is_not_empty(list: Expr) -> Expr {
@@ -314,15 +314,17 @@ pub mod walc_io {
 pub mod number {
     use super::*;
 
-    use std::collections::HashSet;
+    // An ordered set makes the resulting code slightly nicer: the constants are defined in order
+    use std::collections::BTreeSet as Set;
 
     /// This struct accumulates all numeric constants throughout the WASM module in order to
     /// reduce the resulting code size.
     #[derive(Default)]
     pub struct ConstantStore {
-        i8_set: HashSet<u8>,
-        i32_set: HashSet<u32>,
-        i64_set: HashSet<u64>,
+        bytes: Set<u8>,
+        ids: Set<u16>,
+        i32s: Set<u32>,
+        i64s: Set<u64>,
     }
 
     impl ConstantStore {
@@ -331,47 +333,56 @@ pub mod number {
         }
 
         pub fn define_constants(&self, b: &mut DefinitionBuilder) {
-            for &c in &self.i8_set {
-                b.def(format!("{:02x}", c), number_const(&c.to_be_bytes()));
+            for &n in &self.bytes {
+                b.def(format!("{:02x}", n), Self::byte_expr(n));
             }
-            for &c in &self.i32_set {
-                b.def(format!("{:08x}", c), number_const(&c.to_be_bytes()));
+            for &n in &self.ids {
+                b.def(format!("{:04x}", n), Self::number_expr(&n.to_be_bytes()));
             }
-            for &c in &self.i64_set {
-                b.def(format!("{:016x}", c), number_const(&c.to_be_bytes()));
+            for &n in &self.i32s {
+                b.def(format!("{:08x}", n), Self::number_expr(&n.to_be_bytes()));
+            }
+            for &n in &self.i64s {
+                b.def(format!("{:016x}", n), Self::number_expr(&n.to_be_bytes()));
             }
         }
 
-        pub fn i8_const(&mut self, n: u8) -> Expr {
-            self.i8_set.insert(n);
-            var(format!("{:02x}", n))
+        fn byte_expr(byte: u8) -> Expr {
+            let ith_bit = |i: u8| -> Expr { bit((byte >> i) & 1 != 0) };
+
+            abs(["x"], apply(var("x"), (0..8).rev().map(ith_bit)))
+        }
+
+        fn number_expr(be_bytes: &[u8]) -> Expr {
+            let mut expr = var("n");
+            for &byte in be_bytes {
+                expr = apply(var(format!("{:02x}", byte)), [expr]);
+            }
+            abs(["n"], expr)
+        }
+
+        pub fn byte_const(&mut self, byte: u8) -> Expr {
+            self.bytes.insert(byte);
+            var(format!("{:02x}", byte))
+        }
+
+        pub fn id_const(&mut self, id: u16) -> Expr {
+            self.ids.insert(id);
+            self.bytes.extend(id.to_be_bytes());
+            var(format!("{:04x}", id))
         }
 
         pub fn i32_const(&mut self, n: u32) -> Expr {
-            self.i32_set.insert(n);
+            self.i32s.insert(n);
+            self.bytes.extend(n.to_be_bytes());
             var(format!("{:08x}", n))
         }
 
         pub fn i64_const(&mut self, n: u64) -> Expr {
-            self.i64_set.insert(n);
+            self.i64s.insert(n);
+            self.bytes.extend(n.to_be_bytes());
             var(format!("{:016x}", n))
         }
-    }
-
-    fn number_const(be_bytes: &[u8]) -> Expr {
-        fn ith_bit(byte: u8, i: u8) -> Expr {
-            bit((byte >> i) & 1u8 != 0)
-        }
-
-        abs(
-            ["N"],
-            apply(
-                var("N"),
-                be_bytes
-                    .iter()
-                    .flat_map(|byte| (0..8).rev().map(|i| ith_bit(*byte, i))),
-            ),
-        )
     }
 
     pub fn to_bit_list_be32(number: Expr) -> Expr {
