@@ -10,7 +10,7 @@ type TypeId = u32;
 #[derive(Default)]
 struct Module {
     defs: codegen::DefinitionBuilder,
-    consts: codegen::number::ConstantStore,
+    consts: codegen::number::ConstantSet,
 
     function_info: FunctionInfo,
     active_data_segment_infos: Vec<ActiveDataSegmentInfo>,

@@ -1,3 +1,8 @@
+//! Numbers are represented as simple tuples of bits:
+//! `[getter ((...((getter bit<N>) bit<N-1>)... bit1) bit0)]`.
+//! Thus when you want to get actual bits from a number, you must *apply a function to a number*,
+//! and not vice versa!
+
 use super::*;
 
 // An ordered set makes the resulting code slightly nicer: the constants are defined in order
@@ -6,14 +11,14 @@ use std::collections::BTreeSet as Set;
 /// This struct accumulates all numeric constants throughout the WASM module in order to
 /// reduce the resulting code size.
 #[derive(Default)]
-pub struct ConstantStore {
+pub struct ConstantSet {
     bytes: Set<u8>,
     ids: Set<u16>,
     i32s: Set<u32>,
     i64s: Set<u64>,
 }
 
-impl ConstantStore {
+impl ConstantSet {
     pub fn new() -> Self {
         Self::default()
     }
@@ -74,12 +79,10 @@ impl ConstantStore {
 pub fn to_bit_list_be(bitness: u8, number: Expr) -> Expr {
     debug_assert!(bitness == 32 || bitness == 16);
 
-    // I debugged this for two weeks O_o
-    // Yes, you really call a number with a function, not the other way around.
     apply(number, [var(format!("ToBitsBE{bitness}"))])
 }
 
-pub(super) fn define_prelude(b: &mut DefinitionBuilder) {
+pub fn define_prelude(b: &mut DefinitionBuilder) {
     for bitness in [16, 32] {
         b.def(
             format!("ToBitsBE{bitness}"),
