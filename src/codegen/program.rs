@@ -3,7 +3,7 @@ use super::*;
 use crate::analyzer::*;
 
 #[derive(Default)]
-pub struct ModuleBuilder {
+pub struct ProgramBuilder {
     defs: DefinitionBuilder,
     consts: number::ConstantDefinitionBuilder,
 
@@ -25,7 +25,7 @@ struct ActiveDataSegmentInfo {
     offset_expr: Expr,
 }
 
-impl ModuleBuilder {
+impl ProgramBuilder {
     pub fn new() -> Self {
         Self::default()
     }

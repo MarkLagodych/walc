@@ -13,7 +13,7 @@ pub type GlobalId = u32;
 type IdCounter = std::ops::RangeFrom<u32>;
 
 pub struct Analyzer {
-    mod_builder: codegen::module::ModuleBuilder,
+    mod_builder: codegen::program::ProgramBuilder,
 
     function_id: IdCounter,
     data_id: IdCounter,
@@ -36,7 +36,7 @@ impl Analyzer {
 
     pub fn new() -> Self {
         Self {
-            mod_builder: codegen::module::ModuleBuilder::new(),
+            mod_builder: codegen::program::ProgramBuilder::new(),
             function_id: 0..,
             data_id: 0..,
             global_id: 0..,

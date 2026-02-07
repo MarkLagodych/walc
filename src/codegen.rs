@@ -1,8 +1,8 @@
 //! WALC code generator
 
-pub mod module;
 pub mod number;
 pub mod op;
+pub mod program;
 
 mod lists;
 pub use lists::*;
