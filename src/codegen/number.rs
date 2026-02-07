@@ -18,6 +18,13 @@ pub struct ConstantDefinitionBuilder {
     i64s: Set<u64>,
 }
 
+pub type Byte = Expr;
+pub type Id = Expr;
+pub type I32 = Expr;
+pub type I64 = Expr;
+/// Any of: Byte, Id, I32, I64
+pub type Number = Expr;
+
 impl ConstantDefinitionBuilder {
     pub fn new() -> Self {
         Self::default()
@@ -38,13 +45,13 @@ impl ConstantDefinitionBuilder {
         }
     }
 
-    fn byte_expr(byte: u8) -> Expr {
-        let ith_bit = |i: u8| -> Expr { bit((byte >> i) & 1 != 0) };
+    fn byte_expr(byte: u8) -> Byte {
+        let ith_bit = |i: u8| -> Bit { bit((byte >> i) & 1 != 0) };
 
         abs(["x"], apply(var("x"), (0..8).rev().map(ith_bit)))
     }
 
-    fn number_expr(be_bytes: &[u8]) -> Expr {
+    fn number_expr(be_bytes: &[u8]) -> Number {
         let mut expr = var("n");
         for &byte in be_bytes {
             expr = apply(var(format!("{:02x}", byte)), [expr]);
@@ -52,31 +59,31 @@ impl ConstantDefinitionBuilder {
         abs(["n"], expr)
     }
 
-    pub fn byte_const(&mut self, byte: u8) -> Expr {
+    pub fn byte_const(&mut self, byte: u8) -> Byte {
         self.bytes.insert(byte);
         var(format!("{:02x}", byte))
     }
 
-    pub fn id_const(&mut self, id: u16) -> Expr {
+    pub fn id_const(&mut self, id: u16) -> Id {
         self.ids.insert(id);
         self.bytes.extend(id.to_be_bytes());
         var(format!("{:04x}", id))
     }
 
-    pub fn i32_const(&mut self, n: u32) -> Expr {
+    pub fn i32_const(&mut self, n: u32) -> I32 {
         self.i32s.insert(n);
         self.bytes.extend(n.to_be_bytes());
         var(format!("{:08x}", n))
     }
 
-    pub fn i64_const(&mut self, n: u64) -> Expr {
+    pub fn i64_const(&mut self, n: u64) -> I64 {
         self.i64s.insert(n);
         self.bytes.extend(n.to_be_bytes());
         var(format!("{:016x}", n))
     }
 }
 
-pub fn to_bit_list_be(bitness: u8, number: Expr) -> Expr {
+pub fn to_bit_list_be(bitness: u8, number: Number) -> unsafe_list::UnsafeList {
     debug_assert!(bitness == 32 || bitness == 16);
 
     apply(number, [var(format!("ToBitsBE{bitness}"))])
@@ -88,7 +95,7 @@ pub fn define_prelude(b: &mut DefinitionBuilder) {
             format!("ToBitsBE{bitness}"),
             abs(
                 (0..bitness).rev().map(|i| i.to_string()),
-                chain::from((0..bitness).rev().map(|i| var(i.to_string()))),
+                unsafe_list::from((0..bitness).rev().map(|i| var(i.to_string()))),
             ),
         );
     }

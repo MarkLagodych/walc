@@ -74,14 +74,14 @@ pub mod tree {
             abs(
                 ["insert", "array", "index", "value"],
                 cond(
-                    chain::get_head(var("index")),
+                    unsafe_list::get_head(var("index")),
                     tree::node(
                         tree::get_left(var("array")),
                         apply(
                             var("insert"),
                             [
                                 tree::get_right(var("array")),
-                                chain::get_tail(var("index")),
+                                unsafe_list::get_tail(var("index")),
                                 var("value"),
                             ],
                         ),
@@ -91,7 +91,7 @@ pub mod tree {
                             var("insert"),
                             [
                                 tree::get_left(var("array")),
-                                chain::get_tail(var("index")),
+                                unsafe_list::get_tail(var("index")),
                                 var("value"),
                             ],
                         ),
@@ -129,16 +129,14 @@ pub mod memory {
     pub fn insert(memory: Expr, address: Expr, value: Expr) -> Expr {
         tree::insert(BITNESS, memory, address, value)
     }
+
+    // TODO algorithm for fast init from a list
 }
 
 pub mod table {
     use super::*;
 
     const BITNESS: u8 = 16;
-
-    pub fn new() -> Expr {
-        tree::new(BITNESS, unreachable())
-    }
 
     pub fn from(items: impl IntoIterator<Item = Expr>) -> Expr {
         tree::from(BITNESS, items, unreachable())

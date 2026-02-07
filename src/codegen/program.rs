@@ -2,23 +2,25 @@ use super::*;
 
 use crate::analyzer::*;
 
+/// Global variable initialization expression
+type GlobalInitExpr = Expr;
+/// A variable that refers to a function
+type FuncVar = Expr;
+
 #[derive(Default)]
 pub struct ProgramBuilder {
     consts: number::ConstantDefinitionBuilder,
 
-    globals: Vec<Expr>,
+    globals: Vec<GlobalInitExpr>,
 
     data_segments: DefinitionBuilder,
     active_data_segment_infos: Vec<ActiveDataSegmentInfo>,
 
     functions: DefinitionBuilder,
     main_id: Option<FuncId>,
-    walc_input_id: Option<FuncId>,
-    walc_output_id: Option<FuncId>,
-    walc_exit_id: Option<FuncId>,
     start_id: Option<FuncId>,
 
-    custom_func_table: Vec<Expr>,
+    custom_func_table: Vec<FuncVar>,
 }
 
 struct ActiveDataSegmentInfo {
@@ -34,42 +36,50 @@ impl ProgramBuilder {
     pub fn build(self) -> Expr {
         // The analyzer must ensure that a main function exists
         let main_id = self.main_id.unwrap();
+        // TODO main
 
         if let Some(start_id) = self.start_id {
-            // TODO
+            // TODO start
         }
 
-        // TODO handle active data segments
-        let mut expr = walc_io::end();
+        // TODO active data segments
+
+        // TODO root expression
+        let expr = walc_io::end();
 
         let mut defs = DefinitionBuilder::new();
 
         defs.def(
-            "GlobalTable",
-            list::from((0..self.functions.count()).map(|i| var(format!("F{i}")))),
+            "FunctionTable",
+            table::from((0..self.functions.count()).map(|i| var(format!("F{i}")))),
         );
 
-        defs.def(
-            "CustomTable",
-            list::from(self.custom_func_table.into_iter()),
-        );
+        defs.def("CustomTable", table::from(self.custom_func_table));
 
-        defs.def("G", table::from(self.globals));
-
-        expr = defs.build(expr);
-        expr = self.functions.build(expr);
-        expr = self.data_segments.build(expr);
+        defs.def("GlobalTable", table::from(self.globals));
 
         let mut toplevel = DefinitionBuilder::prelude();
         self.consts.build(&mut toplevel);
+        self.data_segments.move_to(&mut toplevel);
+        self.functions.move_to(&mut toplevel);
+        defs.move_to(&mut toplevel);
         toplevel.build(expr)
     }
 
     pub fn handle_import(&mut self, name: &str, id: FuncId) {
         match name {
-            "input" => self.walc_input_id = Some(id),
-            "output" => self.walc_output_id = Some(id),
-            "exit" => self.walc_exit_id = Some(id),
+            "input" => {
+                self.functions
+                    .def(format!("F{id}"), function::input_function());
+            }
+            "output" => {
+                self.functions
+                    .def(format!("F{id}"), function::output_function());
+            }
+            "exit" => {
+                self.functions
+                    .def(format!("F{id}"), function::exit_function());
+            }
             _ => {}
         }
     }

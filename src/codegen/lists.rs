@@ -1,18 +1,22 @@
 use super::*;
 
-pub mod chain {
+pub mod unsafe_list {
     use super::*;
+
+    pub type UnsafeList = Expr;
 
     pub fn empty() -> Expr {
         unreachable()
     }
 
-    pub fn node(head: Expr, tail: Expr) -> Expr {
+    pub fn node(head: Expr, tail: Expr) -> UnsafeList {
         // TODO Should unsafe list also use a predefined cons(tructor) like the safe list?
+        // Or can it be better to use a predefined constructor for pairs?
+        // What would the performance implications be?
         pair::new(head, tail)
     }
 
-    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> Expr {
+    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> UnsafeList {
         let mut result = empty();
         for item in items.rev() {
             result = node(item, result);
@@ -20,15 +24,15 @@ pub mod chain {
         result
     }
 
-    pub fn from_bytes(store: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> Expr {
+    pub fn from_bytes(store: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> UnsafeList {
         from(bytes.iter().map(|b| store.byte_const(*b)))
     }
 
-    pub fn get_head(list: Expr) -> Expr {
+    pub fn get_head(list: UnsafeList) -> Expr {
         pair::get_first(list)
     }
 
-    pub fn get_tail(list: Expr) -> Expr {
+    pub fn get_tail(list: UnsafeList) -> Expr {
         pair::get_second(list)
     }
 }
@@ -36,15 +40,17 @@ pub mod chain {
 pub mod list {
     use super::*;
 
-    pub fn empty() -> Expr {
+    pub type List = Expr;
+
+    pub fn empty() -> List {
         var("Empty")
     }
 
-    pub fn node(head: Expr, tail: Expr) -> Expr {
+    pub fn node(head: Expr, tail: Expr) -> List {
         apply(var("C"), [head, tail])
     }
 
-    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> Expr {
+    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> List {
         let mut result = empty();
         for item in items.rev() {
             result = node(item, result);
@@ -52,19 +58,19 @@ pub mod list {
         result
     }
 
-    pub fn from_bytes(store: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> Expr {
+    pub fn from_bytes(store: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> List {
         from(bytes.iter().map(|b| store.byte_const(*b)))
     }
 
-    pub fn is_not_empty(list: Expr) -> Expr {
+    pub fn is_not_empty(list: List) -> Expr {
         optional::is_some(list)
     }
 
-    pub fn get_head(list: Expr) -> Expr {
+    pub fn get_head(list: List) -> Expr {
         pair::get_first(optional::unwrap(list))
     }
 
-    pub fn get_tail(list: Expr) -> Expr {
+    pub fn get_tail(list: List) -> Expr {
         pair::get_second(optional::unwrap(list))
     }
 
@@ -79,5 +85,27 @@ pub mod list {
                 optional::some(pair::new(var("head"), var("tail"))),
             ),
         );
+    }
+}
+
+pub mod stack {
+    use super::*;
+
+    pub type Stack = unsafe_list::UnsafeList;
+
+    pub fn empty() -> Stack {
+        unsafe_list::empty()
+    }
+
+    pub fn push(stack: Stack, item: Expr) -> Stack {
+        unsafe_list::node(item, stack)
+    }
+
+    pub fn top(stack: Stack) -> Expr {
+        unsafe_list::get_head(stack)
+    }
+
+    pub fn pop(stack: Stack) -> Stack {
+        unsafe_list::get_tail(stack)
     }
 }

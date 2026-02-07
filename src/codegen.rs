@@ -10,8 +10,6 @@ pub use lists::*;
 mod trees;
 pub use trees::*;
 
-use anyhow::{Result, anyhow};
-
 #[derive(Debug, Clone)]
 pub enum Expr {
     Variable {
@@ -45,7 +43,7 @@ impl std::fmt::Display for Expr {
             Expr::Application { function, argument } => {
                 write!(f, "({}", function)?;
 
-                if matches!(**function, Expr::Abstraction { .. })
+                if matches!(**function, Expr::Variable { .. })
                     && matches!(**argument, Expr::Variable { .. })
                 {
                     write!(f, " ")?;
@@ -94,7 +92,7 @@ pub fn def(var: impl ToString, value: Expr, body: Expr) -> Expr {
     apply(abs([var], body), [value])
 }
 
-pub fn cond(condition: Expr, then_branch: Expr, else_branch: Expr) -> Expr {
+pub fn cond(condition: Bit, then_branch: Expr, else_branch: Expr) -> Expr {
     apply(condition, [else_branch, then_branch])
 }
 
@@ -110,7 +108,9 @@ pub fn unreachable() -> Expr {
     }
 }
 
-pub fn bit(b: bool) -> Expr {
+pub type Bit = Expr;
+
+pub fn bit(b: bool) -> Bit {
     if b { var("1") } else { var("0") }
 }
 
@@ -140,6 +140,10 @@ impl DefinitionBuilder {
         result
     }
 
+    pub fn move_to(mut self, other: &mut Self) {
+        other.defs.append(&mut self.defs);
+    }
+
     /// Provides definitions required for all codegen features.
     pub fn prelude() -> Self {
         let mut me = Self::new();
@@ -163,12 +167,12 @@ pub mod walc_io {
         var("End")
     }
 
-    pub fn output(out_byte: Expr, next: Expr) -> Expr {
+    pub fn output(out_byte: number::Byte, next: Expr) -> Expr {
         apply(var("Out"), [out_byte, next])
     }
 
-    pub fn input(root_input_handler: Expr) -> Expr {
-        apply(var("In"), [root_input_handler])
+    pub fn input(input_func: Expr) -> Expr {
+        apply(var("In"), [input_func])
     }
 
     pub fn define_prelude(b: &mut DefinitionBuilder) {
@@ -185,8 +189,8 @@ pub mod walc_io {
         b.def(
             "In",
             abs(
-                ["input_handler"],
-                optional::some(either::second(var("input_handler"))),
+                ["inp_func"],
+                optional::some(either::second(var("inp_func"))),
             ),
         );
     }
@@ -195,15 +199,17 @@ pub mod walc_io {
 pub mod pair {
     use super::*;
 
-    pub fn new(first: Expr, second: Expr) -> Expr {
+    pub type Pair = Expr;
+
+    pub fn new(first: Expr, second: Expr) -> Pair {
         abs(["P"], apply(var("P"), [first, second]))
     }
 
-    pub fn get_first(pair: Expr) -> Expr {
+    pub fn get_first(pair: Pair) -> Expr {
         apply(pair, [var("0")])
     }
 
-    pub fn get_second(pair: Expr) -> Expr {
+    pub fn get_second(pair: Pair) -> Expr {
         apply(pair, [var("1")])
     }
 }
@@ -211,19 +217,21 @@ pub mod pair {
 pub mod either {
     use super::*;
 
-    pub fn first(value: Expr) -> Expr {
+    pub type Either = Expr;
+
+    pub fn first(value: Expr) -> Either {
         pair::new(var("0"), value)
     }
 
-    pub fn second(value: Expr) -> Expr {
+    pub fn second(value: Expr) -> Either {
         pair::new(var("1"), value)
     }
 
-    pub fn is_second(either: Expr) -> Expr {
+    pub fn is_second(either: Either) -> Expr {
         pair::get_first(either)
     }
 
-    pub fn unwrap(either: Expr) -> Expr {
+    pub fn unwrap(either: Either) -> Expr {
         pair::get_second(either)
     }
 }
@@ -231,19 +239,21 @@ pub mod either {
 pub mod optional {
     use super::*;
 
-    pub fn none() -> Expr {
+    pub type Optional = Expr;
+
+    pub fn none() -> Optional {
         either::first(unreachable())
     }
 
-    pub fn some(value: Expr) -> Expr {
+    pub fn some(value: Expr) -> Optional {
         either::second(value)
     }
 
-    pub fn is_some(optional: Expr) -> Expr {
+    pub fn is_some(optional: Optional) -> Expr {
         either::is_second(optional)
     }
 
-    pub fn unwrap(optional: Expr) -> Expr {
+    pub fn unwrap(optional: Optional) -> Expr {
         either::unwrap(optional)
     }
 }
