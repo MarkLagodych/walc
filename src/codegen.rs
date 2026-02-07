@@ -1,7 +1,7 @@
 //! WALC code generator
 
+pub mod function;
 pub mod number;
-pub mod op;
 pub mod program;
 
 mod lists;
@@ -128,6 +128,10 @@ impl DefinitionBuilder {
         self.defs.push((var.to_string(), value));
     }
 
+    pub fn count(&self) -> usize {
+        self.defs.len()
+    }
+
     pub fn build(self, body: Expr) -> Expr {
         let mut result = body;
         for (var, value) in self.defs.into_iter().rev() {
@@ -137,14 +141,18 @@ impl DefinitionBuilder {
     }
 
     /// Provides definitions required for all codegen features.
-    pub fn define_prelude(&mut self) {
-        self.def("0", abs(["x0", "x1"], var("x0")));
-        self.def("1", abs(["x0", "x1"], var("x1")));
+    pub fn prelude() -> Self {
+        let mut me = Self::new();
 
-        walc_io::define_prelude(self);
-        list::define_prelude(self);
-        number::define_prelude(self);
-        tree::define_prelude(self);
+        me.def("0", abs(["x0", "x1"], var("x0")));
+        me.def("1", abs(["x0", "x1"], var("x1")));
+
+        walc_io::define_prelude(&mut me);
+        list::define_prelude(&mut me);
+        number::define_prelude(&mut me);
+        tree::define_prelude(&mut me);
+
+        me
     }
 }
 

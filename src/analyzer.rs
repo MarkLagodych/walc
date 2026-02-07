@@ -7,8 +7,7 @@ pub use wasmparser::{Operator, ValType};
 
 pub type FuncId = u32;
 pub type DataId = u32;
-pub type TypeId = u32;
-pub type GlobalId = u32;
+type TypeId = u32;
 
 type IdCounter = std::ops::RangeFrom<u32>;
 
@@ -17,7 +16,6 @@ pub struct Analyzer {
 
     function_id: IdCounter,
     data_id: IdCounter,
-    global_id: IdCounter,
 
     /// Indexed by TypeId
     function_types: Vec<FuncType>,
@@ -39,7 +37,6 @@ impl Analyzer {
             mod_builder: codegen::program::ProgramBuilder::new(),
             function_id: 0..,
             data_id: 0..,
-            global_id: 0..,
             function_types: Vec::new(),
             function_type_map: Vec::new(),
             has_main: false,
@@ -281,8 +278,6 @@ impl Analyzer {
         for global in section.into_iter() {
             let global = global?;
 
-            let global_id = self.global_id.next().unwrap();
-
             let init = match global.init_expr.get_operators_reader().read()? {
                 Operator::I32Const { value } => value as u64,
                 Operator::I64Const { value } => value as u64,
@@ -295,7 +290,7 @@ impl Analyzer {
             // The mutability flag is ignored because all globals are mutable in WALC
             let ty = global.ty.content_type;
 
-            self.mod_builder.handle_global(global_id, ty, init);
+            self.mod_builder.handle_global(ty, init);
         }
 
         Ok(())
