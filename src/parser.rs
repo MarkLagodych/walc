@@ -4,20 +4,24 @@ use crate::analyzer::Analyzer;
 
 use anyhow::{Result, anyhow};
 
-pub use wasmparser::*;
+use wasmparser::*;
+pub use wasmparser::{Operator, ValType};
 
 pub type FuncId = u32;
 pub type DataId = u32;
 pub type TypeId = u32;
 pub type GlobalId = u32;
-pub type TableId = u32;
+
+type IdCounter = std::ops::RangeFrom<u32>;
 
 pub struct Parser<'a> {
     source: &'a [u8],
 
     analyzer: &'a mut Analyzer,
 
-    next_function_id: FuncId,
+    function_id: IdCounter,
+    data_id: IdCounter,
+    global_id: IdCounter,
 
     /// Indexed by TypeId
     function_types: Vec<FuncType>,
@@ -25,8 +29,6 @@ pub struct Parser<'a> {
     function_type_map: Vec<TypeId>,
 
     has_main: bool,
-
-    next_data_id: DataId,
 }
 
 impl<'a> Parser<'a> {
@@ -40,8 +42,9 @@ impl<'a> Parser<'a> {
         Self {
             source,
             analyzer,
-            next_function_id: 0,
-            next_data_id: 0,
+            function_id: 0..,
+            data_id: 0..,
+            global_id: 0..,
             function_types: Vec::new(),
             function_type_map: Vec::new(),
             has_main: false,
@@ -69,10 +72,9 @@ impl<'a> Parser<'a> {
                 Payload::CodeSectionEntry(function) => self.handle_function(function)?,
                 Payload::DataSection(section) => self.handle_data(section)?,
 
-                // Memory section is ignored because:
-                // - WASM 1.0 modules can only have one memory
-                // - WALC memory is lazy and always has a virtual size of 4 GiB,
-                //   so the initial memory size is irrelevant
+                // Memory section is ignored because WASM 1.0 modules can only have one memory
+                // and its size properties are irrelevant for WALC because WALC memory
+                // is lazy and always has a virtual size of 4 GiB.
                 Payload::MemorySection(_section) => {}
 
                 // Other sections are checked by the validator
@@ -85,18 +87,6 @@ impl<'a> Parser<'a> {
         }
 
         Ok(())
-    }
-
-    fn next_function_id(&mut self) -> FuncId {
-        let id = self.next_function_id;
-        self.next_function_id += 1;
-        id
-    }
-
-    fn next_data_id(&mut self) -> DataId {
-        let id = self.next_data_id;
-        self.next_data_id += 1;
-        id
     }
 
     fn get_function_type(&self, func_id: FuncId) -> &FuncType {
@@ -117,7 +107,7 @@ impl<'a> Parser<'a> {
             // will match function IDs
             self.function_type_map.push(type_id);
 
-            let func_id = self.next_function_id();
+            let func_id = self.function_id.next().unwrap();
 
             let func_type = &self.function_types[type_id as usize];
 
@@ -180,7 +170,7 @@ impl<'a> Parser<'a> {
         for data_segment in section.into_iter() {
             let data_segment = data_segment?;
 
-            let data_id = self.next_data_id();
+            let data_id = self.data_id.next().unwrap();
 
             let mut active_offset = None;
 
@@ -245,7 +235,7 @@ impl<'a> Parser<'a> {
     }
 
     fn handle_function(&mut self, func: FunctionBody) -> Result<()> {
-        let func_id = self.next_function_id();
+        let func_id = self.function_id.next().unwrap();
 
         let local_types = Self::read_function_local_types(&func)?;
 
@@ -260,6 +250,8 @@ impl<'a> Parser<'a> {
 
         let func_type = self.get_function_type(func_id);
         let param_count = func_type.params().len() as u32;
+        // There is at most one result due to validation
+        let has_result = !func_type.results().is_empty();
 
         let operators = func
             .get_operators_reader()?
@@ -267,7 +259,7 @@ impl<'a> Parser<'a> {
             .collect::<Result<Vec<_>, _>>()?;
 
         self.analyzer
-            .handle_function(func_id, param_count, &local_types, &operators);
+            .handle_function(func_id, param_count, has_result, &local_types, &operators);
 
         Ok(())
     }
@@ -284,24 +276,65 @@ impl<'a> Parser<'a> {
         for global in section.into_iter() {
             let global = global?;
 
-            // All globals can be mutable in WALC
+            let global_id = self.global_id.next().unwrap();
 
-            // TODO how to represent a variant of I32/I64/F32/F64 for the handler?
-            // let init_expr = self.expr_to_u32(&global.init_expr)?;
+            let init = match global.init_expr.get_operators_reader().read()? {
+                Operator::I32Const { value } => value as u64,
+                Operator::I64Const { value } => value as u64,
+                Operator::F32Const { value } => value.bits() as u64,
+                Operator::F64Const { value } => value.bits(),
+                // Other operators are unsupported in WASM 1.0
+                _ => unreachable!(),
+            };
 
-            // TODO
+            // The mutability flag is ignored because all globals are mutable in WALC
+            let ty = global.ty.content_type;
+
+            self.analyzer.handle_global(global_id, ty, init);
         }
 
         Ok(())
     }
 
     fn handle_tables(&mut self, section: TableSectionReader) -> Result<()> {
-        // TODO
+        for table in section {
+            let table = table?;
+
+            self.analyzer.handle_table(table.ty.initial as u32);
+        }
+
         Ok(())
     }
 
     fn handle_elements(&mut self, section: ElementSectionReader) -> Result<()> {
-        // TODO
+        for element in section {
+            let element = element?;
+
+            if let ElementKind::Active { offset_expr, .. } = element.kind {
+                let offset = if let Operator::I32Const { value } =
+                    offset_expr.get_operators_reader().read()?
+                {
+                    value as u32
+                } else {
+                    // Offsets are always I32 in WASM 1.0
+                    unreachable!()
+                };
+
+                let items = if let ElementItems::Functions(funcs) = element.items {
+                    funcs
+                } else {
+                    // Other items are not supported in WASM 1.0
+                    unreachable!()
+                };
+
+                let functions = items.into_iter().collect::<Result<Vec<_>, _>>()?;
+
+                self.analyzer.handle_elements(offset, &functions);
+            }
+
+            // Other element kinds do not exist in WASM 1.0
+        }
+
         Ok(())
     }
 }

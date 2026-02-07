@@ -65,8 +65,15 @@ impl Analyzer {
         &mut self,
         id: FuncId,
         param_count: u32,
+        has_result: bool,
         local_types: &[ValType],
         operators: &[Operator],
     ) {
     }
+
+    pub fn handle_global(&mut self, id: GlobalId, ty: ValType, init: u64) {}
+
+    pub fn handle_table(&mut self, size: u32) {}
+
+    pub fn handle_elements(&mut self, offset: u32, functions: &[FuncId]) {}
 }
