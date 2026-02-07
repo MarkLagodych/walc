@@ -11,19 +11,19 @@ use std::collections::BTreeSet as Set;
 /// This struct accumulates all numeric constants throughout the WASM module in order to
 /// reduce the resulting code size.
 #[derive(Default)]
-pub struct ConstantSet {
+pub struct ConstantDefinitionBuilder {
     bytes: Set<u8>,
     ids: Set<u16>,
     i32s: Set<u32>,
     i64s: Set<u64>,
 }
 
-impl ConstantSet {
+impl ConstantDefinitionBuilder {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn define_constants(&self, b: &mut DefinitionBuilder) {
+    pub fn build(self, b: &mut DefinitionBuilder) {
         for &n in &self.bytes {
             b.def(format!("{:02x}", n), Self::byte_expr(n));
         }

@@ -1,6 +1,5 @@
 mod analyzer;
 mod codegen;
-mod parser;
 
 use anyhow::{Result, anyhow};
 use clap::*;
@@ -30,11 +29,7 @@ fn run(args: Args) -> Result<()> {
     let source =
         std::fs::read(&args.input_file).map_err(|e| anyhow!("Cannot read input file: {e}"))?;
 
-    let mut analyzer = analyzer::Analyzer::new();
-
-    parser::Parser::new(&source, &mut analyzer).parse()?;
-
-    let expr = analyzer.compile();
+    let expr = analyzer::Analyzer::new().compile(&source)?;
 
     std::fs::write(&args.output_file, expr.to_string())
         .map_err(|e| anyhow!("Cannot write output file: {e}"))?;

@@ -20,7 +20,7 @@ pub mod chain {
         result
     }
 
-    pub fn from_bytes(store: &mut number::ConstantSet, bytes: &[u8]) -> Expr {
+    pub fn from_bytes(store: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> Expr {
         from(bytes.iter().map(|b| store.byte_const(*b)))
     }
 
@@ -52,7 +52,7 @@ pub mod list {
         result
     }
 
-    pub fn from_bytes(store: &mut number::ConstantSet, bytes: &[u8]) -> Expr {
+    pub fn from_bytes(store: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> Expr {
         from(bytes.iter().map(|b| store.byte_const(*b)))
     }
 

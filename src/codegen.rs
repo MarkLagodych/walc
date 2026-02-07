@@ -1,5 +1,6 @@
 //! WALC code generator
 
+pub mod module;
 pub mod number;
 pub mod op;
 
