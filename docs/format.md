@@ -39,61 +39,85 @@ See more examples in the [examples directory](../examples/lambda-calculus/).
 
 ## Interpretation
 
-The input lambda expression must not contain unbound variables.
+The input lambda expression must not contain free (unbound) variables,
+must be evaluated [lazily](https://en.wikipedia.org/wiki/Lazy_evaluation)
+(i.e. using [call by name](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_name))
+and must evaluate to a [`command`](#command).
 
-The input lambda expression must evaluate to a `program`.
-
-On every step the interpreter performs an I/O operation according to the
-output string and supplies the resulting input string back to the next program
-function.
+On execution step the interpreter performs an I/O operation according to the
+command and continues to the next command derived from the current one.
 
 ### Definitions
 
 The angle-bracket notation (e.g. `f<a,b,c>`) denotes a generic definition
 or a substitution into a definition.
 
-* `unreachable` is anything that should not be executed, e.g. `[_ _]`.
+#### Command
 
-    This is only used to fill in places that structurally
-    require a value when the value is not important.
+`command` is `optional<either<output_command, input_command>>`
 
-* `bit` is either:
-    * `0` (`[x0[x1 x0]]`)
-    * `1` (`[x0[x1 x1]]`).
+If the command is `none`, the interpreter stops.
+Otherwise, it executes the given command (either output or input).
 
-* `byte` is `[g ((((((((g bit7) bit6) bit5) bit4) bit3) bit2) bit1) bit0)]`
+#### Output command
 
-* `pair<x0,x1>` is `[f ((f x0) x1)]`.
+`output_command<byte, command>` is `pair<byte, command>`
 
-    To get the 0th or the 1st element of a pair, just apply `0` or `1` to it:
-    `(my_pair 0)`, `(my_pair 1)`.
+When executing an output command, the interpreter writes the byte (the 0th
+item of the pair) to STDOUT and proceeds interpreting the 1st item of
+the pair.
 
-* `optional<a>` is `pair<bit,a>` and is either:
-    * `some<a>`: `pair<1,a>`
-    * `none`: `pair<0,unreachable>`
+#### Input command
 
-* `either<a,b>` is `pair<bit, a|b>` and is one of:
-    * `left<a>`: `pair<0,a>`
-    * `right<b>`: `pair<1,b>`
+`input_command` is `[optional_input_byte command]`
 
-    This is a sum-type that stores a value of one of the two possible types.
+When executing an input command, the interpreter reads one byte from STDIN,
+constructs an `optional` out of it (`none` is used to indicate EOF),
+applies it to the command and proceeds interpreting the result.
 
-* `output_command` is `pair<byte, program>`
+#### Byte
 
-    When executing an output command, the interpreter writes the byte (the 0th
-    item of the pair) to STDOUT and proceeds interpreting the 1st item of
-    the pair.
+`byte<bit7,bit6,bit5,bit4,bit3,bit2,bit1,bit0>` is
+`[g ((((((((g bit7) bit6) bit5) bit4) bit3) bit2) bit1) bit0)]`
 
-* `input_command` is `[optional_input_byte program]`
+This bit order was chosen to match the natural (big-endian) way of writing
+numbers, so that `00110011` (51) is `[g ((((((((g 0)0)1)1)0)0)1)1)]`.
 
-    When executing an input command, the interpreter reads one byte from STDIN,
-    constructs an `optional` out of it (or `none` if failed to read from STDIN),
-    applies it to the `input_command` and proceeds interpreting the result.
+#### Either
 
-* `program` is `optional<either<output_command,input_command>>`
+`either<a,b>` is either:
+* `left<a>`: `pair<0, a>`
+* `right<b>`: `pair<1, b>`
 
-    If the program is `none`, the interpreter finishes.
-    Otherwise, it executes the given command (either input or output).
+#### Optional
+
+`optional<a>` is either:
+* `none`: `pair<0, unreachable>`
+* `some<a>`: `pair<1, a>`
+
+#### Pair
+
+`pair<x0,x1>` is `[f ((f x0) x1)]`.
+
+To get the 0th or the 1st element of a pair, just apply `0` or `1` to it:
+`(my_pair 0)`, `(my_pair 1)`.
+
+#### Bit
+
+`bit` is either:
+* `0`: `[x0[x1 x0]]`
+* `1`: `[x0[x1 x1]]`
+
+This order was chosen for consistency: function arguments are always written
+from left to right, so it's `[x0[x1[x2...]]]` and `(((f x0)x1)x2)...`.
+
+#### Unreachable
+
+`unreachable` is anything that should not be executed,
+often defined as some sort of a garbage value, e.g. `[_ _]`.
+
+This is only used to fill in places that structurally
+require a value when the value is not important.
 
 ### Examples
 
