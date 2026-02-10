@@ -145,7 +145,7 @@ impl DefinitionBuilder {
         me.def("1", abs(["x0", "x1"], var("x1")));
 
         pair::define_prelude(&mut me);
-        walc_io::define_prelude(&mut me);
+        io_command::define_prelude(&mut me);
         list::define_prelude(&mut me);
         number::define_prelude(&mut me);
         tree::define_prelude(&mut me);
@@ -154,11 +154,11 @@ impl DefinitionBuilder {
     }
 }
 
-pub mod walc_io {
+pub mod io_command {
     use super::*;
 
-    pub fn end() -> Expr {
-        var("End")
+    pub fn exit() -> Expr {
+        var("Exit")
     }
 
     pub fn output(out_byte: number::Byte, next: Expr) -> Expr {
@@ -170,7 +170,7 @@ pub mod walc_io {
     }
 
     pub fn define_prelude(b: &mut DefinitionBuilder) {
-        b.def("End", optional::none());
+        b.def("Exit", optional::none());
 
         b.def(
             "Out",

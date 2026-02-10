@@ -41,7 +41,7 @@ impl ProgramBuilder {
         // TODO active data segments
 
         // TODO root expression
-        let expr = walc_io::end();
+        let expr = io_command::exit();
 
         let func_count = self.functions.len();
 

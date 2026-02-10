@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::analyzer::{Operator, ValType};
+use crate::analyzer::*;
 
 use std::collections::BTreeSet as Set;
 
@@ -9,17 +9,25 @@ pub type Instruction = Expr;
 type ExecutionContext = Expr;
 
 #[derive(Default)]
-struct ExecutionContextBuilder {
-    memory: Option<Expr>,
-    globals: Option<Expr>,
-    locals: Option<Expr>,
-    data_stack: Option<Expr>,
-    jump_stack: Option<Expr>,
+struct Ctx {
+    memory: Option<memory::Memory>,
+    globals: Option<table::Table>,
+    locals: Option<stack::Stack>,
+    data_stack: Option<framed_stack::FramedStack>,
+    jump_stack: Option<stack::Stack>,
 }
 
-impl ExecutionContextBuilder {
+impl Ctx {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn function_table(&self) -> table::Table {
+        pair::get_first(var("F"))
+    }
+
+    pub fn indirect_function_table(&self) -> table::Table {
+        pair::get_second(var("F"))
     }
 
     pub fn memory(&self) -> memory::Memory {
@@ -46,11 +54,11 @@ impl ExecutionContextBuilder {
         self.locals = Some(locals);
     }
 
-    pub fn data_stack(&self) -> stack::Stack {
+    pub fn data_stack(&self) -> framed_stack::FramedStack {
         var("D")
     }
 
-    pub fn set_data_stack(&mut self, data_stack: stack::Stack) {
+    pub fn set_data_stack(&mut self, data_stack: framed_stack::FramedStack) {
         self.data_stack = Some(data_stack);
     }
 
@@ -62,7 +70,16 @@ impl ExecutionContextBuilder {
         self.jump_stack = Some(jump_stack);
     }
 
-    pub fn build(self) -> ExecutionContext {
+    pub fn get_next(&self) -> Expr {
+        var("N")
+    }
+
+    pub fn next(self) -> ExecutionContext {
+        let next = self.get_next();
+        self.jump(next)
+    }
+
+    pub fn jump(self, target: Expr) -> ExecutionContext {
         let f = var("F");
         let m = self.memory.unwrap_or_else(|| var("M"));
         let g = self.globals.unwrap_or_else(|| var("G"));
@@ -70,20 +87,18 @@ impl ExecutionContextBuilder {
         let d = self.data_stack.unwrap_or_else(|| var("D"));
         let j = self.jump_stack.unwrap_or_else(|| var("J"));
 
-        abs(["E"], apply(var("E"), [f, m, g, l, d, j]))
+        apply(target, [f, m, g, l, d, j])
     }
 }
 
-fn instr(make_body: impl FnOnce(ExecutionContextBuilder) -> ExecutionContext) -> Instruction {
-    abs(
-        ["N", "F", "M", "G", "L", "D", "J"],
-        make_body(ExecutionContextBuilder::new()),
-    )
+fn instr(body: Expr) -> Instruction {
+    abs(["N", "F", "M", "G", "L", "D", "J"], body)
 }
 
 #[derive(PartialEq, PartialOrd, Eq, Ord)]
 enum InstructionId {
     Const,
+    Call,
     // TODO more instructions
 }
 
@@ -98,25 +113,38 @@ impl InstructionDefinitionBuilder {
     }
 
     fn _const(&self) -> Expr {
-        // TODO handle data stack stack! It's a stack of stacks of data items!
         abs(
             ["item"],
-            instr(|mut ctx| {
-                let b = DefinitionBuilder::new();
-                ctx.set_data_stack(stack::push(ctx.data_stack(), var("item")));
-                b.build(ctx.build())
+            instr({
+                let mut ctx = Ctx::new();
+                ctx.set_data_stack(framed_stack::push(ctx.data_stack(), var("item")));
+                ctx.next()
+            }),
+        )
+    }
+
+    fn _call(&self) -> Expr {
+        abs(
+            ["func"],
+            instr({
+                let mut ctx = Ctx::new();
+                ctx.set_jump_stack(stack::push(ctx.jump_stack(), ctx.get_next()));
+                let func = table::index(ctx.function_table(), var("func"));
+                ctx.jump(func)
             }),
         )
     }
 
     pub fn build(self, b: &mut DefinitionBuilder) {
         // TODO use ArithDefBuilder here
+        // TODO can constant builder be needed here???
 
         for instr_id in &self.instr_set {
             use InstructionId::*;
 
             match instr_id {
                 Const => b.def("Const", self._const()),
+                Call => b.def("Call", self._call()),
                 // TODO
             }
         }
@@ -125,6 +153,7 @@ impl InstructionDefinitionBuilder {
     pub fn instruction(
         &mut self,
         consts: &mut number::ConstantDefinitionBuilder,
+        function_types: &[FuncType],
         op: &Operator,
     ) -> Instruction {
         use InstructionId::*;
@@ -137,6 +166,10 @@ impl InstructionDefinitionBuilder {
             Operator::I64Const { value } => {
                 self.instr_set.insert(Const);
                 apply(var("Const"), [consts.i64_const(*value as u64)])
+            }
+            Operator::Call { function_index } => {
+                self.instr_set.insert(Call);
+                apply(var("Call"), [consts.id_const(*function_index as u16)])
             }
             // TODO
             _ => unreachable(),

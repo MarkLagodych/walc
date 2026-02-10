@@ -28,7 +28,6 @@ pub mod tree {
 
     /// The index bitness must match the tree bitness.
     pub fn insert(bitness: u8, tree: Tree, index: number::Number, value: Expr) -> Tree {
-        debug_assert!(number::is_allowed_bit_list_be_bitness(bitness));
         apply(
             var(format!("TIns{bitness}")),
             [tree, number::to_bit_list_be(bitness, index), value],
@@ -78,34 +77,22 @@ pub mod tree {
 
         b.def(
             "TIns",
-            abs(
-                ["insert", "array", "index", "value"],
+            abs(["insert", "array", "index", "value"], {
+                let index_bit = unsafe_list::get_head(var("index"));
+                let index_rest = unsafe_list::get_tail(var("index"));
+
+                let left = tree::get_left(var("array"));
+                let right = tree::get_right(var("array"));
+
+                let insert_into =
+                    |subtree| apply(var("insert"), [subtree, index_rest.clone(), var("value")]);
+
                 cond(
-                    unsafe_list::get_head(var("index")),
-                    tree::node(
-                        tree::get_left(var("array")),
-                        apply(
-                            var("insert"),
-                            [
-                                tree::get_right(var("array")),
-                                unsafe_list::get_tail(var("index")),
-                                var("value"),
-                            ],
-                        ),
-                    ),
-                    tree::node(
-                        apply(
-                            var("insert"),
-                            [
-                                tree::get_left(var("array")),
-                                unsafe_list::get_tail(var("index")),
-                                var("value"),
-                            ],
-                        ),
-                        tree::get_right(var("array")),
-                    ),
-                ),
-            ),
+                    index_bit,
+                    tree::node(left.clone(), insert_into(right.clone())),
+                    tree::node(insert_into(left.clone()), right.clone()),
+                )
+            }),
         );
 
         b.def("TIns0", abs(["array", "index", "value"], var("value")));

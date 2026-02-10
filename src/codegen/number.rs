@@ -105,13 +105,8 @@ impl ConstantDefinitionBuilder {
     }
 }
 
-#[allow(dead_code)]
-pub fn is_allowed_bit_list_be_bitness(bitness: u8) -> bool {
-    bitness == 16 || bitness == 32
-}
-
 pub fn to_bit_list_be(bitness: u8, number: Number) -> unsafe_list::UnsafeList {
-    debug_assert!(is_allowed_bit_list_be_bitness(bitness));
+    debug_assert!(bitness == 16 || bitness == 32);
 
     apply(number, [var(format!("ToBitsBE{bitness}"))])
 }

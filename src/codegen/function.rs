@@ -16,8 +16,9 @@ pub struct FunctionInfo<'a> {
     pub instructions: &'a [Operator<'a>],
 }
 
-// TODO get refs to consts, instrs, arith, and func type map
 pub fn function(env: &EnvironmentInfo, func: &FunctionInfo) -> FunctionBody {
+    let mut labels = Vec::<Operator>::new();
+
     unreachable()
 }
 
@@ -30,5 +31,5 @@ pub fn output_function() -> FunctionBody {
 }
 
 pub fn exit_function() -> FunctionBody {
-    walc_io::end()
+    io_command::exit()
 }
