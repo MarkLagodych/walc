@@ -45,6 +45,13 @@ impl ConstantDefinitionBuilder {
         }
     }
 
+    pub fn merge(&mut self, other: Self) {
+        self.bytes.extend(other.bytes);
+        self.ids.extend(other.ids);
+        self.i32s.extend(other.i32s);
+        self.i64s.extend(other.i64s);
+    }
+
     fn byte_expr(byte: u8) -> Byte {
         let ith_bit = |i: u8| -> Bit { bit((byte >> i) & 1 != 0) };
 
@@ -83,8 +90,13 @@ impl ConstantDefinitionBuilder {
     }
 }
 
+#[allow(dead_code)]
+pub fn allowed_bit_list_be_bitness(bitness: u8) -> bool {
+    bitness == 16 || bitness == 32
+}
+
 pub fn to_bit_list_be(bitness: u8, number: Number) -> unsafe_list::UnsafeList {
-    debug_assert!(bitness == 32 || bitness == 16);
+    debug_assert!(allowed_bit_list_be_bitness(bitness));
 
     apply(number, [var(format!("ToBitsBE{bitness}"))])
 }

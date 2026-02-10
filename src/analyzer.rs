@@ -7,16 +7,16 @@ pub use wasmparser::{Operator, ValType};
 
 pub type FuncId = u32;
 pub type DataId = u32;
-type TypeId = u32;
+pub type TypeId = u32;
 
 type IdCounter = std::ops::RangeFrom<u32>;
 
 pub struct Analyzer {
-    mod_builder: codegen::program::ProgramBuilder,
+    prog_builder: codegen::program::ProgramBuilder,
 
-    function_id: IdCounter,
-    data_id: IdCounter,
+    function_ids: IdCounter,
 
+    // TODO extract this to a separate function type struct
     /// Indexed by TypeId
     function_types: Vec<FuncType>,
     /// Indexed by FuncId
@@ -34,9 +34,8 @@ impl Analyzer {
 
     pub fn new() -> Self {
         Self {
-            mod_builder: codegen::program::ProgramBuilder::new(),
-            function_id: 0..,
-            data_id: 0..,
+            prog_builder: codegen::program::ProgramBuilder::new(),
+            function_ids: 0..,
             function_types: Vec::new(),
             function_type_map: Vec::new(),
             has_main: false,
@@ -58,7 +57,7 @@ impl Analyzer {
             Err(anyhow!("The module does not export a 'main' function"))?
         }
 
-        Ok(self.mod_builder.build())
+        Ok(self.prog_builder.build())
     }
 
     fn handle_payload(&mut self, payload: Payload<'_>) -> Result<()> {
@@ -95,6 +94,13 @@ impl Analyzer {
         for import in section.into_imports() {
             let import = import?;
 
+            if import.module != "walc" {
+                Err(anyhow!(
+                    "Unknown import module: '{}', only 'walc' is supported",
+                    import.module
+                ))?
+            }
+
             let type_id = match import.ty {
                 TypeRef::Func(type_id) | TypeRef::FuncExact(type_id) => type_id,
                 _ => Err(anyhow!("Only function imports are supported"))?,
@@ -104,32 +110,33 @@ impl Analyzer {
             // will match function IDs
             self.function_type_map.push(type_id);
 
-            let func_id = self.function_id.next().unwrap();
+            // Account for imported functions in function IDs
+            self.function_ids.next().unwrap();
 
             let func_type = &self.function_types[type_id as usize];
 
             match import.name {
                 "input" => {
                     if !(func_type.params().is_empty() && func_type.results() == [ValType::I32]) {
-                        Err(anyhow!("walc.input must have type () -> (i32)"))?
+                        Err(anyhow!("'walc.input' must have type () -> (i32)"))?
                     }
                 }
                 "output" => {
                     if !(func_type.params() == [ValType::I32] && func_type.results().is_empty()) {
-                        Err(anyhow!("walc.output must have type (i32) -> ()"))?
+                        Err(anyhow!("'walc.output' must have type (i32) -> ()"))?
                     }
                 }
                 "exit" => {
                     if !(func_type.params().is_empty() && func_type.results().is_empty()) {
-                        Err(anyhow!("walc.exit must have type () -> ()"))?
+                        Err(anyhow!("'walc.exit' must have type () -> ()"))?
                     }
                 }
                 name => Err(anyhow!(
-                    "Unknown import: {name} (only 'input', 'output', and 'exit' are supported)",
+                    "Unknown import: '{name}' (only 'input', 'output', and 'exit' are supported)",
                 ))?,
             }
 
-            self.mod_builder.handle_import(import.name, func_id);
+            self.prog_builder.handle_import(import.name);
         }
 
         Ok(())
@@ -152,22 +159,20 @@ impl Analyzer {
 
             self.has_main = true;
 
-            self.mod_builder.handle_main(export.index);
+            self.prog_builder.handle_main(export.index);
         }
 
         Ok(())
     }
 
     fn handle_start(&mut self, func: u32) -> Result<()> {
-        self.mod_builder.handle_start(func);
+        self.prog_builder.handle_start(func);
         Ok(())
     }
 
     fn handle_data(&mut self, section: DataSectionReader) -> Result<()> {
-        for data_segment in section.into_iter() {
+        for (data_id, data_segment) in section.into_iter().enumerate() {
             let data_segment = data_segment?;
-
-            let data_id = self.data_id.next().unwrap();
 
             let mut active_offset = None;
 
@@ -179,8 +184,8 @@ impl Analyzer {
                 };
             }
 
-            self.mod_builder
-                .handle_data(data_id, data_segment.data, active_offset);
+            self.prog_builder
+                .handle_data(data_id as u32, data_segment.data, active_offset);
         }
 
         Ok(())
@@ -232,13 +237,13 @@ impl Analyzer {
     }
 
     fn handle_function(&mut self, func: FunctionBody) -> Result<()> {
-        let func_id = self.function_id.next().unwrap();
+        let func_id = self.function_ids.next().unwrap();
 
         let local_types = Self::read_function_local_types(&func)?;
 
         if local_types.len() > (Self::MAX_COUNT as usize) {
             Err(anyhow!(
-                "Too many locals in function {}: {} (max is {})",
+                "Too many locals in function #{}: {} (max is {})",
                 func_id,
                 local_types.len(),
                 Self::MAX_COUNT
@@ -250,18 +255,13 @@ impl Analyzer {
         // There is at most one result due to validation
         let has_result = !func_type.results().is_empty();
 
-        let operators = func
+        let instructions = func
             .get_operators_reader()?
             .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<Operator>, _>>()?;
 
-        self.mod_builder.handle_function(
-            func_id,
-            param_count,
-            has_result,
-            &local_types,
-            &operators,
-        );
+        self.prog_builder
+            .handle_function(param_count, has_result, &local_types, &instructions);
 
         Ok(())
     }
@@ -290,7 +290,7 @@ impl Analyzer {
             // The mutability flag is ignored because all globals are mutable in WALC
             let ty = global.ty.content_type;
 
-            self.mod_builder.handle_global(ty, init);
+            self.prog_builder.handle_global(ty, init);
         }
 
         Ok(())
@@ -300,7 +300,7 @@ impl Analyzer {
         for table in section {
             let table = table?;
 
-            self.mod_builder.handle_table(table.ty.initial as u32);
+            self.prog_builder.handle_table(table.ty.initial as u32);
         }
 
         Ok(())
@@ -329,7 +329,7 @@ impl Analyzer {
 
                 let functions = items.into_iter().collect::<Result<Vec<_>, _>>()?;
 
-                self.mod_builder.handle_elements(offset, &functions);
+                self.prog_builder.handle_elements(offset, &functions);
             }
 
             // Other element kinds do not exist in WASM 1.0

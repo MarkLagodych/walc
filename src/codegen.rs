@@ -1,6 +1,7 @@
 //! WALC code generator
 
 pub mod function;
+pub mod instruction;
 pub mod number;
 pub mod program;
 
@@ -140,17 +141,18 @@ impl DefinitionBuilder {
         result
     }
 
-    pub fn move_to(mut self, other: &mut Self) {
-        other.defs.append(&mut self.defs);
-    }
+    // pub fn merge(&mut self, other: Self) {
+    //     self.defs.extend(other.defs);
+    // }
 
-    /// Provides definitions required for all codegen features.
+    /// Provides definitions required for all basic codegen features.
     pub fn prelude() -> Self {
         let mut me = Self::new();
 
         me.def("0", abs(["x0", "x1"], var("x0")));
         me.def("1", abs(["x0", "x1"], var("x1")));
 
+        pair::define_prelude(&mut me);
         walc_io::define_prelude(&mut me);
         list::define_prelude(&mut me);
         number::define_prelude(&mut me);
@@ -202,7 +204,7 @@ pub mod pair {
     pub type Pair = Expr;
 
     pub fn new(first: Expr, second: Expr) -> Pair {
-        abs(["P"], apply(var("P"), [first, second]))
+        apply(var("P"), [first, second])
     }
 
     pub fn get_first(pair: Pair) -> Expr {
@@ -211,6 +213,16 @@ pub mod pair {
 
     pub fn get_second(pair: Pair) -> Expr {
         apply(pair, [var("1")])
+    }
+
+    pub fn define_prelude(b: &mut DefinitionBuilder) {
+        b.def(
+            "P",
+            abs(
+                ["first", "second"],
+                abs(["g"], apply(var("g"), [var("first"), var("second")])),
+            ),
+        );
     }
 }
 
@@ -227,10 +239,12 @@ pub mod either {
         pair::new(var("1"), value)
     }
 
+    #[allow(unused)]
     pub fn is_second(either: Either) -> Expr {
         pair::get_first(either)
     }
 
+    #[allow(unused)]
     pub fn unwrap(either: Either) -> Expr {
         pair::get_second(either)
     }

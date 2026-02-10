@@ -15,6 +15,7 @@ unbound-unreachable = []
 
 [dependencies.wasmparser]
 version = "^0.244"
+default-features = false
 features = ["std", "features", "validate"] # Ignore SIMD and WASM components
 
 [dependencies.clap]

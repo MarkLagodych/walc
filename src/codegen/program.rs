@@ -4,23 +4,23 @@ use crate::analyzer::*;
 
 /// Global variable initialization expression
 type GlobalInitExpr = Expr;
-/// A variable that refers to a function
-type FuncVar = Expr;
+// TODO this definition is too specific. Create number::from and number::default that handle
+// ValType and ValType+value
 
 #[derive(Default)]
 pub struct ProgramBuilder {
-    consts: number::ConstantDefinitionBuilder,
+    pub consts: number::ConstantDefinitionBuilder,
 
     globals: Vec<GlobalInitExpr>,
 
-    data_segments: DefinitionBuilder,
+    data_segments: Vec<list::List>,
     active_data_segment_infos: Vec<ActiveDataSegmentInfo>,
 
-    functions: DefinitionBuilder,
+    functions: Vec<function::FunctionBody>,
     main_id: Option<FuncId>,
     start_id: Option<FuncId>,
 
-    custom_func_table: Vec<FuncVar>,
+    custom_func_table: Vec<Option<u32>>,
 }
 
 struct ActiveDataSegmentInfo {
@@ -47,41 +47,40 @@ impl ProgramBuilder {
         // TODO root expression
         let expr = walc_io::end();
 
-        let mut defs = DefinitionBuilder::new();
+        let func_count = self.functions.len();
+
+        let mut defs = DefinitionBuilder::prelude();
+
+        self.consts.build(&mut defs);
+
+        for (i, data) in self.data_segments.into_iter().enumerate() {
+            defs.def(format!("Data{i}"), data);
+        }
+
+        for (i, func) in self.functions.into_iter().enumerate() {
+            defs.def(format!("F{i}"), func);
+        }
 
         defs.def(
             "FunctionTable",
-            table::from((0..self.functions.count()).map(|i| var(format!("F{i}")))),
+            table::from((0..func_count).map(|i| var(format!("F{i}")))),
         );
 
-        defs.def("CustomTable", table::from(self.custom_func_table));
+        defs.def(
+            "CustomTable",
+            table::from(
+                self.custom_func_table
+                    .into_iter()
+                    .map(|opt_id| match opt_id {
+                        Some(id) => var(format!("F{id}")),
+                        None => unreachable(),
+                    }),
+            ),
+        );
 
         defs.def("GlobalTable", table::from(self.globals));
 
-        let mut toplevel = DefinitionBuilder::prelude();
-        self.consts.build(&mut toplevel);
-        self.data_segments.move_to(&mut toplevel);
-        self.functions.move_to(&mut toplevel);
-        defs.move_to(&mut toplevel);
-        toplevel.build(expr)
-    }
-
-    pub fn handle_import(&mut self, name: &str, id: FuncId) {
-        match name {
-            "input" => {
-                self.functions
-                    .def(format!("F{id}"), function::input_function());
-            }
-            "output" => {
-                self.functions
-                    .def(format!("F{id}"), function::output_function());
-            }
-            "exit" => {
-                self.functions
-                    .def(format!("F{id}"), function::exit_function());
-            }
-            _ => {}
-        }
+        defs.build(expr)
     }
 
     pub fn handle_main(&mut self, id: FuncId) {
@@ -94,7 +93,7 @@ impl ProgramBuilder {
 
     pub fn handle_data(&mut self, id: DataId, data: &[u8], active_offset: Option<u32>) {
         self.data_segments
-            .def(format!("DAT{id}"), list::from_bytes(&mut self.consts, data));
+            .push(list::from_bytes(&mut self.consts, data));
 
         if let Some(offset) = active_offset {
             self.active_data_segment_infos.push(ActiveDataSegmentInfo {
@@ -104,18 +103,34 @@ impl ProgramBuilder {
         }
     }
 
+    pub fn handle_import(&mut self, name: &str) {
+        match name {
+            "input" => {
+                self.functions.push(function::input_function());
+            }
+            "output" => {
+                self.functions.push(function::output_function());
+            }
+            "exit" => {
+                self.functions.push(function::exit_function());
+            }
+            _ => {}
+        }
+    }
+
     pub fn handle_function(
         &mut self,
-        id: FuncId,
         param_count: u32,
         has_result: bool,
         local_types: &[ValType],
-        operators: &[Operator],
+        instructions: &[Operator],
     ) {
-        self.functions.def(
-            format!("F{id}"),
-            function::function(param_count, has_result, local_types, operators),
-        );
+        self.functions.push(function::function(
+            param_count,
+            has_result,
+            local_types,
+            instructions,
+        ));
     }
 
     pub fn handle_global(&mut self, ty: ValType, init: u64) {
@@ -131,12 +146,12 @@ impl ProgramBuilder {
     }
 
     pub fn handle_table(&mut self, size: u32) {
-        self.custom_func_table.resize(size as usize, unreachable());
+        self.custom_func_table.resize(size as usize, None);
     }
 
     pub fn handle_elements(&mut self, offset: u32, functions: &[FuncId]) {
         for (i, func_id) in functions.iter().enumerate() {
-            self.custom_func_table[offset as usize + i] = var(format!("F{func_id}"));
+            self.custom_func_table[offset as usize + i] = Some(*func_id);
         }
     }
 }

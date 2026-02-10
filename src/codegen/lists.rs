@@ -10,9 +10,6 @@ pub mod unsafe_list {
     }
 
     pub fn node(head: Expr, tail: Expr) -> UnsafeList {
-        // TODO Should unsafe list also use a predefined cons(tructor) like the safe list?
-        // Or can it be better to use a predefined constructor for pairs?
-        // What would the performance implications be?
         pair::new(head, tail)
     }
 
@@ -22,10 +19,6 @@ pub mod unsafe_list {
             result = node(item, result);
         }
         result
-    }
-
-    pub fn from_bytes(store: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> UnsafeList {
-        from(bytes.iter().map(|b| store.byte_const(*b)))
     }
 
     pub fn get_head(list: UnsafeList) -> Expr {

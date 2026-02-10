@@ -4,7 +4,13 @@
 #![no_std]
 
 pub extern crate alloc;
-pub use alloc::{format, string::String, vec::Vec};
+pub use alloc::{
+    borrow::ToOwned,
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 
 mod walc {
     #[link(wasm_import_module = "walc")]
@@ -15,18 +21,16 @@ mod walc {
     }
 }
 
-const INVALID_FLAG: u32 = 0x100;
-
 pub fn print_byte(c: u8) {
     unsafe { walc::output(c) }
 }
 
 pub fn read_byte() -> Option<u8> {
-    let byte = unsafe { walc::input() };
-    if byte & INVALID_FLAG != 0 {
+    let result = unsafe { walc::input() };
+    if result == 0xFFFFFFFF {
         None
     } else {
-        Some(byte as u8)
+        Some(result as u8)
     }
 }
 
@@ -110,6 +114,11 @@ macro_rules! eprintln {
     ($($arg:tt)*) => {{
         println!($($arg)*);
     }};
+}
+
+#[unsafe(export_name = "main")]
+fn main() {
+    crate::main()
 }
 
 #[panic_handler]

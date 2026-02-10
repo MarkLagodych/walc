@@ -3,47 +3,54 @@ use super::*;
 pub mod tree {
     use super::*;
 
-    pub fn new(bitness: u8, initial_item: Expr) -> Expr {
+    pub type Tree = Expr;
+
+    pub fn new(bitness: u8, initial_item: Expr) -> Tree {
         apply(var(format!("Tr{bitness}")), [initial_item])
     }
 
-    pub fn node(left: Expr, right: Expr) -> Expr {
+    pub fn node(left: Expr, right: Expr) -> Tree {
         pair::new(left, right)
     }
 
-    pub fn get_left(array: Expr) -> Expr {
-        pair::get_first(array)
+    pub fn get_left(tree: Tree) -> Expr {
+        pair::get_first(tree)
     }
 
-    pub fn get_right(array: Expr) -> Expr {
-        pair::get_second(array)
-    }
-
-    /// The index bitness must match the tree bitness.
-    pub fn index(array: Expr, index: Expr) -> Expr {
-        apply(index, [array])
+    pub fn get_right(tree: Tree) -> Expr {
+        pair::get_second(tree)
     }
 
     /// The index bitness must match the tree bitness.
-    pub fn insert(bitness: u8, array: Expr, index: Expr, value: Expr) -> Expr {
-        debug_assert!(bitness == 32 || bitness == 16);
+    pub fn index(tree: Tree, index: Expr) -> Expr {
+        apply(index, [tree])
+    }
+
+    /// The index bitness must match the tree bitness.
+    pub fn insert(bitness: u8, tree: Tree, index: number::Number, value: Expr) -> Tree {
+        debug_assert!(number::allowed_bit_list_be_bitness(bitness));
         apply(
             var(format!("TIns{bitness}")),
-            [array, number::to_bit_list_be(bitness, index), value],
+            [tree, number::to_bit_list_be(bitness, index), value],
         )
     }
 
     // TODO Is this useful? The idea is to generate a bit list at compile time if possible
     // pub fn static_insert(bitness: u8, array: Expr, index: u32, value: Expr) -> Expr {
-    //     debug_assert!(bitness == 32 || bitness == 16);
+    //     debug_assert!(bitness <= 32);
     //     insert(bitness, array, todo!(), value)
     // }
 
     /// The index bitness must match the tree bitness.
-    pub fn from(bitness: u8, items: impl IntoIterator<Item = Expr>, default_item: Expr) -> Expr {
-        debug_assert!(bitness == 32 || bitness == 16);
+    pub fn from(bitness: u8, items: impl IntoIterator<Item = Expr>, default_item: Expr) -> Tree {
+        debug_assert!(bitness <= 32);
 
         let mut items = items.into_iter().collect::<Vec<Expr>>();
+
+        if items.is_empty() {
+            return tree::new(bitness, default_item);
+        }
+
         for i in 0..bitness {
             if items.len() % 2 != 0 {
                 items.push(tree::new(i, default_item.clone()));
@@ -118,15 +125,17 @@ pub mod memory {
 
     const BITNESS: u8 = 32;
 
-    pub fn new(initial_item: Expr) -> Expr {
+    pub type Memory = tree::Tree;
+
+    pub fn new(initial_item: Expr) -> Memory {
         tree::new(BITNESS, initial_item)
     }
 
-    pub fn index(memory: Expr, address: Expr) -> Expr {
+    pub fn index(memory: Memory, address: number::I32) -> Expr {
         tree::index(memory, address)
     }
 
-    pub fn insert(memory: Expr, address: Expr, value: Expr) -> Expr {
+    pub fn insert(memory: Memory, address: number::I32, value: Expr) -> Memory {
         tree::insert(BITNESS, memory, address, value)
     }
 
@@ -138,15 +147,17 @@ pub mod table {
 
     const BITNESS: u8 = 16;
 
-    pub fn from(items: impl IntoIterator<Item = Expr>) -> Expr {
+    pub type Table = tree::Tree;
+
+    pub fn from(items: impl IntoIterator<Item = Expr>) -> Table {
         tree::from(BITNESS, items, unreachable())
     }
 
-    pub fn index(table: Expr, address: Expr) -> Expr {
+    pub fn index(table: Table, address: number::Id) -> Expr {
         tree::index(table, address)
     }
 
-    pub fn insert(table: Expr, address: Expr, value: Expr) -> Expr {
+    pub fn insert(table: Table, address: number::Id, value: Expr) -> Table {
         tree::insert(BITNESS, table, address, value)
     }
 }

@@ -3,8 +3,7 @@
 mod walc;
 use walc::*;
 
-#[unsafe(no_mangle)]
-fn main() {
+pub fn main() {
     while let Some(byte) = read_byte() {
         print_byte(byte);
     }
