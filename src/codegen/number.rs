@@ -5,6 +5,8 @@
 
 use super::*;
 
+use crate::analyzer::{Operator, ValType};
+
 // An ordered set makes the resulting code slightly nicer: the constants are defined in order
 use std::collections::BTreeSet as Set;
 
@@ -45,15 +47,8 @@ impl ConstantDefinitionBuilder {
         }
     }
 
-    pub fn merge(&mut self, other: Self) {
-        self.bytes.extend(other.bytes);
-        self.ids.extend(other.ids);
-        self.i32s.extend(other.i32s);
-        self.i64s.extend(other.i64s);
-    }
-
     fn byte_expr(byte: u8) -> Byte {
-        let ith_bit = |i: u8| -> Bit { bit((byte >> i) & 1 != 0) };
+        let ith_bit = |i: u8| bit((byte >> i) & 1 != 0);
 
         abs(["x"], apply(var("x"), (0..8).rev().map(ith_bit)))
     }
@@ -88,15 +83,35 @@ impl ConstantDefinitionBuilder {
         self.bytes.extend(n.to_be_bytes());
         var(format!("{:016x}", n))
     }
+
+    pub fn init_const(&mut self, init: &Operator) -> Number {
+        match init {
+            Operator::I32Const { value } => self.i32_const(*value as u32),
+            Operator::I64Const { value } => self.i64_const(*value as u64),
+            Operator::F32Const { value } => self.i32_const(value.bits()),
+            Operator::F64Const { value } => self.i64_const(value.bits()),
+            _ => unreachable!("WASM 1.0 cannot have const initializers other than I32/I64/F32/F64"),
+        }
+    }
+
+    pub fn default_const(&mut self, ty: ValType) -> Number {
+        match ty {
+            ValType::I32 => self.i32_const(0),
+            ValType::I64 => self.i64_const(0),
+            ValType::F32 => self.i32_const(0),
+            ValType::F64 => self.i64_const(0),
+            _ => unreachable!("WASM 1.0 cannot have value types other than I32/I64/F32/F64"),
+        }
+    }
 }
 
 #[allow(dead_code)]
-pub fn allowed_bit_list_be_bitness(bitness: u8) -> bool {
+pub fn is_allowed_bit_list_be_bitness(bitness: u8) -> bool {
     bitness == 16 || bitness == 32
 }
 
 pub fn to_bit_list_be(bitness: u8, number: Number) -> unsafe_list::UnsafeList {
-    debug_assert!(allowed_bit_list_be_bitness(bitness));
+    debug_assert!(is_allowed_bit_list_be_bitness(bitness));
 
     apply(number, [var(format!("ToBitsBE{bitness}"))])
 }

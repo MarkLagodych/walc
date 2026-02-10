@@ -3,26 +3,22 @@ use anyhow::{Result, anyhow};
 use crate::codegen;
 
 use wasmparser::*;
-pub use wasmparser::{Operator, ValType};
+pub use wasmparser::{FuncType, Operator, ValType};
 
 pub type FuncId = u32;
-pub type DataId = u32;
 pub type TypeId = u32;
+pub type DataSegmentId = u32;
 
-type IdCounter = std::ops::RangeFrom<u32>;
-
+#[derive(Default)]
 pub struct Analyzer {
     prog_builder: codegen::program::ProgramBuilder,
 
-    function_ids: IdCounter,
-
-    // TODO extract this to a separate function type struct
     /// Indexed by TypeId
     function_types: Vec<FuncType>,
-    /// Indexed by FuncId
-    function_type_map: Vec<TypeId>,
 
-    has_main: bool,
+    /// Stack of function type IDs.
+    /// The last type ID corresponds to the first function body defined in the module.
+    function_type_ids: Vec<TypeId>,
 }
 
 impl Analyzer {
@@ -33,13 +29,7 @@ impl Analyzer {
     const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1;
 
     pub fn new() -> Self {
-        Self {
-            prog_builder: codegen::program::ProgramBuilder::new(),
-            function_ids: 0..,
-            function_types: Vec::new(),
-            function_type_map: Vec::new(),
-            has_main: false,
-        }
+        Self::default()
     }
 
     pub fn compile(mut self, source: &[u8]) -> Result<codegen::Expr> {
@@ -51,10 +41,6 @@ impl Analyzer {
         parser.set_features(Self::SUPPORTED_FEATURES);
         for payload in parser.parse_all(source) {
             self.handle_payload(payload?)?;
-        }
-
-        if !self.has_main {
-            Err(anyhow!("The module does not export a 'main' function"))?
         }
 
         Ok(self.prog_builder.build())
@@ -85,11 +71,6 @@ impl Analyzer {
         Ok(())
     }
 
-    fn get_function_type(&self, func_id: FuncId) -> &FuncType {
-        let type_id = self.function_type_map[func_id as usize];
-        &self.function_types[type_id as usize]
-    }
-
     fn handle_imports(&mut self, section: ImportSectionReader) -> Result<()> {
         for import in section.into_imports() {
             let import = import?;
@@ -105,13 +86,6 @@ impl Analyzer {
                 TypeRef::Func(type_id) | TypeRef::FuncExact(type_id) => type_id,
                 _ => Err(anyhow!("Only function imports are supported"))?,
             };
-
-            // Imported functions' types must be recorded so that indexes of function_types
-            // will match function IDs
-            self.function_type_map.push(type_id);
-
-            // Account for imported functions in function IDs
-            self.function_ids.next().unwrap();
 
             let func_type = &self.function_types[type_id as usize];
 
@@ -143,6 +117,8 @@ impl Analyzer {
     }
 
     fn handle_exports(&mut self, section: ExportSectionReader) -> Result<()> {
+        let mut has_main = false;
+
         for export in section {
             let export = export?;
 
@@ -151,15 +127,20 @@ impl Analyzer {
                 continue;
             }
 
-            let func_type = self.get_function_type(export.index);
+            let len = self.function_types.len();
+            let func_type = &self.function_types[len - 1 - export.index as usize];
 
             if !(func_type.params().is_empty() && func_type.results().is_empty()) {
                 Err(anyhow!("'main' must have type () -> ()"))?
             }
 
-            self.has_main = true;
+            has_main = true;
 
             self.prog_builder.handle_main(export.index);
+        }
+
+        if !has_main {
+            Err(anyhow!("The module does not export a 'main' function"))?
         }
 
         Ok(())
@@ -192,17 +173,18 @@ impl Analyzer {
     }
 
     fn handle_types(&mut self, section: TypeSectionReader) -> Result<()> {
-        for func_type in section
-            .into_iter()
-            .map(|recursive_type_group| -> Result<FuncType> {
-                let mut subtypes = recursive_type_group?.into_types();
-                let first = subtypes.nth(0).unwrap();
-                match first.composite_type.inner {
-                    CompositeInnerType::Func(func_type) => Ok(func_type),
-                    _ => Err(anyhow!("Only function types are supported")),
-                }
-            })
-        {
+        let func_types = section.into_iter().map(|type_group| -> Result<FuncType> {
+            let func_type = type_group?
+                .into_types()
+                .next()
+                .unwrap()
+                .unwrap_func()
+                .clone();
+
+            Ok(func_type)
+        });
+
+        for func_type in func_types {
             self.function_types.push(func_type?);
         }
 
@@ -218,9 +200,9 @@ impl Analyzer {
             ))?
         }
 
-        for type_id in section.into_iter() {
-            self.function_type_map.push(type_id?);
-        }
+        self.function_type_ids = section.into_iter().collect::<Result<Vec<_>, _>>()?;
+
+        self.function_type_ids.reverse();
 
         Ok(())
     }
@@ -233,35 +215,34 @@ impl Analyzer {
             local_types.extend(std::iter::repeat_n(val_type, count as usize));
         }
 
-        Ok(local_types)
-    }
-
-    fn handle_function(&mut self, func: FunctionBody) -> Result<()> {
-        let func_id = self.function_ids.next().unwrap();
-
-        let local_types = Self::read_function_local_types(&func)?;
-
         if local_types.len() > (Self::MAX_COUNT as usize) {
             Err(anyhow!(
-                "Too many locals in function #{}: {} (max is {})",
-                func_id,
+                "Too many locals in a function: {} (max is {})",
                 local_types.len(),
                 Self::MAX_COUNT
             ))?;
         }
 
-        let func_type = self.get_function_type(func_id);
-        let param_count = func_type.params().len() as u32;
-        // There is at most one result due to validation
-        let has_result = !func_type.results().is_empty();
+        Ok(local_types)
+    }
+
+    fn handle_function(&mut self, func: FunctionBody) -> Result<()> {
+        let type_id = self.function_type_ids.pop().unwrap();
+        let func_type = &self.function_types[type_id as usize];
+
+        let local_types = Self::read_function_local_types(&func)?;
 
         let instructions = func
             .get_operators_reader()?
             .into_iter()
             .collect::<Result<Vec<Operator>, _>>()?;
 
-        self.prog_builder
-            .handle_function(param_count, has_result, &local_types, &instructions);
+        self.prog_builder.handle_function(
+            &self.function_types,
+            func_type,
+            &local_types,
+            &instructions,
+        );
 
         Ok(())
     }
@@ -278,19 +259,10 @@ impl Analyzer {
         for global in section.into_iter() {
             let global = global?;
 
-            let init = match global.init_expr.get_operators_reader().read()? {
-                Operator::I32Const { value } => value as u64,
-                Operator::I64Const { value } => value as u64,
-                Operator::F32Const { value } => value.bits() as u64,
-                Operator::F64Const { value } => value.bits(),
-                // Other operators are unsupported in WASM 1.0
-                _ => unreachable!(),
-            };
+            // WASM 1.0 initializer expressions can only contain a single const instruction
+            let init = global.init_expr.get_operators_reader().read()?;
 
-            // The mutability flag is ignored because all globals are mutable in WALC
-            let ty = global.ty.content_type;
-
-            self.prog_builder.handle_global(ty, init);
+            self.prog_builder.handle_global(init);
         }
 
         Ok(())

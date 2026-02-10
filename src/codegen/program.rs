@@ -2,16 +2,12 @@ use super::*;
 
 use crate::analyzer::*;
 
-/// Global variable initialization expression
-type GlobalInitExpr = Expr;
-// TODO this definition is too specific. Create number::from and number::default that handle
-// ValType and ValType+value
-
 #[derive(Default)]
 pub struct ProgramBuilder {
-    pub consts: number::ConstantDefinitionBuilder,
+    consts: number::ConstantDefinitionBuilder,
+    instrs: instruction::InstructionDefinitionBuilder,
 
-    globals: Vec<GlobalInitExpr>,
+    globals: Vec<number::Number>,
 
     data_segments: Vec<list::List>,
     active_data_segment_infos: Vec<ActiveDataSegmentInfo>,
@@ -24,8 +20,8 @@ pub struct ProgramBuilder {
 }
 
 struct ActiveDataSegmentInfo {
-    segment_id: DataId,
-    offset: u32,
+    id: DataSegmentId,
+    target_memory_offset: u32,
 }
 
 impl ProgramBuilder {
@@ -52,6 +48,7 @@ impl ProgramBuilder {
         let mut defs = DefinitionBuilder::prelude();
 
         self.consts.build(&mut defs);
+        self.instrs.build(&mut defs);
 
         for (i, data) in self.data_segments.into_iter().enumerate() {
             defs.def(format!("Data{i}"), data);
@@ -91,14 +88,14 @@ impl ProgramBuilder {
         self.start_id = Some(id);
     }
 
-    pub fn handle_data(&mut self, id: DataId, data: &[u8], active_offset: Option<u32>) {
+    pub fn handle_data(&mut self, id: DataSegmentId, data: &[u8], active_offset: Option<u32>) {
         self.data_segments
             .push(list::from_bytes(&mut self.consts, data));
 
         if let Some(offset) = active_offset {
             self.active_data_segment_infos.push(ActiveDataSegmentInfo {
-                segment_id: id,
-                offset,
+                id,
+                target_memory_offset: offset,
             });
         }
     }
@@ -120,29 +117,27 @@ impl ProgramBuilder {
 
     pub fn handle_function(
         &mut self,
-        param_count: u32,
-        has_result: bool,
+        function_types: &[FuncType],
+        function_type: &FuncType,
         local_types: &[ValType],
         instructions: &[Operator],
     ) {
         self.functions.push(function::function(
-            param_count,
-            has_result,
-            local_types,
-            instructions,
+            &function::EnvironmentInfo {
+                consts: &mut self.consts,
+                instrs: &mut self.instrs,
+                types: function_types,
+            },
+            &function::FunctionInfo {
+                function_type,
+                local_types,
+                instructions,
+            },
         ));
     }
 
-    pub fn handle_global(&mut self, ty: ValType, init: u64) {
-        let expr = match ty {
-            ValType::I32 => self.consts.i32_const(init as u32),
-            ValType::I64 => self.consts.i64_const(init),
-            ValType::F32 => self.consts.i32_const(init as u32),
-            ValType::F64 => self.consts.i64_const(init),
-            _ => unreachable!(),
-        };
-
-        self.globals.push(expr);
+    pub fn handle_global(&mut self, init: Operator) {
+        self.globals.push(self.consts.init_const(&init));
     }
 
     pub fn handle_table(&mut self, size: u32) {

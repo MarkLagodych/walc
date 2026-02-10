@@ -28,7 +28,7 @@ pub mod tree {
 
     /// The index bitness must match the tree bitness.
     pub fn insert(bitness: u8, tree: Tree, index: number::Number, value: Expr) -> Tree {
-        debug_assert!(number::allowed_bit_list_be_bitness(bitness));
+        debug_assert!(number::is_allowed_bit_list_be_bitness(bitness));
         apply(
             var(format!("TIns{bitness}")),
             [tree, number::to_bit_list_be(bitness, index), value],

@@ -129,10 +129,6 @@ impl DefinitionBuilder {
         self.defs.push((var.to_string(), value));
     }
 
-    pub fn count(&self) -> usize {
-        self.defs.len()
-    }
-
     pub fn build(self, body: Expr) -> Expr {
         let mut result = body;
         for (var, value) in self.defs.into_iter().rev() {
@@ -140,10 +136,6 @@ impl DefinitionBuilder {
         }
         result
     }
-
-    // pub fn merge(&mut self, other: Self) {
-    //     self.defs.extend(other.defs);
-    // }
 
     /// Provides definitions required for all basic codegen features.
     pub fn prelude() -> Self {
