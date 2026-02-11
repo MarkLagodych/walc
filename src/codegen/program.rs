@@ -10,7 +10,7 @@ pub struct ProgramBuilder {
     globals: Vec<number::Number>,
 
     data_segments: Vec<list::List>,
-    active_data_segment_infos: Vec<ActiveDataSegmentInfo>,
+    data_infos: Vec<DataSegmentInfo>,
 
     functions: Vec<function::FunctionBody>,
     main_id: Option<FuncId>,
@@ -19,7 +19,7 @@ pub struct ProgramBuilder {
     custom_func_table: Vec<Option<u32>>,
 }
 
-struct ActiveDataSegmentInfo {
+struct DataSegmentInfo {
     id: DataSegmentId,
     target_memory_offset: u32,
 }
@@ -29,7 +29,7 @@ impl ProgramBuilder {
         Self::default()
     }
 
-    pub fn build(self) -> Expr {
+    pub fn build(mut self) -> Expr {
         // The analyzer must ensure that a main function exists
         let main_id = self.main_id.unwrap();
         // TODO main
@@ -45,25 +45,27 @@ impl ProgramBuilder {
 
         let func_count = self.functions.len();
 
-        let mut defs = DefinitionBuilder::prelude();
+        let mut instr_defs = DefinitionBuilder::new();
+        self.instrs.build(&mut instr_defs, &mut self.consts);
+        let expr = instr_defs.build(expr);
 
-        self.consts.build(&mut defs);
-        self.instrs.build(&mut defs);
+        let mut toplevel = DefinitionBuilder::prelude();
+        self.consts.build(&mut toplevel);
 
-        for (i, data) in self.data_segments.into_iter().enumerate() {
-            defs.def(format!("Data{i}"), data);
+        for (id, data) in self.data_segments.into_iter().enumerate() {
+            toplevel.def(format!("Data{id}"), data);
         }
 
-        for (i, func) in self.functions.into_iter().enumerate() {
-            defs.def(format!("F{i}"), func);
+        for (id, func) in self.functions.into_iter().enumerate() {
+            toplevel.def(format!("F{id}"), func);
         }
 
-        defs.def(
+        toplevel.def(
             "FunctionTable",
-            table::from((0..func_count).map(|i| var(format!("F{i}")))),
+            table::from((0..func_count).map(|id| var(format!("F{id}")))),
         );
 
-        defs.def(
+        toplevel.def(
             "CustomTable",
             table::from(
                 self.custom_func_table
@@ -75,9 +77,9 @@ impl ProgramBuilder {
             ),
         );
 
-        defs.def("GlobalTable", table::from(self.globals));
+        toplevel.def("GlobalTable", table::from(self.globals));
 
-        defs.build(expr)
+        toplevel.build(expr)
     }
 
     pub fn handle_main(&mut self, id: FuncId) {
@@ -88,16 +90,14 @@ impl ProgramBuilder {
         self.start_id = Some(id);
     }
 
-    pub fn handle_data(&mut self, id: DataSegmentId, data: &[u8], active_offset: Option<u32>) {
+    pub fn handle_data(&mut self, id: DataSegmentId, data: &[u8], active_offset: u32) {
         self.data_segments
             .push(list::from_bytes(&mut self.consts, data));
 
-        if let Some(offset) = active_offset {
-            self.active_data_segment_infos.push(ActiveDataSegmentInfo {
-                id,
-                target_memory_offset: offset,
-            });
-        }
+        self.data_infos.push(DataSegmentInfo {
+            id,
+            target_memory_offset: active_offset,
+        });
     }
 
     pub fn handle_import(&mut self, name: &str) {
@@ -115,25 +115,9 @@ impl ProgramBuilder {
         }
     }
 
-    pub fn handle_function(
-        &mut self,
-        function_types: &[FuncType],
-        function_type: &FuncType,
-        local_types: &[ValType],
-        instructions: &[Operator],
-    ) {
-        self.functions.push(function::function(
-            &function::EnvironmentInfo {
-                consts: &mut self.consts,
-                instrs: &mut self.instrs,
-                types: function_types,
-            },
-            &function::FunctionInfo {
-                function_type,
-                local_types,
-                instructions,
-            },
-        ));
+    pub fn handle_function(&mut self, info: &FunctionInfo) {
+        self.functions
+            .push(function::function(info, &mut self.consts));
     }
 
     pub fn handle_global(&mut self, init: Operator) {

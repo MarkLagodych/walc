@@ -4,19 +4,10 @@ use crate::analyzer::*;
 
 pub type FunctionBody = Expr;
 
-pub struct EnvironmentInfo<'a> {
-    pub consts: &'a mut number::ConstantDefinitionBuilder,
-    pub instrs: &'a mut instruction::InstructionDefinitionBuilder,
-    pub types: &'a [FuncType],
-}
-
-pub struct FunctionInfo<'a> {
-    pub function_type: &'a FuncType,
-    pub local_types: &'a [ValType],
-    pub instructions: &'a [Operator<'a>],
-}
-
-pub fn function(env: &EnvironmentInfo, func: &FunctionInfo) -> FunctionBody {
+pub fn function(
+    info: &FunctionInfo,
+    consts: &mut number::ConstantDefinitionBuilder,
+) -> FunctionBody {
     let mut labels = Vec::<Operator>::new();
 
     unreachable()

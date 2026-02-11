@@ -9,6 +9,13 @@ pub type FuncId = u32;
 pub type TypeId = u32;
 pub type DataSegmentId = u32;
 
+pub struct FunctionInfo<'a> {
+    pub function_types: &'a [FuncType],
+    pub function_type: &'a FuncType,
+    pub local_types: &'a [ValType],
+    pub instructions: &'a [Operator<'a>],
+}
+
 #[derive(Default)]
 pub struct Analyzer {
     prog_builder: codegen::program::ProgramBuilder,
@@ -155,18 +162,20 @@ impl Analyzer {
         for (data_id, data_segment) in section.into_iter().enumerate() {
             let data_segment = data_segment?;
 
-            let mut active_offset = None;
-
-            if let DataKind::Active { offset_expr, .. } = data_segment.kind {
-                active_offset = match offset_expr.get_operators_reader().read()? {
-                    Operator::I32Const { value } => Some(value as u32),
-                    // Validator must ensure that offset_expr is I32
-                    _ => unreachable!(),
-                };
-            }
+            let target_memory_offsest = match data_segment.kind {
+                DataKind::Active { offset_expr, .. } => {
+                    match offset_expr.get_operators_reader().read()? {
+                        Operator::I32Const { value } => value as u32,
+                        // Validator must ensure that offset_expr is I32
+                        _ => unreachable!(),
+                    }
+                }
+                // Passive data segments are not supported in WASM 1.0
+                _ => unreachable!(),
+            };
 
             self.prog_builder
-                .handle_data(data_id as u32, data_segment.data, active_offset);
+                .handle_data(data_id as u32, data_segment.data, target_memory_offsest);
         }
 
         Ok(())
@@ -237,12 +246,12 @@ impl Analyzer {
             .into_iter()
             .collect::<Result<Vec<Operator>, _>>()?;
 
-        self.prog_builder.handle_function(
-            &self.function_types,
-            func_type,
-            &local_types,
-            &instructions,
-        );
+        self.prog_builder.handle_function(&FunctionInfo {
+            function_types: &self.function_types,
+            function_type: func_type,
+            local_types: &local_types,
+            instructions: &instructions,
+        });
 
         Ok(())
     }

@@ -124,8 +124,8 @@ pub mod framed_stack {
 
     pub fn push(stack: FramedStack, item: Expr) -> FramedStack {
         let top_stack = stack::top(stack.clone());
-        let rest = stack::pop(stack);
-        stack::push(rest, stack::push(top_stack, item))
+        let new_top = stack::push(top_stack, item);
+        stack::push(stack::pop(stack), new_top)
     }
 
     pub fn top(stack: FramedStack) -> Expr {
@@ -134,7 +134,7 @@ pub mod framed_stack {
 
     pub fn pop(stack: FramedStack) -> FramedStack {
         let top_stack = stack::top(stack.clone());
-        let rest = stack::pop(stack);
-        stack::push(rest, stack::pop(top_stack))
+        let new_top = stack::pop(top_stack);
+        stack::push(stack::pop(stack), new_top)
     }
 }

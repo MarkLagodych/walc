@@ -34,16 +34,16 @@ impl ConstantDefinitionBuilder {
 
     pub fn build(self, b: &mut DefinitionBuilder) {
         for &n in &self.bytes {
-            b.def(format!("{:02x}", n), Self::byte_expr(n));
+            b.def(format!("{:02X}", n), Self::byte_expr(n));
         }
         for &n in &self.ids {
-            b.def(format!("{:04x}", n), Self::number_expr(&n.to_be_bytes()));
+            b.def(format!("{:04X}", n), Self::number_expr(&n.to_be_bytes()));
         }
         for &n in &self.i32s {
-            b.def(format!("{:08x}", n), Self::number_expr(&n.to_be_bytes()));
+            b.def(format!("{:08X}", n), Self::number_expr(&n.to_be_bytes()));
         }
         for &n in &self.i64s {
-            b.def(format!("{:016x}", n), Self::number_expr(&n.to_be_bytes()));
+            b.def(format!("{:016X}", n), Self::number_expr(&n.to_be_bytes()));
         }
     }
 
@@ -56,32 +56,32 @@ impl ConstantDefinitionBuilder {
     fn number_expr(be_bytes: &[u8]) -> Number {
         let mut expr = var("n");
         for &byte in be_bytes {
-            expr = apply(var(format!("{:02x}", byte)), [expr]);
+            expr = apply(var(format!("{:02X}", byte)), [expr]);
         }
         abs(["n"], expr)
     }
 
     pub fn byte_const(&mut self, byte: u8) -> Byte {
         self.bytes.insert(byte);
-        var(format!("{:02x}", byte))
+        var(format!("{:02X}", byte))
     }
 
     pub fn id_const(&mut self, id: u16) -> Id {
         self.ids.insert(id);
         self.bytes.extend(id.to_be_bytes());
-        var(format!("{:04x}", id))
+        var(format!("{:04X}", id))
     }
 
     pub fn i32_const(&mut self, n: u32) -> I32 {
         self.i32s.insert(n);
         self.bytes.extend(n.to_be_bytes());
-        var(format!("{:08x}", n))
+        var(format!("{:08X}", n))
     }
 
     pub fn i64_const(&mut self, n: u64) -> I64 {
         self.i64s.insert(n);
         self.bytes.extend(n.to_be_bytes());
-        var(format!("{:016x}", n))
+        var(format!("{:016X}", n))
     }
 
     pub fn init_const(&mut self, init: &Operator) -> Number {
