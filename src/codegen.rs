@@ -97,10 +97,6 @@ pub fn cond(condition: Bit, then_branch: Expr, else_branch: Expr) -> Expr {
     apply(condition, [else_branch, then_branch])
 }
 
-pub fn rec(func: Expr) -> Expr {
-    apply(func.clone(), [func])
-}
-
 pub fn unreachable() -> Expr {
     if cfg!(feature = "unbound-unreachable") {
         var("__UNREACHABLE__")
@@ -125,8 +121,15 @@ impl DefinitionBuilder {
         Self { defs: vec![] }
     }
 
-    pub fn def(&mut self, var: impl ToString, value: Expr) {
-        self.defs.push((var.to_string(), value));
+    pub fn def(&mut self, name: impl ToString, value: Expr) {
+        self.defs.push((name.to_string(), value));
+    }
+
+    pub fn def_rec(&mut self, name: impl ToString, value: Expr) {
+        self.defs.push((
+            name.to_string(),
+            apply(var("Y"), [abs([name.to_string()], value)]),
+        ));
     }
 
     pub fn build(self, body: Expr) -> Expr {
@@ -143,6 +146,18 @@ impl DefinitionBuilder {
 
         me.def("0", abs(["x0", "x1"], var("x0")));
         me.def("1", abs(["x0", "x1"], var("x1")));
+
+        // Y combinator
+        me.def(
+            "Y",
+            abs(
+                ["f"],
+                apply(
+                    abs(["x"], apply(var("f"), [apply(var("x"), [var("x")])])),
+                    [abs(["x"], apply(var("f"), [apply(var("x"), [var("x")])]))],
+                ),
+            ),
+        );
 
         pair::define_prelude(&mut me);
         io_command::define_prelude(&mut me);

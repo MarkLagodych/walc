@@ -60,7 +60,7 @@ tuple<a, b, c>
 ```
 corresponds to:
 ```
-λgetter. (((getter a) b) c)
+[getter (((getter a) b) c)]
 ```
 
 The getter function can be either one of these three:
@@ -99,14 +99,31 @@ IN
 ```
 corresponds to:
 ```
-LET f = [f[x[y[z
-    ...(f f)...]]]]
+LET f<f,x,y,z> =
+    ...use (f f)...
 IN
-    ...((((f f) 1) 2) 3)
+    ...f<f,1,2,3>
 ```
 
 The key is to always use the function `f` applying it to itself: `(f f)`.
 This way it can always refer to itself by its first argument.
+
+TODO Explain how this becomes simpler with the Y combinator
+
+```
+LETREC f<x,y,z> =
+    ...use f...
+IN
+    ...f<1,2,3>
+```
+corresponds to:
+```
+LET f = (Y [f[x[y[z
+    ...use f...
+]]]])
+IN
+    ...(((f 1)2)3)
+```
 
 ## Recursive loops
 
