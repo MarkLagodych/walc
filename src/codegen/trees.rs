@@ -87,10 +87,10 @@ pub mod tree {
                 let insert_into =
                     |subtree| apply(var("insert"), [subtree, index_rest.clone(), var("value")]);
 
-                cond(
+                select(
                     index_bit,
-                    tree::node(left.clone(), insert_into(right.clone())),
                     tree::node(insert_into(left.clone()), right.clone()),
+                    tree::node(left.clone(), insert_into(right.clone())),
                 )
             }),
         );

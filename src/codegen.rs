@@ -93,8 +93,9 @@ pub fn def(var: impl ToString, value: Expr, body: Expr) -> Expr {
     apply(abs([var], body), [value])
 }
 
-pub fn cond(condition: Bit, then_branch: Expr, else_branch: Expr) -> Expr {
-    apply(condition, [else_branch, then_branch])
+/// `branch0` is selected if `condition` is 0, `branch1` is selected if `condition` is 1.
+pub fn select(condition: Bit, branch0: Expr, branch1: Expr) -> Expr {
+    apply(condition, [branch0, branch1])
 }
 
 pub fn unreachable() -> Expr {
