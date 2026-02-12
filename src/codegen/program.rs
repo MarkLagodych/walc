@@ -117,7 +117,7 @@ impl ProgramBuilder {
 
     pub fn handle_function(&mut self, info: &FunctionInfo) {
         self.functions
-            .push(function::function(info, &mut self.consts));
+            .push(function::function(info, &mut self.consts, &mut self.instrs));
     }
 
     pub fn handle_global(&mut self, init: Operator) {

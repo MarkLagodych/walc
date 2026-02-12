@@ -28,6 +28,10 @@ pub struct Analyzer {
     function_type_ids: Vec<TypeId>,
 }
 
+pub fn compile(source: &[u8]) -> Result<codegen::Expr> {
+    Analyzer::new().compile(source)
+}
+
 impl Analyzer {
     /// Maximum ID for functions, globals, and locals
     const MAX_ID: u32 = u16::MAX as u32;

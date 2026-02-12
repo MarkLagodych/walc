@@ -27,13 +27,13 @@ impl InstructionDefinitionBuilder {
         self.map.insert(name.to_string(), def);
     }
 
-    pub fn num_const(&mut self, num: number::Number) -> Expr {
-        self.insert("NumConst", Self::num_const_def);
+    pub fn push(&mut self, item: Expr) -> Instruction {
+        self.insert("Push", Self::push_def);
 
-        apply(var("NumConst"), [num])
+        apply(var("Push"), [item])
     }
 
-    fn num_const_def(_ctx: &mut DefCtx) -> Expr {
+    fn push_def(_ctx: &mut DefCtx) -> Expr {
         abs(
             ["item"],
             instr({
@@ -44,7 +44,7 @@ impl InstructionDefinitionBuilder {
         )
     }
 
-    pub fn call(&mut self, function_id: number::Id) -> Expr {
+    pub fn call(&mut self, function_id: number::Id) -> Instruction {
         self.insert("Call", Self::call_def);
 
         apply(var("Call"), [function_id])
@@ -79,10 +79,11 @@ impl InstructionDefinitionBuilder {
         op: &Operator,
         info: &FunctionInfo,
         consts: &mut number::ConstantDefinitionBuilder,
+        labels: &[Expr],
     ) -> Instruction {
         match op {
-            Operator::I32Const { value } => self.num_const(consts.i32_const(*value as u32)),
-            Operator::I64Const { value } => self.num_const(consts.i64_const(*value as u64)),
+            Operator::I32Const { value } => self.push(consts.i32_const(*value as u32)),
+            Operator::I64Const { value } => self.push(consts.i64_const(*value as u64)),
             Operator::Call { function_index } => self.call(consts.id_const(*function_index as u16)),
             // TODO
             _ => unreachable(),
