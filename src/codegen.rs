@@ -161,7 +161,6 @@ impl DefinitionBuilder {
         );
 
         pair::define_prelude(&mut me);
-        io_command::define_prelude(&mut me);
         list::define_prelude(&mut me);
         number::define_prelude(&mut me);
         tree::define_prelude(&mut me);
@@ -174,35 +173,15 @@ pub mod io_command {
     use super::*;
 
     pub fn exit() -> Expr {
-        var("Exit")
+        optional::none()
     }
 
     pub fn output(out_byte: number::Byte, next: Expr) -> Expr {
-        apply(var("Out"), [out_byte, next])
+        optional::some(either::first(pair::new(out_byte, next)))
     }
 
     pub fn input(input_func: Expr) -> Expr {
-        apply(var("In"), [input_func])
-    }
-
-    pub fn define_prelude(b: &mut DefinitionBuilder) {
-        b.def("Exit", optional::none());
-
-        b.def(
-            "Out",
-            abs(
-                ["out_byte", "next"],
-                optional::some(either::first(pair::new(var("out_byte"), var("next")))),
-            ),
-        );
-
-        b.def(
-            "In",
-            abs(
-                ["inp_func"],
-                optional::some(either::second(var("inp_func"))),
-            ),
-        );
+        optional::some(either::second(input_func))
     }
 }
 

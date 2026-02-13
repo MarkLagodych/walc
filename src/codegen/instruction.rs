@@ -1,6 +1,9 @@
 mod context;
 use context::*;
 
+mod arith;
+use arith::*;
+
 use crate::{analyzer::*, codegen::*};
 
 use std::collections::BTreeMap as Map;

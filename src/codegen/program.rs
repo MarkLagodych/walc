@@ -121,7 +121,7 @@ impl ProgramBuilder {
     }
 
     pub fn handle_global(&mut self, init: Operator) {
-        self.globals.push(self.consts.init_const(&init));
+        self.globals.push(self.consts.with_init_value(&init));
     }
 
     pub fn handle_table(&mut self, size: u32) {

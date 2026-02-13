@@ -27,6 +27,20 @@ pub type I64 = Expr;
 /// Any of: Byte, Id, I32, I64
 pub type Number = Expr;
 
+fn byte_expr(byte: u8) -> Byte {
+    let ith_bit = |i: u8| bit((byte >> i) & 1 != 0);
+
+    abs(["x"], apply(var("x"), (0..8).rev().map(ith_bit)))
+}
+
+fn number_expr(be_bytes: &[u8]) -> Number {
+    let mut expr = var("n");
+    for &byte in be_bytes {
+        expr = apply(var(format!("{:02X}", byte)), [expr]);
+    }
+    abs(["n"], expr)
+}
+
 impl ConstantDefinitionBuilder {
     pub fn new() -> Self {
         Self::default()
@@ -34,58 +48,61 @@ impl ConstantDefinitionBuilder {
 
     pub fn build(self, b: &mut DefinitionBuilder) {
         for &n in &self.bytes {
-            b.def(format!("{:02X}", n), Self::byte_expr(n));
+            if n == 0 {
+                continue; // "00" is pre-defined in the prelude
+            }
+            b.def(format!("{:02X}", n), byte_expr(n));
         }
         for &n in &self.ids {
-            b.def(format!("{:04X}", n), Self::number_expr(&n.to_be_bytes()));
+            b.def(format!("{:04X}", n), number_expr(&n.to_be_bytes()));
         }
         for &n in &self.i32s {
-            b.def(format!("{:08X}", n), Self::number_expr(&n.to_be_bytes()));
+            b.def(format!("{:08X}", n), number_expr(&n.to_be_bytes()));
         }
         for &n in &self.i64s {
-            b.def(format!("{:016X}", n), Self::number_expr(&n.to_be_bytes()));
+            b.def(format!("{:016X}", n), number_expr(&n.to_be_bytes()));
         }
-    }
-
-    fn byte_expr(byte: u8) -> Byte {
-        let ith_bit = |i: u8| bit((byte >> i) & 1 != 0);
-
-        abs(["x"], apply(var("x"), (0..8).rev().map(ith_bit)))
-    }
-
-    fn number_expr(be_bytes: &[u8]) -> Number {
-        let mut expr = var("n");
-        for &byte in be_bytes {
-            expr = apply(var(format!("{:02X}", byte)), [expr]);
-        }
-        abs(["n"], expr)
     }
 
     pub fn byte_const(&mut self, byte: u8) -> Byte {
+        if byte == 0 {
+            return var("0_8");
+        }
+
         self.bytes.insert(byte);
         var(format!("{:02X}", byte))
     }
 
     pub fn id_const(&mut self, id: u16) -> Id {
+        // The ID of 0 is not special and does not need to be optimized
+
         self.ids.insert(id);
         self.bytes.extend(id.to_be_bytes());
         var(format!("{:04X}", id))
     }
 
     pub fn i32_const(&mut self, n: u32) -> I32 {
+        if n == 0 {
+            return var("0_32");
+        }
+
         self.i32s.insert(n);
         self.bytes.extend(n.to_be_bytes());
         var(format!("{:08X}", n))
     }
 
     pub fn i64_const(&mut self, n: u64) -> I64 {
+        if n == 0 {
+            return var("0_64");
+        }
+
         self.i64s.insert(n);
         self.bytes.extend(n.to_be_bytes());
         var(format!("{:016X}", n))
     }
 
-    pub fn init_const(&mut self, init: &Operator) -> Number {
-        match init {
+    pub fn with_init_value(&mut self, init_value: &Operator) -> Number {
+        match init_value {
             Operator::I32Const { value } => self.i32_const(*value as u32),
             Operator::I64Const { value } => self.i64_const(*value as u64),
             Operator::F32Const { value } => self.i32_const(value.bits()),
@@ -105,20 +122,8 @@ impl ConstantDefinitionBuilder {
     }
 }
 
-pub fn to_bit_list_be(bitness: u8, number: Number) -> unsafe_list::UnsafeList {
-    debug_assert!(bitness == 16 || bitness == 32);
-
-    apply(number, [var(format!("ToBitsBE{bitness}"))])
-}
-
 pub fn define_prelude(b: &mut DefinitionBuilder) {
-    for bitness in [16, 32] {
-        b.def(
-            format!("ToBitsBE{bitness}"),
-            abs(
-                (0..bitness).rev().map(|i| i.to_string()),
-                unsafe_list::from((0..bitness).rev().map(|i| var(i.to_string()))),
-            ),
-        );
-    }
+    b.def("00", byte_expr(0));
+    b.def("0i", number_expr(&0u32.to_be_bytes())); // "int"
+    b.def("0l", number_expr(&0u64.to_be_bytes())); // "long"
 }

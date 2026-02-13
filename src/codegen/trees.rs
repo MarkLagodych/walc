@@ -6,6 +6,7 @@ pub mod tree {
     pub type Tree = Expr;
 
     pub fn new(bitness: u8, initial_item: Expr) -> Tree {
+        debug_assert!(bitness <= 32);
         apply(var(format!("Tr{bitness}")), [initial_item])
     }
 
@@ -28,17 +29,9 @@ pub mod tree {
 
     /// The index bitness must match the tree bitness.
     pub fn insert(bitness: u8, tree: Tree, index: number::Number, value: Expr) -> Tree {
-        apply(
-            var(format!("TIns{bitness}")),
-            [tree, number::to_bit_list_be(bitness, index), value],
-        )
+        debug_assert!(bitness <= 32);
+        apply(index, [apply(var(format!("TIns{bitness}")), [tree, value])])
     }
-
-    // TODO Is this useful? The idea is to generate a bit list at compile time if possible
-    // pub fn static_insert(bitness: u8, array: Expr, index: u32, value: Expr) -> Expr {
-    //     debug_assert!(bitness <= 32);
-    //     insert(bitness, array, todo!(), value)
-    // }
 
     /// The index bitness must match the tree bitness.
     pub fn from(bitness: u8, items: impl IntoIterator<Item = Expr>, default_item: Expr) -> Tree {
@@ -77,25 +70,21 @@ pub mod tree {
 
         b.def(
             "TIns",
-            abs(["insert", "array", "index", "value"], {
-                let index_bit = unsafe_list::get_head(var("index"));
-                let index_rest = unsafe_list::get_tail(var("index"));
+            abs(["insert", "tree", "value", "index_bit"], {
+                let left = tree::get_left(var("tree"));
+                let right = tree::get_right(var("tree"));
 
-                let left = tree::get_left(var("array"));
-                let right = tree::get_right(var("array"));
-
-                let insert_into =
-                    |subtree| apply(var("insert"), [subtree, index_rest.clone(), var("value")]);
+                let insert = |subtree| apply(var("insert"), [subtree, var("value")]);
 
                 select(
-                    index_bit,
-                    tree::node(insert_into(left.clone()), right.clone()),
-                    tree::node(left.clone(), insert_into(right.clone())),
+                    var("index_bit"),
+                    tree::node(insert(left.clone()), right.clone()),
+                    tree::node(left.clone(), insert(right.clone())),
                 )
             }),
         );
 
-        b.def("TIns0", abs(["array", "index", "value"], var("value")));
+        b.def("TIns0", abs(["tree", "value"], var("value")));
 
         // Each insertion function consumes i bits of the index
         for i in 1..=32 {
@@ -114,8 +103,8 @@ pub mod memory {
 
     pub type Memory = tree::Tree;
 
-    pub fn new(initial_item: Expr) -> Memory {
-        tree::new(BITNESS, initial_item)
+    pub fn new() -> Memory {
+        tree::new(BITNESS, var("00"))
     }
 
     pub fn index(memory: Memory, address: number::I32) -> Expr {
