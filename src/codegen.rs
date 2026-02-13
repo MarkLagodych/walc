@@ -119,7 +119,7 @@ pub struct DefinitionBuilder {
 
 impl DefinitionBuilder {
     pub fn new() -> Self {
-        Self { defs: vec![] }
+        Self::default()
     }
 
     pub fn def(&mut self, name: impl ToString, value: Expr) {
@@ -131,6 +131,10 @@ impl DefinitionBuilder {
             name.to_string(),
             apply(var("Y"), [abs([name.to_string()], value)]),
         ));
+    }
+
+    pub fn append(&mut self, other: Self) {
+        self.defs.extend(other.defs);
     }
 
     pub fn build(self, body: Expr) -> Expr {

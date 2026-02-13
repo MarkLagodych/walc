@@ -23,7 +23,7 @@ pub mod tree {
     }
 
     /// The index bitness must match the tree bitness.
-    pub fn index(tree: Tree, index: Expr) -> Expr {
+    pub fn index(tree: Tree, index: number::Number) -> Expr {
         apply(index, [tree])
     }
 
@@ -104,7 +104,7 @@ pub mod memory {
     pub type Memory = tree::Tree;
 
     pub fn new() -> Memory {
-        tree::new(BITNESS, var("00"))
+        tree::new(BITNESS, number::null_byte())
     }
 
     pub fn index(memory: Memory, address: number::I32) -> Expr {
@@ -114,8 +114,6 @@ pub mod memory {
     pub fn insert(memory: Memory, address: number::I32, value: Expr) -> Memory {
         tree::insert(BITNESS, memory, address, value)
     }
-
-    // TODO algorithm for fast init from a list
 }
 
 pub mod table {

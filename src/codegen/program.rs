@@ -45,12 +45,12 @@ impl ProgramBuilder {
 
         let func_count = self.functions.len();
 
-        let mut instr_defs = DefinitionBuilder::new();
-        self.instrs.build(&mut instr_defs, &mut self.consts);
-        let expr = instr_defs.build(expr);
+        let instrs = self.instrs.build(&mut self.consts);
+        let consts = self.consts.build();
 
         let mut toplevel = DefinitionBuilder::prelude();
-        self.consts.build(&mut toplevel);
+        toplevel.append(consts);
+        toplevel.append(instrs);
 
         for (id, data) in self.data_segments.into_iter().enumerate() {
             toplevel.def(format!("Data{id}"), data);
@@ -66,7 +66,7 @@ impl ProgramBuilder {
         );
 
         toplevel.def(
-            "CustomTable",
+            "IndirectTable",
             table::from(
                 self.custom_func_table
                     .into_iter()
@@ -77,7 +77,9 @@ impl ProgramBuilder {
             ),
         );
 
-        toplevel.def("GlobalTable", table::from(self.globals));
+        toplevel.def("Globals", table::from(self.globals));
+
+        toplevel.def("Memory", memory::new());
 
         toplevel.build(expr)
     }

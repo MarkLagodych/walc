@@ -41,12 +41,26 @@ fn number_expr(be_bytes: &[u8]) -> Number {
     abs(["n"], expr)
 }
 
+pub fn null_byte() -> Byte {
+    var("00")
+}
+
+pub fn null_i32() -> I32 {
+    var("0i")
+}
+
+pub fn null_i64() -> I64 {
+    var("0I")
+}
+
 impl ConstantDefinitionBuilder {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn build(self, b: &mut DefinitionBuilder) {
+    pub fn build(self) -> DefinitionBuilder {
+        let mut b = DefinitionBuilder::new();
+
         for &n in &self.bytes {
             if n == 0 {
                 continue; // "00" is pre-defined in the prelude
@@ -62,11 +76,13 @@ impl ConstantDefinitionBuilder {
         for &n in &self.i64s {
             b.def(format!("{:016X}", n), number_expr(&n.to_be_bytes()));
         }
+
+        b
     }
 
     pub fn byte_const(&mut self, byte: u8) -> Byte {
         if byte == 0 {
-            return var("0_8");
+            return null_byte();
         }
 
         self.bytes.insert(byte);
@@ -83,7 +99,7 @@ impl ConstantDefinitionBuilder {
 
     pub fn i32_const(&mut self, n: u32) -> I32 {
         if n == 0 {
-            return var("0_32");
+            return null_i32();
         }
 
         self.i32s.insert(n);
@@ -93,7 +109,7 @@ impl ConstantDefinitionBuilder {
 
     pub fn i64_const(&mut self, n: u64) -> I64 {
         if n == 0 {
-            return var("0_64");
+            return null_i64();
         }
 
         self.i64s.insert(n);
@@ -124,6 +140,6 @@ impl ConstantDefinitionBuilder {
 
 pub fn define_prelude(b: &mut DefinitionBuilder) {
     b.def("00", byte_expr(0));
-    b.def("0i", number_expr(&0u32.to_be_bytes())); // "int"
-    b.def("0l", number_expr(&0u64.to_be_bytes())); // "long"
+    b.def("0i", number_expr(&0u32.to_be_bytes()));
+    b.def("0I", number_expr(&0u64.to_be_bytes()));
 }

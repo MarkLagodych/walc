@@ -30,6 +30,35 @@ impl InstructionDefinitionBuilder {
         self.map.insert(name.to_string(), def);
     }
 
+    pub fn build(self, consts: &mut number::ConstantDefinitionBuilder) -> DefinitionBuilder {
+        let mut b = DefinitionBuilder::new();
+
+        // TODO use ArithDefBuilder here
+        let mut ctx = DefCtx { consts };
+
+        for (def_name, def) in self.map.into_iter() {
+            b.def(def_name, def(&mut ctx));
+        }
+
+        b
+    }
+
+    pub fn instruction(
+        &mut self,
+        op: &Operator,
+        info: &FunctionInfo,
+        consts: &mut number::ConstantDefinitionBuilder,
+        labels: &[Expr],
+    ) -> Instruction {
+        match op {
+            Operator::I32Const { value } => self.push(consts.i32_const(*value as u32)),
+            Operator::I64Const { value } => self.push(consts.i64_const(*value as u64)),
+            Operator::Call { function_index } => self.call(consts.id_const(*function_index as u16)),
+            // TODO
+            _ => unreachable(),
+        }
+    }
+
     pub fn push(&mut self, item: Expr) -> Instruction {
         self.insert("Push", Self::push_def);
 
@@ -65,31 +94,5 @@ impl InstructionDefinitionBuilder {
                     .build()
             }),
         )
-    }
-
-    pub fn build(self, b: &mut DefinitionBuilder, consts: &mut number::ConstantDefinitionBuilder) {
-        // TODO use ArithDefBuilder here
-
-        let mut ctx = DefCtx { consts };
-
-        for (def_name, def) in self.map.into_iter() {
-            b.def(def_name, def(&mut ctx));
-        }
-    }
-
-    pub fn instruction(
-        &mut self,
-        op: &Operator,
-        info: &FunctionInfo,
-        consts: &mut number::ConstantDefinitionBuilder,
-        labels: &[Expr],
-    ) -> Instruction {
-        match op {
-            Operator::I32Const { value } => self.push(consts.i32_const(*value as u32)),
-            Operator::I64Const { value } => self.push(consts.i64_const(*value as u64)),
-            Operator::Call { function_index } => self.call(consts.id_const(*function_index as u16)),
-            // TODO
-            _ => unreachable(),
-        }
     }
 }
