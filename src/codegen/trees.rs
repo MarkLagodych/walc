@@ -30,7 +30,7 @@ pub mod tree {
     /// The index bitness must match the tree bitness.
     pub fn insert(bitness: u8, tree: Tree, index: number::Number, value: Expr) -> Tree {
         debug_assert!(bitness <= 32);
-        apply(index, [apply(var(format!("TIns{bitness}")), [tree, value])])
+        apply(index, [apply(var(format!("Ins{bitness}")), [tree, value])])
     }
 
     /// The index bitness must match the tree bitness.
@@ -59,17 +59,17 @@ pub mod tree {
 
     pub fn define_prelude(b: &mut DefinitionBuilder) {
         // Indexable by 0 bits (i.e. not indexable)
-        b.def("Tr0", abs(["init"], var("init")));
+        b.def("Tr0", abs(["x"], var("x")));
         // Every node is indexable by i bits
         for i in 1..=32 {
             let node_name = format!("Tr{}", i);
             let item_name = format!("Tr{}", i - 1);
-            let item = apply(var(item_name), [var("init")]);
-            b.def(node_name, abs(["init"], tree::node(item.clone(), item)));
+            let item = apply(var(item_name), [var("x")]);
+            b.def(node_name, abs(["x"], tree::node(item.clone(), item)));
         }
 
         b.def(
-            "TIns",
+            "Ins",
             abs(["insert", "tree", "value", "index_bit"], {
                 let left = tree::get_left(var("tree"));
                 let right = tree::get_right(var("tree"));
@@ -84,13 +84,13 @@ pub mod tree {
             }),
         );
 
-        b.def("TIns0", abs(["tree", "value"], var("value")));
+        b.def("Ins0", abs(["tree", "value"], var("value")));
 
         // Each insertion function consumes i bits of the index
         for i in 1..=32 {
             b.def(
-                format!("TIns{}", i),
-                apply(var("TIns"), [var(format!("TIns{}", i - 1))]),
+                format!("Ins{}", i),
+                apply(var("Ins"), [var(format!("Ins{}", i - 1))]),
             );
         }
     }

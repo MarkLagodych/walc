@@ -9,8 +9,28 @@ pub type FuncId = u32;
 pub type TypeId = u32;
 pub type DataSegmentId = u32;
 
+#[derive(Default)]
+pub struct TypeInfo {
+    /// Indexed by TypeId
+    types: Vec<FuncType>,
+
+    /// Indexed by FuncId
+    functions: Vec<TypeId>,
+}
+
+impl TypeInfo {
+    pub fn get_type(&self, type_id: TypeId) -> &FuncType {
+        &self.types[type_id as usize]
+    }
+
+    pub fn get_function_type(&self, func_id: FuncId) -> &FuncType {
+        let type_id = self.functions[func_id as usize];
+        &self.types[type_id as usize]
+    }
+}
+
 pub struct FunctionInfo<'a> {
-    pub function_types: &'a [FuncType],
+    pub type_info: &'a TypeInfo,
     pub function_type: &'a FuncType,
     pub local_types: &'a [ValType],
     pub instructions: &'a [Operator<'a>],
@@ -18,14 +38,9 @@ pub struct FunctionInfo<'a> {
 
 #[derive(Default)]
 pub struct Analyzer {
-    prog_builder: codegen::program::ProgramBuilder,
-
-    /// Indexed by TypeId
-    function_types: Vec<FuncType>,
-
-    /// Stack of function type IDs.
-    /// The last type ID corresponds to the first function body defined in the module.
-    function_type_ids: Vec<TypeId>,
+    program: codegen::program::ProgramBuilder,
+    type_info: TypeInfo,
+    next_function_id: u32,
 }
 
 pub fn compile(source: &[u8]) -> Result<codegen::Expr> {
@@ -54,7 +69,7 @@ impl Analyzer {
             self.handle_payload(payload?)?;
         }
 
-        Ok(self.prog_builder.build())
+        Ok(self.program.build())
     }
 
     fn handle_payload(&mut self, payload: Payload<'_>) -> Result<()> {
@@ -98,7 +113,10 @@ impl Analyzer {
                 _ => Err(anyhow!("Only function imports are supported"))?,
             };
 
-            let func_type = &self.function_types[type_id as usize];
+            self.next_function_id += 1;
+            self.type_info.functions.push(type_id);
+
+            let func_type = self.type_info.get_type(type_id);
 
             match import.name {
                 "input" => {
@@ -121,7 +139,7 @@ impl Analyzer {
                 ))?,
             }
 
-            self.prog_builder.handle_import(import.name);
+            self.program.handle_import(import.name);
         }
 
         Ok(())
@@ -138,8 +156,7 @@ impl Analyzer {
                 continue;
             }
 
-            let len = self.function_types.len();
-            let func_type = &self.function_types[len - 1 - export.index as usize];
+            let func_type = self.type_info.get_function_type(export.index);
 
             if !(func_type.params().is_empty() && func_type.results().is_empty()) {
                 Err(anyhow!("'main' must have type () -> ()"))?
@@ -147,7 +164,7 @@ impl Analyzer {
 
             has_main = true;
 
-            self.prog_builder.handle_main(export.index);
+            self.program.handle_main(export.index);
         }
 
         if !has_main {
@@ -158,7 +175,7 @@ impl Analyzer {
     }
 
     fn handle_start(&mut self, func: u32) -> Result<()> {
-        self.prog_builder.handle_start(func);
+        self.program.handle_start(func);
         Ok(())
     }
 
@@ -178,7 +195,7 @@ impl Analyzer {
                 _ => unreachable!(),
             };
 
-            self.prog_builder
+            self.program
                 .handle_data(data_id as u32, data_segment.data, target_memory_offsest);
         }
 
@@ -198,7 +215,7 @@ impl Analyzer {
         });
 
         for func_type in func_types {
-            self.function_types.push(func_type?);
+            self.type_info.types.push(func_type?);
         }
 
         Ok(())
@@ -213,9 +230,9 @@ impl Analyzer {
             ))?
         }
 
-        self.function_type_ids = section.into_iter().collect::<Result<Vec<_>, _>>()?;
-
-        self.function_type_ids.reverse();
+        for type_id in section.into_iter() {
+            self.type_info.functions.push(type_id?);
+        }
 
         Ok(())
     }
@@ -240,8 +257,8 @@ impl Analyzer {
     }
 
     fn handle_function(&mut self, func: FunctionBody) -> Result<()> {
-        let type_id = self.function_type_ids.pop().unwrap();
-        let func_type = &self.function_types[type_id as usize];
+        let func_type = self.type_info.get_function_type(self.next_function_id);
+        self.next_function_id += 1;
 
         let local_types = Self::read_function_local_types(&func)?;
 
@@ -250,8 +267,8 @@ impl Analyzer {
             .into_iter()
             .collect::<Result<Vec<Operator>, _>>()?;
 
-        self.prog_builder.handle_function(&FunctionInfo {
-            function_types: &self.function_types,
+        self.program.handle_function(&FunctionInfo {
+            type_info: &self.type_info,
             function_type: func_type,
             local_types: &local_types,
             instructions: &instructions,
@@ -275,7 +292,7 @@ impl Analyzer {
             // WASM 1.0 initializer expressions can only contain a single const instruction
             let init = global.init_expr.get_operators_reader().read()?;
 
-            self.prog_builder.handle_global(init);
+            self.program.handle_global(init);
         }
 
         Ok(())
@@ -285,7 +302,7 @@ impl Analyzer {
         for table in section {
             let table = table?;
 
-            self.prog_builder.handle_table(table.ty.initial as u32);
+            self.program.handle_table(table.ty.initial as u32);
         }
 
         Ok(())
@@ -314,7 +331,7 @@ impl Analyzer {
 
                 let functions = items.into_iter().collect::<Result<Vec<_>, _>>()?;
 
-                self.prog_builder.handle_elements(offset, &functions);
+                self.program.handle_elements(offset, &functions);
             }
 
             // Other element kinds do not exist in WASM 1.0
