@@ -10,11 +10,9 @@ use std::collections::BTreeMap as Map;
 
 pub type Instruction = Expr;
 
-struct InstructionDefinitionContext<'a> {
+struct DefCtx<'a> {
     consts: &'a mut number::ConstantDefinitionBuilder,
 }
-
-use InstructionDefinitionContext as DefCtx;
 
 #[derive(Default)]
 pub struct InstructionDefinitionBuilder {
@@ -68,9 +66,9 @@ impl InstructionDefinitionBuilder {
     fn push_def(_ctx: &mut DefCtx) -> Expr {
         abs(
             ["item"],
-            instr({
-                ContextBuilder::new()
-                    .stack(framed_stack::push(stack(), var("item")))
+            instruction(|ctx| {
+                NewContextBuilder::new()
+                    .stack(data_stack::push(ctx.stack(), var("item")))
                     .build()
             }),
         )
@@ -84,15 +82,28 @@ impl InstructionDefinitionBuilder {
 
     fn call_def(_ctx: &mut DefCtx) -> Expr {
         abs(
-            ["func"],
-            instr({
-                let func = table::index(functions(), var("func"));
-
-                ContextBuilder::new()
-                    .trace(stack::push(trace(), next()))
-                    .next(func)
+            ["funcid"],
+            instruction(|ctx| {
+                NewContextBuilder::new()
+                    .trace(stack::push(ctx.trace(), ctx.next()))
+                    .next(table::index(ctx.function_table(), var("funcid")))
                     .build()
             }),
         )
+    }
+
+    pub fn enter(
+        &mut self,
+        func_type: &FuncType,
+        local_types: &[ValType],
+        consts: &mut number::ConstantDefinitionBuilder,
+    ) -> Instruction {
+        self.insert("Enter", Self::enter_def);
+
+        apply(var("Enter"), [todo!()])
+    }
+
+    fn enter_def(_ctx: &mut DefCtx) -> Expr {
+        todo!()
     }
 }

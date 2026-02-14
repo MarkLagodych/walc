@@ -135,35 +135,3 @@ pub mod table {
         tree::insert(BITNESS, table, address, value)
     }
 }
-
-pub mod framed_table {
-    use super::*;
-
-    /// Stack of tables
-    pub type FramedTable = stack::Stack;
-
-    pub fn new() -> FramedTable {
-        stack::empty()
-    }
-
-    pub fn push_frame(
-        framed_table: FramedTable,
-        items: impl IntoIterator<Item = Expr>,
-    ) -> FramedTable {
-        stack::push(framed_table, table::from(items))
-    }
-
-    pub fn pop_frame(framed_table: FramedTable) -> FramedTable {
-        stack::pop(framed_table)
-    }
-
-    pub fn index(framed_table: FramedTable, address: number::Id) -> Expr {
-        table::index(stack::top(framed_table), address)
-    }
-
-    pub fn insert(framed_table: FramedTable, address: number::Id, value: Expr) -> FramedTable {
-        let top_table = stack::top(framed_table.clone());
-        let new_top = table::insert(top_table, address, value);
-        stack::push(stack::pop(framed_table), new_top)
-    }
-}

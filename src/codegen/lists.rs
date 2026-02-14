@@ -102,39 +102,3 @@ pub mod stack {
         unsafe_list::get_tail(stack)
     }
 }
-
-pub mod framed_stack {
-    use super::*;
-
-    /// Stack of stacks.
-    /// Every substack represents a call/block frame.
-    pub type FramedStack = stack::Stack;
-
-    pub fn empty() -> FramedStack {
-        stack::empty()
-    }
-
-    pub fn push_frame(stack: FramedStack) -> FramedStack {
-        stack::push(stack, stack::empty())
-    }
-
-    pub fn pop_frame(stack: FramedStack) -> FramedStack {
-        stack::pop(stack)
-    }
-
-    pub fn push(stack: FramedStack, item: Expr) -> FramedStack {
-        let top_stack = stack::top(stack.clone());
-        let new_top = stack::push(top_stack, item);
-        stack::push(stack::pop(stack), new_top)
-    }
-
-    pub fn top(stack: FramedStack) -> Expr {
-        stack::top(stack::top(stack))
-    }
-
-    pub fn pop(stack: FramedStack) -> FramedStack {
-        let top_stack = stack::top(stack.clone());
-        let new_top = stack::pop(top_stack);
-        stack::push(stack::pop(stack), new_top)
-    }
-}
