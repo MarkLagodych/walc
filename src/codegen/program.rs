@@ -1,6 +1,4 @@
-use super::*;
-
-use crate::analyzer::*;
+use crate::{analyzer::*, codegen::*};
 
 #[derive(Default)]
 pub struct ProgramBuilder {
@@ -30,18 +28,21 @@ impl ProgramBuilder {
     }
 
     pub fn build(mut self) -> Expr {
-        // The analyzer must ensure that a main function exists
-        let main_id = self.main_id.unwrap();
-        // TODO main
+        let expr = unreachable();
+
+        let instr = self.instrs.exit();
+        let expr = apply(instr, [expr]);
+
+        // TODO active data segments
 
         if let Some(start_id) = self.start_id {
             // TODO start
         }
 
-        // TODO active data segments
-
-        // TODO root expression
-        let expr = io_command::exit();
+        // The analyzer must ensure that a main function exists
+        let main_id = self.main_id.unwrap();
+        let instr = self.instrs.call(self.consts.id_const(main_id as u16));
+        let expr = apply(instr, [expr]);
 
         let func_count = self.functions.len();
 
@@ -81,6 +82,18 @@ impl ProgramBuilder {
 
         toplevel.def("Memory", memory::new());
 
+        let expr = apply(
+            expr,
+            [
+                pair::new(var("FunctionTable"), var("IndirectTable")),
+                var("Memory"),
+                var("Globals"),
+                stack::empty(),
+                stack::empty(),
+                stack::empty(),
+            ],
+        );
+
         toplevel.build(expr)
     }
 
@@ -105,13 +118,16 @@ impl ProgramBuilder {
     pub fn handle_import(&mut self, name: &str) {
         match name {
             "input" => {
-                self.functions.push(function::input_function());
+                self.functions
+                    .push(function::input_function(&mut self.instrs));
             }
             "output" => {
-                self.functions.push(function::output_function());
+                self.functions
+                    .push(function::output_function(&mut self.instrs));
             }
             "exit" => {
-                self.functions.push(function::exit_function());
+                self.functions
+                    .push(function::exit_function(&mut self.instrs));
             }
             _ => {}
         }

@@ -2,12 +2,11 @@ use crate::codegen::*;
 
 use instruction::Instruction;
 
-pub fn instruction(body: impl FnOnce(&mut InstructionContext)) -> Instruction {
-    let mut ctx = InstructionContext::new();
-
-    body(&mut ctx);
-
-    abs(["N", "F", "M", "G", "L", "S", "T"], ctx.build())
+pub fn instruction(body: impl FnOnce(InstructionContext) -> Expr) -> Instruction {
+    abs(
+        ["N", "F", "M", "G", "L", "S", "T"],
+        body(InstructionContext::new()),
+    )
 }
 
 #[derive(Default)]
@@ -97,6 +96,10 @@ impl InstructionContext {
 
     pub fn pop(&mut self, dest_var: impl ToString) {
         self.def(dest_var, data_stack::top(self.stack()));
+        self.drop();
+    }
+
+    pub fn drop(&mut self) {
         self.set_stack(data_stack::pop(self.stack()));
     }
 
@@ -158,8 +161,12 @@ impl InstructionContext {
         self.set_next(table::index(self.indirect_function_table(), indirect_id));
     }
 
-    pub fn new_frame(&mut self, trace: Expr, locals: impl IntoIterator<Item = Expr>) {
-        self.push_trace(trace);
+    pub fn ret(&mut self) {
+        self.pop_trace("_ret");
+        self.set_next(var("_ret"));
+    }
+
+    pub fn push_frame(&mut self, locals: impl IntoIterator<Item = Expr>) {
         self.set_locals(locals::push_frame(self.locals(), locals));
         self.set_stack(data_stack::push_frame(self.stack()));
     }
@@ -167,8 +174,6 @@ impl InstructionContext {
     pub fn pop_frame(&mut self) {
         self.set_locals(locals::pop_frame(self.locals()));
         self.set_stack(data_stack::pop_frame(self.stack()));
-        self.pop_trace("a");
-        self.set_next(var("a"));
     }
 }
 

@@ -34,12 +34,12 @@ impl<'a> FunctionBodyBuilder<'a> {
         }
     }
 
-    /// `chain` is the chain of instruction following the block end
+    /// `chain` is the chain of instructions following the block end
     fn block_end(&mut self, chain: Expr) -> Expr {
-        let label = var(format!("_{}", self.label_id.next().unwrap()));
+        let label = format!("_{}", self.label_id.next().unwrap());
         self.defs.def(label.clone(), chain);
-        self.labels.push(label.clone());
-        label
+        self.labels.push(var(label.clone()));
+        var(label)
     }
 
     fn block_start(&mut self) -> Expr {
@@ -47,8 +47,13 @@ impl<'a> FunctionBodyBuilder<'a> {
     }
 
     pub fn build(mut self) -> FunctionBody {
-        // TODO return instruction after the body ends
-        let mut expr = self.block_end(unreachable());
+        let mut expr = unreachable();
+
+        // TODO track information of the kind of a block that "end" refers to, so that
+        // the codegen can generate the correct jump (forward/backward)
+        // This probably requires a preliminary forward pass over the instructions
+        // Label info: [{ is_backward_jump, label_expr }]
+        // OR! Rather build the function body in natural order and come up with how to fix everything
 
         for instr in self.info.instructions.iter().rev() {
             match instr {
@@ -68,7 +73,11 @@ impl<'a> FunctionBodyBuilder<'a> {
             expr = apply(instr, [expr]);
         }
 
-        // TODO setup instruction that reads params and inits locals
+        let instr = self
+            .instrs
+            .enter(self.info.function_type, self.info.local_types, self.consts);
+
+        expr = apply(instr, [expr]);
 
         self.defs.build(expr)
     }
@@ -82,14 +91,14 @@ pub fn function(
     FunctionBodyBuilder::new(info, consts, instrs).build()
 }
 
-pub fn input_function() -> FunctionBody {
-    unreachable()
+pub fn input_function(instrs: &mut instruction::InstructionDefinitionBuilder) -> FunctionBody {
+    instrs.input_and_return()
 }
 
-pub fn output_function() -> FunctionBody {
-    unreachable()
+pub fn output_function(instrs: &mut instruction::InstructionDefinitionBuilder) -> FunctionBody {
+    instrs.output_and_return()
 }
 
-pub fn exit_function() -> FunctionBody {
-    io_command::exit()
+pub fn exit_function(instrs: &mut instruction::InstructionDefinitionBuilder) -> FunctionBody {
+    instrs.exit()
 }

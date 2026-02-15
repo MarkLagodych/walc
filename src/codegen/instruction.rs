@@ -24,7 +24,8 @@ impl InstructionDefinitionBuilder {
         Self::default()
     }
 
-    fn insert(&mut self, name: impl ToString, def: fn(&mut DefCtx) -> Expr) {
+    /// Adds an instruction definition with the given name and definition function.
+    fn add_def(&mut self, name: impl ToString, def: fn(&mut DefCtx) -> Expr) {
         self.map.insert(name.to_string(), def);
     }
 
@@ -48,47 +49,157 @@ impl InstructionDefinitionBuilder {
         consts: &mut number::ConstantDefinitionBuilder,
         labels: &[Expr],
     ) -> Instruction {
+        use Operator::*;
+
         match op {
-            Operator::I32Const { value } => self.push(consts.i32_const(*value as u32)),
-            Operator::I64Const { value } => self.push(consts.i64_const(*value as u64)),
-            Operator::Call { function_index } => self.call(consts.id_const(*function_index as u16)),
+            I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
+                self.push(consts.with_init_value(op))
+            }
+
+            Call { function_index } => self.call(consts.id_const(*function_index as u16)),
+            CallIndirect { .. } => self.call_indirect(),
+
+            End => {
+                if labels.len() == 1 {
+                    // FIXME This does not work. However, if I change this to exit(), it works
+                    // for minimal.wasm/walc
+                    self.leave(info.function_type)
+                } else {
+                    // TODO
+                    todo!()
+                }
+            }
+
             // TODO
-            _ => unreachable(),
+            _ => todo!(),
         }
     }
 
+    pub fn output_and_return(&mut self) -> Instruction {
+        self.add_def("Output", |_| {
+            instruction(|mut ctx| {
+                ctx.pop("a");
+                ctx.set_next(instruction(|mut ctx| {
+                    ctx.ret();
+                    io_command::output(var("a"), ctx.build())
+                }));
+                ctx.build()
+            })
+        });
+
+        var("Output")
+    }
+
+    pub fn input_and_return(&mut self) -> Instruction {
+        self.add_def("Input", |def_ctx| {
+            instruction(|mut ctx| {
+                io_command::input(abs(["inp"], {
+                    ctx.def(
+                        "a",
+                        select(
+                            optional::is_some(var("inp")),
+                            def_ctx.consts.i32_const(u32::MAX),
+                            var("inp"),
+                        ),
+                    );
+
+                    ctx.push(var("a"));
+
+                    ctx.build()
+                }))
+            })
+        });
+
+        var("Input")
+    }
+
+    pub fn exit(&mut self) -> Instruction {
+        self.add_def("Exit", |_| instruction(|_| io_command::exit()));
+
+        var("Exit")
+    }
+
     pub fn push(&mut self, item: Expr) -> Instruction {
-        self.insert("Push", Self::push_def);
+        self.add_def("Push", |_| {
+            abs(
+                ["item"],
+                instruction(|mut ctx| {
+                    ctx.push(var("item"));
+                    ctx.build()
+                }),
+            )
+        });
 
         apply(var("Push"), [item])
     }
 
-    fn push_def(_ctx: &mut DefCtx) -> Expr {
-        abs(["item"], instruction(|ctx| ctx.push(var("item"))))
-    }
-
     pub fn call(&mut self, function_id: number::Id) -> Instruction {
-        self.insert("Call", Self::call_def);
+        self.add_def("Call", |_| {
+            abs(
+                ["funcid"],
+                instruction(|mut ctx| {
+                    ctx.call(var("funcid"));
+                    ctx.build()
+                }),
+            )
+        });
 
         apply(var("Call"), [function_id])
     }
 
-    fn call_def(_ctx: &mut DefCtx) -> Expr {
-        abs(["funcid"], instruction(|ctx| ctx.call(var("funcid"))))
+    pub fn call_indirect(&mut self) -> Instruction {
+        self.add_def("CallIndirect", |_| {
+            instruction(|mut ctx| {
+                ctx.pop("a");
+                ctx.call_indirect(var("a"));
+                ctx.build()
+            })
+        });
+
+        var("CallIndirect")
     }
 
     pub fn enter(
-        &mut self,
+        &self,
         func_type: &FuncType,
         local_types: &[ValType],
         consts: &mut number::ConstantDefinitionBuilder,
     ) -> Instruction {
-        self.insert("Enter", Self::enter_def);
+        instruction(|mut ctx| {
+            let param_count = func_type.params().len();
 
-        apply(var("Enter"), [todo!()])
+            // Parameters are pushed left-to-right, so we pop them right-to-left
+            for i in (0..param_count).rev() {
+                ctx.pop(format!("p{i}"));
+            }
+
+            let mut locals = Vec::new();
+            locals.extend((0..param_count).map(|i| var(format!("p{i}"))));
+            locals.extend(local_types.iter().map(|ty| consts.default_const(*ty)));
+
+            ctx.push_frame(locals);
+
+            ctx.build()
+        })
     }
 
-    fn enter_def(_ctx: &mut DefCtx) -> Expr {
-        todo!()
+    pub fn leave(&self, func_type: &FuncType) -> Instruction {
+        instruction(|mut ctx| {
+            let result_count = func_type.results().len();
+
+            for i in (0..result_count).rev() {
+                ctx.pop(format!("r{i}"));
+            }
+
+            ctx.pop_frame();
+
+            for i in 0..result_count {
+                ctx.push(var(format!("r{i}")));
+            }
+
+            ctx.ret();
+
+            ctx.build()
+        })
     }
 }
