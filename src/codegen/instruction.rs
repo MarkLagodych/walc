@@ -64,14 +64,7 @@ impl InstructionDefinitionBuilder {
     }
 
     fn push_def(_ctx: &mut DefCtx) -> Expr {
-        abs(
-            ["item"],
-            instruction(|ctx| {
-                NewContextBuilder::new()
-                    .stack(data_stack::push(ctx.stack(), var("item")))
-                    .build()
-            }),
-        )
+        abs(["item"], instruction(|ctx| ctx.push(var("item"))))
     }
 
     pub fn call(&mut self, function_id: number::Id) -> Instruction {
@@ -81,15 +74,7 @@ impl InstructionDefinitionBuilder {
     }
 
     fn call_def(_ctx: &mut DefCtx) -> Expr {
-        abs(
-            ["funcid"],
-            instruction(|ctx| {
-                NewContextBuilder::new()
-                    .trace(stack::push(ctx.trace(), ctx.next()))
-                    .next(table::index(ctx.function_table(), var("funcid")))
-                    .build()
-            }),
-        )
+        abs(["funcid"], instruction(|ctx| ctx.call(var("funcid"))))
     }
 
     pub fn enter(

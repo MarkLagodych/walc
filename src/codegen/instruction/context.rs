@@ -2,39 +2,77 @@ use crate::codegen::*;
 
 use instruction::Instruction;
 
-pub struct CurrentContext {}
-pub type NewContext = Expr;
+pub fn instruction(body: impl FnOnce(&mut InstructionContext)) -> Instruction {
+    let mut ctx = InstructionContext::new();
 
-pub fn instruction(body_fn: impl FnOnce(&CurrentContext) -> NewContext) -> Instruction {
-    abs(
-        ["N", "F", "M", "G", "L", "S", "T"],
-        body_fn(&CurrentContext {}),
-    )
+    body(&mut ctx);
+
+    abs(["N", "F", "M", "G", "L", "S", "T"], ctx.build())
 }
 
-impl CurrentContext {
+#[derive(Default)]
+pub struct InstructionContext {
+    defs: DefinitionBuilder,
+}
+
+impl InstructionContext {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn build(self) -> Expr {
+        self.defs.build(apply(
+            var("N"),
+            [var("F"), var("M"), var("G"), var("L"), var("S"), var("T")],
+        ))
+    }
+
     pub fn next(&self) -> Instruction {
         var("N")
+    }
+
+    pub fn set_next(&mut self, next: Expr) {
+        self.def("N", next);
     }
 
     pub fn memory(&self) -> memory::Memory {
         var("M")
     }
 
+    pub fn set_memory(&mut self, memory: Expr) {
+        self.def("M", memory);
+    }
+
     pub fn globals(&self) -> table::Table {
         var("G")
+    }
+
+    pub fn set_globals(&mut self, globals: Expr) {
+        self.def("G", globals);
     }
 
     pub fn locals(&self) -> locals::Locals {
         var("L")
     }
 
+    pub fn set_locals(&mut self, locals: Expr) {
+        self.def("L", locals);
+    }
+
     pub fn stack(&self) -> data_stack::DataStack {
         var("S")
     }
 
+    pub fn set_stack(&mut self, stack: Expr) {
+        self.def("S", stack);
+    }
+
     pub fn trace(&self) -> stack::Stack {
         var("T")
+    }
+
+    pub fn set_trace(&mut self, trace: Expr) {
+        self.def("T", trace);
     }
 
     fn function_tables(&self) -> pair::Pair {
@@ -48,71 +86,89 @@ impl CurrentContext {
     pub fn indirect_function_table(&self) -> table::Table {
         pair::get_second(self.function_tables())
     }
-}
 
-pub struct NewContextBuilder {
-    next: Instruction,
-    memory: memory::Memory,
-    globals: table::Table,
-    locals: locals::Locals,
-    stack: data_stack::DataStack,
-    trace: stack::Stack,
-}
-
-impl NewContextBuilder {
-    pub fn new() -> Self {
-        Self {
-            next: var("N"),
-            memory: var("M"),
-            globals: var("G"),
-            locals: var("L"),
-            stack: var("S"),
-            trace: var("T"),
-        }
+    pub fn def(&mut self, name: impl ToString, def: Expr) {
+        self.defs.def(name, def);
     }
 
-    pub fn next(mut self, next: Instruction) -> Self {
-        self.next = next;
-        self
+    pub fn push(&mut self, item: Expr) {
+        self.set_stack(data_stack::push(self.stack(), item));
     }
 
-    pub fn memory(mut self, memory: memory::Memory) -> Self {
-        self.memory = memory;
-        self
+    pub fn pop(&mut self, dest_var: impl ToString) {
+        self.def(dest_var, data_stack::top(self.stack()));
+        self.set_stack(data_stack::pop(self.stack()));
     }
 
-    pub fn globals(mut self, globals: table::Table) -> Self {
-        self.globals = globals;
-        self
+    pub fn get_top(&mut self, dest_var: impl ToString) {
+        self.def(dest_var, data_stack::top(self.stack()));
     }
 
-    pub fn locals(mut self, locals: locals::Locals) -> Self {
-        self.locals = locals;
-        self
+    pub fn push_trace(&mut self, item: Expr) {
+        self.set_trace(stack::push(self.trace(), item));
     }
 
-    pub fn stack(mut self, stack: data_stack::DataStack) -> Self {
-        self.stack = stack;
-        self
+    pub fn pop_trace(&mut self, dest_var: impl ToString) {
+        self.def(dest_var, stack::top(self.trace()));
+        self.set_trace(stack::pop(self.trace()));
     }
 
-    pub fn trace(mut self, trace: stack::Stack) -> Self {
-        self.trace = trace;
-        self
+    pub fn get_global(&mut self, dest_var: impl ToString, global_id: number::Id) {
+        self.def(dest_var, table::index(self.globals(), global_id));
     }
 
-    pub fn build(self) -> NewContext {
-        apply(
-            self.next,
-            [
-                var("F"),
-                self.memory,
-                self.globals,
-                self.locals,
-                self.stack,
-                self.trace,
-            ],
-        )
+    pub fn set_global(&mut self, global_id: number::Id, value: Expr) {
+        self.set_globals(table::insert(self.globals(), global_id, value));
+    }
+
+    pub fn get_local(&mut self, dest_var: impl ToString, local_id: number::Id) {
+        self.def(dest_var, locals::index(self.locals(), local_id));
+    }
+
+    pub fn set_local(&mut self, local_id: number::Id, value: Expr) {
+        self.set_locals(locals::insert(self.locals(), local_id, value));
+    }
+
+    pub fn load(&mut self, dest_var: impl ToString, address: number::I32) {
+        self.def(dest_var, memory::index(self.memory(), address));
+    }
+
+    pub fn store(&mut self, address: number::I32, value: Expr) {
+        self.set_memory(memory::insert(self.memory(), address, value));
+    }
+
+    pub fn get_function(&mut self, dest_var: impl ToString, function_id: number::Id) {
+        self.def(dest_var, table::index(self.function_table(), function_id));
+    }
+
+    pub fn get_function_indirect(&mut self, dest_var: impl ToString, function_id: number::Id) {
+        self.def(
+            dest_var,
+            table::index(self.indirect_function_table(), function_id),
+        );
+    }
+
+    pub fn call(&mut self, function_id: number::Id) {
+        self.push_trace(self.next());
+        self.set_next(table::index(self.function_table(), function_id));
+    }
+
+    pub fn call_indirect(&mut self, indirect_id: number::Id) {
+        self.push_trace(self.next());
+        self.set_next(table::index(self.indirect_function_table(), indirect_id));
+    }
+
+    pub fn new_frame(&mut self, trace: Expr, locals: impl IntoIterator<Item = Expr>) {
+        self.push_trace(trace);
+        self.set_locals(locals::push_frame(self.locals(), locals));
+        self.set_stack(data_stack::push_frame(self.stack()));
+    }
+
+    pub fn pop_frame(&mut self) {
+        self.set_locals(locals::pop_frame(self.locals()));
+        self.set_stack(data_stack::pop_frame(self.stack()));
+        self.pop_trace("a");
+        self.set_next(var("a"));
     }
 }
 
