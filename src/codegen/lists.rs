@@ -82,7 +82,23 @@ pub mod list {
 }
 
 pub mod stack {
-    pub use super::unsafe_list::{
-        UnsafeList as Stack, empty, get_head as top, get_tail as pop, node as push,
-    };
+    pub use super::*;
+
+    pub type Stack = unsafe_list::UnsafeList;
+
+    pub fn empty() -> Stack {
+        unsafe_list::empty()
+    }
+
+    pub fn push(stack: Stack, item: Expr) -> Stack {
+        unsafe_list::node(item, stack)
+    }
+
+    pub fn top(stack: Stack) -> Expr {
+        unsafe_list::get_head(stack)
+    }
+
+    pub fn pop(stack: Stack) -> Stack {
+        unsafe_list::get_tail(stack)
+    }
 }

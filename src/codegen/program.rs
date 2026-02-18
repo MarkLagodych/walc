@@ -54,16 +54,16 @@ impl ProgramBuilder {
         toplevel.append(instrs);
 
         for (id, data) in self.data_segments.into_iter().enumerate() {
-            toplevel.def(format!("Data{id}"), data);
+            toplevel.def(format!("Data{id:x}"), data);
         }
 
         for (id, func) in self.functions.into_iter().enumerate() {
-            toplevel.def(format!("F{id}"), func);
+            toplevel.def(format!("Func{id:x}"), func);
         }
 
         toplevel.def(
             "FunctionTable",
-            table::from((0..func_count).map(|id| var(format!("F{id}")))),
+            table::from((0..func_count).map(|id| var(format!("Func{id:x}")))),
         );
 
         toplevel.def(
@@ -72,7 +72,7 @@ impl ProgramBuilder {
                 self.custom_func_table
                     .into_iter()
                     .map(|opt_id| match opt_id {
-                        Some(id) => var(format!("F{id}")),
+                        Some(id) => var(format!("Func{id:x}")),
                         None => unreachable(),
                     }),
             ),

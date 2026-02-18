@@ -1,5 +1,4 @@
 #![allow(clippy::redundant_closure)]
-#![allow(clippy::unsafe_removed_from_name)]
 
 mod analyzer;
 mod codegen;

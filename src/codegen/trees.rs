@@ -7,7 +7,7 @@ pub mod tree {
 
     pub fn new(bitness: u8, initial_item: Expr) -> Tree {
         debug_assert!(bitness <= 32);
-        apply(var(format!("Tr{bitness}")), [initial_item])
+        apply(var(format!("T{bitness:x}")), [initial_item])
     }
 
     pub fn node(left: Expr, right: Expr) -> Tree {
@@ -30,7 +30,7 @@ pub mod tree {
     /// The index bitness must match the tree bitness.
     pub fn insert(bitness: u8, tree: Tree, index: number::Number, value: Expr) -> Tree {
         debug_assert!(bitness <= 32);
-        apply(index, [apply(var(format!("Ins{bitness}")), [tree, value])])
+        apply(index, [apply(var(format!("I{bitness:x}")), [tree, value])])
     }
 
     /// The index bitness must match the tree bitness.
@@ -58,18 +58,21 @@ pub mod tree {
     }
 
     pub fn define_prelude(b: &mut DefinitionBuilder) {
+        // Dummy trees
+
         // Indexable by 0 bits (i.e. not indexable)
-        b.def("Tr0", abs(["x"], var("x")));
+        b.def("T0", abs(["x"], var("x")));
         // Every node is indexable by i bits
         for i in 1..=32 {
-            let node_name = format!("Tr{}", i);
-            let item_name = format!("Tr{}", i - 1);
+            let node_name = format!("T{:x}", i);
+            let item_name = format!("T{:x}", i - 1);
             let item = apply(var(item_name), [var("x")]);
             b.def(node_name, abs(["x"], tree::node(item.clone(), item)));
         }
 
+        // Insertion helper
         b.def(
-            "Ins",
+            "I_",
             abs(["insert", "tree", "value", "index_bit"], {
                 let left = tree::get_left(var("tree"));
                 let right = tree::get_right(var("tree"));
@@ -84,13 +87,15 @@ pub mod tree {
             }),
         );
 
-        b.def("Ins0", abs(["tree", "value"], var("value")));
+        // Insertion functions
+
+        b.def("I0", abs(["tree", "value"], var("value")));
 
         // Each insertion function consumes i bits of the index
         for i in 1..=32 {
             b.def(
-                format!("Ins{}", i),
-                apply(var("Ins"), [var(format!("Ins{}", i - 1))]),
+                format!("I{:x}", i),
+                apply(var("I_"), [var(format!("I{:x}", i - 1))]),
             );
         }
     }

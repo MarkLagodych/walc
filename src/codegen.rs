@@ -100,7 +100,7 @@ pub fn select(condition: Bit, branch0: Expr, branch1: Expr) -> Expr {
 
 pub fn unreachable() -> Expr {
     if cfg!(feature = "unbound-unreachable") {
-        var("__UNREACHABLE__")
+        var("UNREACHABLE")
     } else {
         abs(["_"], var("_"))
     }

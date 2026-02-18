@@ -64,6 +64,7 @@ impl InstructionDefinitionBuilder {
                     // FIXME This does not work. However, if I change this to exit(), it works
                     // for minimal.wasm/walc
                     self.leave(info.function_type)
+                    // self.exit()
                 } else {
                     // TODO
                     todo!()
@@ -77,14 +78,39 @@ impl InstructionDefinitionBuilder {
 
     pub fn output_and_return(&mut self) -> Instruction {
         self.add_def("Output", |_| {
-            instruction(|mut ctx| {
-                ctx.pop("a");
-                ctx.set_next(instruction(|mut ctx| {
-                    ctx.ret();
-                    io_command::output(var("a"), ctx.build())
-                }));
-                ctx.build()
-            })
+            apply(
+                instruction(|mut ctx| {
+                    ctx.pop("a");
+                    ctx.def(
+                        "out",
+                        apply(
+                            instruction(|mut ctx| {
+                                ctx.ret();
+                                apply(
+                                    var("a"),
+                                    [abs(
+                                        (0..32).rev().map(|i| format!("b{i:x}")),
+                                        io_command::output(
+                                            abs(
+                                                ["n"],
+                                                apply(
+                                                    var("n"),
+                                                    (0..8).rev().map(|i| var(format!("b{i:x}"))),
+                                                ),
+                                            ),
+                                            ctx.build(),
+                                        ),
+                                    )],
+                                )
+                            }),
+                            [unreachable()],
+                        ),
+                    );
+                    ctx.set_next(var("out"));
+                    ctx.build()
+                }),
+                [unreachable()],
+            )
         });
 
         var("Output")
@@ -92,22 +118,25 @@ impl InstructionDefinitionBuilder {
 
     pub fn input_and_return(&mut self) -> Instruction {
         self.add_def("Input", |def_ctx| {
-            instruction(|mut ctx| {
-                io_command::input(abs(["inp"], {
-                    ctx.def(
-                        "a",
-                        select(
-                            optional::is_some(var("inp")),
-                            def_ctx.consts.i32_const(u32::MAX),
-                            var("inp"),
-                        ),
-                    );
+            apply(
+                instruction(|mut ctx| {
+                    io_command::input(abs(["inp"], {
+                        ctx.def(
+                            "a",
+                            select(
+                                optional::is_some(var("inp")),
+                                def_ctx.consts.i32_const(u32::MAX),
+                                var("inp"),
+                            ),
+                        );
 
-                    ctx.push(var("a"));
+                        ctx.push(var("a"));
 
-                    ctx.build()
-                }))
-            })
+                        ctx.build()
+                    }))
+                }),
+                [unreachable()],
+            )
         });
 
         var("Input")
@@ -170,11 +199,11 @@ impl InstructionDefinitionBuilder {
 
             // Parameters are pushed left-to-right, so we pop them right-to-left
             for i in (0..param_count).rev() {
-                ctx.pop(format!("p{i}"));
+                ctx.pop(format!("p{i:x}"));
             }
 
             let mut locals = Vec::new();
-            locals.extend((0..param_count).map(|i| var(format!("p{i}"))));
+            locals.extend((0..param_count).map(|i| var(format!("p{i:x}"))));
             locals.extend(local_types.iter().map(|ty| consts.default_const(*ty)));
 
             ctx.push_frame(locals);
@@ -188,13 +217,13 @@ impl InstructionDefinitionBuilder {
             let result_count = func_type.results().len();
 
             for i in (0..result_count).rev() {
-                ctx.pop(format!("r{i}"));
+                ctx.pop(format!("r{i:x}"));
             }
 
             ctx.pop_frame();
 
             for i in 0..result_count {
-                ctx.push(var(format!("r{i}")));
+                ctx.push(var(format!("r{i:x}")));
             }
 
             ctx.ret();

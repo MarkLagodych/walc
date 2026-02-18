@@ -36,7 +36,7 @@ impl<'a> FunctionBodyBuilder<'a> {
 
     /// `chain` is the chain of instructions following the block end
     fn block_end(&mut self, chain: Expr) -> Expr {
-        let label = format!("_{}", self.label_id.next().unwrap());
+        let label = format!("_{:x}", self.label_id.next().unwrap());
         self.defs.def(label.clone(), chain);
         self.labels.push(var(label.clone()));
         var(label)
