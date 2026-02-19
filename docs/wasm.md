@@ -20,9 +20,9 @@ WALC allows only the following imports in WebAssembly modules:
 
 * `walc.exit`
 
-    Signature: `() -> ()`
+    Type: `() -> ()`
 
-    Type signature: `(function)`
+    Signature: `(function)`
 
     Exits the program.
 

@@ -10,12 +10,12 @@ into
 
 The input modules are only allowed to use custom
 [WALC functions](./docs/wasm.md) for standard I/O,
-see [example programs](./examples/wasm) written in Rust.
+see [example programs](./examples/rust) written in Rust.
 
 The output lambda expressions are in [WALC format](./docs/format.md),
 which defines how the expressions should be interpreted in order to perform I/O.
 The format does not change anything about lambda calculus or how it is evaluated
 inside the interpreter, it just defines what the interpreter does with
 the evaluated result.
-You can run some [example expressions](./examples/lambda-calculus/) written
+You can run some [example expressions](./examples/walc/) written
 by hand with an [example interpreter](./examples/interpreter/).

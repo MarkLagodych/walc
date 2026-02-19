@@ -35,7 +35,7 @@ abc _hello_ 123 ; Variables
 ([p ((p foo) bar)] [item0[item1 item0]])
 ```
 
-See more examples in the [examples directory](../examples/lambda-calculus/).
+See more examples in the [examples directory](../examples/walc/).
 
 ## Interpretation
 

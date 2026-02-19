@@ -5,10 +5,7 @@ WAT2WASM=wasm-tools parse
 all: \
 bin \
 bin/minimal.wasm \
-bin/simple.wasm \
-bin/hello.wasm \
-bin/function.wasm \
-bin/function-locals.wasm
+bin/hello.wasm
 
 bin:
 	mkdir -p bin
