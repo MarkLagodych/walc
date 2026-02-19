@@ -13,7 +13,7 @@ in code editors.
 
 ```ebnf
 whitespace = ' ' | TAB | VT | FF | CR | LF ;
-comment = ';' (not LF)* LF ;
+comment = ';' (~LF)* LF ;
 variable = ('a'-'z' | 'A'-'Z' | '0'-'9' | '_')+ ;
 abstraction = '[' variable term ']' ;
 application = '(' term term ')' ;
@@ -29,10 +29,10 @@ abc _hello_ 123 ; Variables
 (f x)           ; Application: f x
 
 ; Y combinator:
-[f ([g (g g)] [x (f (x x))])]
+[f ( [x (f (x x))] [x (f (x x))] ) ]
 
 ; Construct a pair and get the 0th element:
-([p ((p [foo foo]) (bar bar))] [item0[item1 item0]])
+([p ((p foo) bar)] [item0[item1 item0]])
 ```
 
 See more examples in the [examples directory](../examples/lambda-calculus/).
@@ -41,10 +41,10 @@ See more examples in the [examples directory](../examples/lambda-calculus/).
 
 The input lambda expression must not contain free (unbound) variables,
 must be evaluated [lazily](https://en.wikipedia.org/wiki/Lazy_evaluation)
-(i.e. using [call by name](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_name))
+(i.e. using [call by need](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_need))
 and must evaluate to a [`command`](#command).
 
-On execution step the interpreter performs an I/O operation according to the
+At each step the interpreter performs an I/O operation according to the
 command and continues to the next command derived from the current one.
 
 ### Definitions
@@ -77,11 +77,21 @@ applies it to the command and proceeds interpreting the result.
 
 #### Byte
 
-`byte<bit7,bit6,bit5,bit4,bit3,bit2,bit1,bit0>` is
-`[g ((((((((g bit7) bit6) bit5) bit4) bit3) bit2) bit1) bit0)]`
+`byte<bit7,bit6,...,bit0>` is `list<bit7,bit6,...,bit0>`.
 
-This bit order was chosen to match the natural (big-endian) way of writing
-numbers, so that `00110011` (51) is `[g ((((((((g 0)0)1)1)0)0)1)1)]`.
+#### List
+
+`list<x0,x1,x2,...>` is `optional<pair<x0, list<x1,x2,...>>>`.
+Its constructors are:
+* `empty`: `none`
+* `cons<head, tail>`: `some<pair<head, tail>>`
+
+#### Optional
+
+`optional<a>` is `either<unreachable, a>`.
+Its constructors are:
+* `none`: `left<unreachable>`
+* `some<a>`: `right<a>`
 
 #### Either
 
@@ -89,15 +99,9 @@ numbers, so that `00110011` (51) is `[g ((((((((g 0)0)1)1)0)0)1)1)]`.
 * `left<a>`: `pair<0, a>`
 * `right<b>`: `pair<1, b>`
 
-#### Optional
-
-`optional<a>` is either:
-* `none`: `pair<0, unreachable>`
-* `some<a>`: `pair<1, a>`
-
 #### Pair
 
-`pair<x0,x1>` is `[f ((f x0) x1)]`.
+`pair<x0,x1>` is `[p ((p x0) x1)]`.
 
 To get the 0th or the 1st element of a pair, just apply `0` or `1` to it:
 `(my_pair 0)`, `(my_pair 1)`.

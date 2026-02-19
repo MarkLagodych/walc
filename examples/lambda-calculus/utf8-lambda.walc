@@ -1,13 +1,20 @@
 ; This program prints "λ" (lambda symbol) encoded in UTF-8
 
 ([Unreachable ([0 ([1 ([Pair ([None ([Some ([Left ([Right ([End ([Out ([In
-([newline_ ([0xCE ([0xBB
+([Empty ([C ([Byte ([newline_ ([0xCE ([0xBB
 
     ((Out 0xCE) ((Out 0xBB) ((Out newline_) End)))
 
-] [g ((((((((g 1)0)1)1)1)0)1)1)] ) ; 0xBB
-] [g ((((((((g 1)1)0)0)1)1)1)0)] ) ; 0xCE
-] [g ((((((((g 0)0)0)0)1)0)1)0)] ) ; newline_
+] ((((((((Byte 1)0)1)1)1)0)1)1) ) ; 0xBB
+] ((((((((Byte 1)1)0)0)1)1)1)0) ) ; 0xCE
+] ((((((((Byte 0)0)0)0)1)0)1)0) ) ; newline_
+
+] [7[6[5[4[3[2[1[0
+    ((C 7) ((C 6) ((C 5) ((C 4) ((C 3) ((C 2) ((C 1) ((C 0) Empty))))))))
+]]]]]]]] ) ; Byte
+
+] [x0[x1 (Some ((Pair x0) x1)) ]] ) ; C
+] None ) ; Empty
 
 ] [input_handler (Some (Right input_handler))] ) ; In
 ] [out_byte [next (Some (Left ((Pair out_byte) next)))]] ) ; Out

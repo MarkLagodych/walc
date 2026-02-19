@@ -10,12 +10,12 @@ local function Var(name)
     return { type = "variable", name = name }
 end
 
-local function Fun(variable, body)
-    return { type = "function", variable = variable, body = body }
+local function Abs(variable, body)
+    return { type = "abstraction", variable = variable, body = body }
 end
 
-local function Call(left, right)
-    return { type = "call", left = left, right = right }
+local function Apply(left, right)
+    return { type = "application", left = left, right = right }
 end
 
 
@@ -26,12 +26,12 @@ local function parse_expr(next_token)
         local variable = next_token()
         local body = parse_expr(next_token)
         assert(next_token() == "]", "Expected ']'")
-        return Fun(variable, body)
+        return Abs(variable, body)
     elseif token == "(" then
         local left = parse_expr(next_token)
         local right = parse_expr(next_token)
         assert(next_token() == ")", "Expected ')'")
-        return Call(left, right)
+        return Apply(left, right)
     else
         return Var(token)
     end
@@ -59,17 +59,17 @@ function Closure(env, expr)
     return { env = env, expr = expr }
 end
 
--- Represents a variable binding in a function.
--- * parent: next environment in the chain
--- * name: variable name
--- * value: Closure assigned to the variable
--- * computed: whether the value has been computed and assigned (can be nil)
+-- Represents a value binding of an abstraction variable.
+-- * parent: the next environment in the chain (can be nil)
+-- * name: the variable name
+-- * value: a closure assigned to the variable (may be updated when computed)
+-- * computed: true if the value has been evaluated yet (can be nil)
 function Env(parent, name, value, computed)
     return { parent = parent, name = name, value = value, computed = computed }
 end
 
 local function run(closure)
-    -- Based on Krivine machine
+    -- Based on the Krivine machine
     -- Implements an optimization to avoid re-computing variable values
     -- by updating the env when a variable is computed for the first time.
 
@@ -81,15 +81,15 @@ local function run(closure)
     local compute_locations = {}
 
     while true do
-        if closure.expr.type == "call" then
+        if closure.expr.type == "application" then
             table.insert(stack, Closure(closure.env, closure.expr.right))
             closure = Closure(closure.env, closure.expr.left)
-        elseif closure.expr.type == "function" then
+        elseif closure.expr.type == "abstraction" then
             -- Optimization: assign the value to the corresponding variables
             while compute_locations[#compute_locations] == #stack do
                 table.remove(compute_locations)
                 local env = table.remove(uncomputed_envs)
-                env.value = closure -- Assigns the computed (optimized) value
+                env.value = closure -- Assign the computed (optimized) value
                 env.computed = true
             end
 
@@ -128,12 +128,8 @@ local unreachable = Var([[unreachable ¯\_(ツ)_/¯]])
 local bit0 = parse("[x0[x1 x0]]")
 local bit1 = parse("[x0[x1 x1]]")
 
-local function bit_getter(bit_index)
-    return parse("[7[6[5[4[3[2[1[0 " .. bit_index .. "]]]]]]]]")
-end
-
 local function decode_bit(closure)
-    local expr = Call(Call(closure.expr, bit0), bit1)
+    local expr = Apply(Apply(closure.expr, bit0), bit1)
     local result = run(Closure(closure.env, expr))
     if result.expr == bit0 then
         return 0
@@ -154,38 +150,17 @@ local function encode_bit(bit)
     end
 end
 
-local function decode_byte(closure)
-    local result = 0
-    for i = 0, 7 do
-        local bit_expr = Call(closure.expr, bit_getter(i))
-        local bit = decode_bit(Closure(closure.env, bit_expr))
-        result = result + (bit * 2 ^ i)
-    end
-
-    return result
-end
-
-local function encode_byte(byte)
-    local expr = Var("x")
-    for i = 7, 0, -1 do
-        local bit = math.floor(byte / 2 ^ i) % 2
-        expr = Call(expr, encode_bit(bit))
-    end
-
-    return Fun("x", expr)
-end
-
 local function decode_pair(closure)
     -- Avoid duplicate computations when evaluating the items
     closure = run(closure)
 
-    local item0 = Closure(closure.env, Call(closure.expr, bit0))
-    local item1 = Closure(closure.env, Call(closure.expr, bit1))
+    local item0 = Closure(closure.env, Apply(closure.expr, bit0))
+    local item1 = Closure(closure.env, Apply(closure.expr, bit1))
     return item0, item1
 end
 
 local function encode_pair(expr0, expr1)
-    return Fun("p", Call(Call(Var("p"), expr0), expr1))
+    return Abs("p", Apply(Apply(Var("p"), expr0), expr1))
 end
 
 local function decode_optional(closure)
@@ -197,6 +172,50 @@ local function encode_optional(expr)
     return expr
         and encode_pair(encode_bit(1), expr)
         or encode_pair(encode_bit(0), unreachable)
+end
+
+local function decode_list(closure)
+    local node = decode_optional(closure)
+    if not node then return {} end
+
+    local head, tail = decode_pair(node)
+    local items = decode_list(tail)
+    table.insert(items, 1, head)
+    return items
+end
+
+local function encode_list(items)
+    local node
+    if #items == 0 then
+        node = nil
+    else
+        local head = table.remove(items, 1)
+        node = encode_pair(head, encode_list(items))
+    end
+
+    return encode_optional(node)
+end
+
+local function decode_byte(closure)
+    local bits = decode_list(closure)
+
+    local byte = 0
+    for _, bit in ipairs(bits) do
+        byte = byte * 2 + decode_bit(bit)
+    end
+
+    return byte
+end
+
+local function encode_byte(byte)
+    local bits = {}
+
+    for i = 0, 7 do
+        table.insert(bits, 1, encode_bit(byte % 2))
+        byte = math.floor(byte / 2)
+    end
+
+    return encode_list(bits)
 end
 
 local help_message =
@@ -229,7 +248,7 @@ local function main()
             end
 
             local input = encode_optional(input_expr)
-            program = Closure(data.env, Call(data.expr, input))
+            program = Closure(data.env, Apply(data.expr, input))
         else
             -- Output
             local output, next_program = decode_pair(data)

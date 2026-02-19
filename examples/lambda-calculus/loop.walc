@@ -1,7 +1,7 @@
 ; This program prints "Hello world" 8192 times in a simple loop
 
 ([Unreachable ([0 ([1 ([Pair ([None ([Some ([Left ([Right ([End ([Out ([In
-([space_ ([newline_ ([H_ ([e_ ([l_ ([o_ ([w_ ([r_ ([d_
+([Empty ([C ([Byte ([space_ ([newline_ ([H_ ([e_ ([l_ ([o_ ([w_ ([r_ ([d_
 ([print_Hello_world_and_then
 
 ([cons ([empty
@@ -70,15 +70,23 @@
     ((Out w_) ((Out o_) ((Out r_) ((Out l_) ((Out d_) ((Out newline_) next)
         )))))))))))] ) ; print_Hello_world_and_then
 
-] [g ((((((((g 0)1)1)0)0)1)0)0)] ); d_
-] [g ((((((((g 0)1)1)1)0)0)1)0)] ); r_
-] [g ((((((((g 0)1)1)1)0)1)1)1)] ); w_
-] [g ((((((((g 0)1)1)0)1)1)1)1)] ); o_
-] [g ((((((((g 0)1)1)0)1)1)0)0)] ); l_
-] [g ((((((((g 0)1)1)0)0)1)0)1)] ); e_
-] [g ((((((((g 0)1)0)0)1)0)0)0)] ); H_
-] [g ((((((((g 0)0)0)0)1)0)1)0)] ); newline_
-] [g ((((((((g 0)0)1)0)0)0)0)0)] ); space_
+
+] ((((((((Byte 0)1)1)0)0)1)0)0) ); d_
+] ((((((((Byte 0)1)1)1)0)0)1)0) ); r_
+] ((((((((Byte 0)1)1)1)0)1)1)1) ); w_
+] ((((((((Byte 0)1)1)0)1)1)1)1) ); o_
+] ((((((((Byte 0)1)1)0)1)1)0)0) ); l_
+] ((((((((Byte 0)1)1)0)0)1)0)1) ); e_
+] ((((((((Byte 0)1)0)0)1)0)0)0) ); H_
+] ((((((((Byte 0)0)0)0)1)0)1)0) ); newline_
+] ((((((((Byte 0)0)1)0)0)0)0)0) ); space_
+
+] [7[6[5[4[3[2[1[0
+    ((C 7) ((C 6) ((C 5) ((C 4) ((C 3) ((C 2) ((C 1) ((C 0) Empty))))))))
+]]]]]]]] ) ; Byte
+
+] [x0[x1 (Some ((Pair x0) x1)) ]] ) ; C
+] None ) ; Empty
 
 ] [input_handler (Some (Right input_handler))] ) ; In
 ] [out_byte [next (Some (Left ((Pair out_byte) next)))]] ) ; Out

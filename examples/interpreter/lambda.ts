@@ -5,10 +5,10 @@
 // Copyright (c) 2025-2026 Mark Lagodych
 // SPDX-License-Identifier: MIT
 
-type Expr = Var | Fun | Call
+type Expr = Var | Abs | Apply
 class Var { constructor(public name: string) {} }
-class Fun { constructor(public variable: string, public body: Expr) {} }
-class Call { constructor(public left: Expr, public right: Expr) {} }
+class Abs { constructor(public variable: string, public body: Expr) {} }
+class Apply { constructor(public left: Expr, public right: Expr) {} }
 
 function parse_expr(next_token: () => string): Expr {
     const token = next_token()
@@ -17,14 +17,14 @@ function parse_expr(next_token: () => string): Expr {
         const variable = next_token()
         const body = parse_expr(next_token)
         if (next_token() != "]") throw new Error("Expected ']'")
-        return new Fun(variable, body)
+        return new Abs(variable, body)
     }
 
     if (token == "(") {
         const left = parse_expr(next_token)
         const right = parse_expr(next_token)
         if (next_token() != ")") throw new Error("Expected ')'")
-        return new Call(left, right)
+        return new Apply(left, right)
     }
 
     return new Var(token)
@@ -58,7 +58,7 @@ class Env {
 }
 
 function run(closure: Closure): Closure {
-    // Based on Krivine machine.
+    // Based on the Krivine machine.
     // Implements an optimization to avoid re-computing variable values
     // by updating the env when a variable is computed for the first time.
 
@@ -70,16 +70,16 @@ function run(closure: Closure): Closure {
     const stack_locations: number[] = []
 
     while (true) {
-        if (closure.expr instanceof Call) {
+        if (closure.expr instanceof Apply) {
             stack.push(new Closure(closure.env, closure.expr.right))
             closure = new Closure(closure.env, closure.expr.left)
         }
-        else if (closure.expr instanceof Fun) {
+        else if (closure.expr instanceof Abs) {
             // Optimization: update the values of the corresponding envs
             while (stack_locations.at(-1) === stack.length) {
                 stack_locations.pop()!
                 const env = uncomputed_envs.pop()!
-                env.value = closure // Assigns the computed (optimized) value
+                env.value = closure // Assign the computed (optimized) value
                 env.computed = true
             }
 
@@ -116,11 +116,8 @@ const unreachable = new Var("unreachable ¯\\_(ツ)_/¯")
 const bit0 = parse("[x0[x1 x0]]")
 const bit1 = parse("[x0[x1 x1]]")
 
-const bit_getter = (bit_index: number): Expr =>
-    parse(`[7[6[5[4[3[2[1[0 ${bit_index}]]]]]]]]`)
-
 function decode_bit(closure: Closure): number {
-    const expr = new Call(new Call(closure.expr, bit0), bit1)
+    const expr = new Apply(new Apply(closure.expr, bit0), bit1)
     const result = run(new Closure(closure.env, expr))
     switch (result.expr) {
         case bit0: return 0
@@ -137,38 +134,17 @@ function encode_bit(bit: number): Expr {
     }
 }
 
-function decode_byte(closure: Closure): number {
-    let result = 0
-    for (let i = 0; i <= 7; i++) {
-        const bit_expr = new Call(closure.expr, bit_getter(i))
-        const bit = decode_bit(new Closure(closure.env, bit_expr))
-        result |= bit << i
-    }
-
-    return result
-}
-
-function encode_byte(byte: number): Expr {
-    let expr: Expr = new Var("x")
-    for (let i = 7; i >= 0; i--) {
-        const bit = (byte >> i) & 1
-        expr = new Call(expr, encode_bit(bit))
-    }
-
-    return new Fun("x", expr)
-}
-
 function decode_pair(closure: Closure): [Closure, Closure] {
     // Avoid duplicate computations when evaluating the items
     closure = run(closure)
 
-    const item0 = new Closure(closure.env, new Call(closure.expr, bit0))
-    const item1 = new Closure(closure.env, new Call(closure.expr, bit1))
+    const item0 = new Closure(closure.env, new Apply(closure.expr, bit0))
+    const item1 = new Closure(closure.env, new Apply(closure.expr, bit1))
     return [item0, item1]
 }
 
 function encode_pair(expr0: Expr, expr1: Expr): Expr {
-    return new Fun("p", new Call(new Call(new Var("p"), expr0), expr1))
+    return new Abs("p", new Apply(new Apply(new Var("p"), expr0), expr1))
 }
 
 function decode_optional(closure: Closure): Closure | null {
@@ -180,6 +156,45 @@ function encode_optional(expr: Expr | null): Expr {
     return expr
         ? encode_pair(encode_bit(1), expr)
         : encode_pair(encode_bit(0), unreachable)
+}
+
+function decode_list(closure: Closure): Closure[] {
+    const node = decode_optional(closure);
+    if (!node) return [];
+
+    const [head, tail] = decode_pair(node);
+    return [head, ...decode_list(tail)];
+}
+
+function encode_list(items: Expr[]): Expr {
+    const node = items.length == 0
+        ? null
+        : encode_pair(items[0], encode_list(items.slice(1)))
+
+    return encode_optional(node)
+}
+
+function decode_byte(closure: Closure): number {
+    const bits = decode_list(closure)
+
+    let byte = 0
+    for (const bit of bits) {
+        byte <<= 1
+        byte |= decode_bit(bit)
+    }
+
+    return byte
+}
+
+function encode_byte(byte: number): Expr {
+    const bits = []
+
+    for (let i = 0; i < 8; i++) {
+        bits.push(encode_bit(byte & 1))
+        byte >>= 1
+    }
+
+    return encode_list(bits.reverse())
 }
 
 
@@ -227,7 +242,7 @@ function main() {
             const byte = read_byte()
             const input_expr = (byte == null) ? null : encode_byte(byte)
             const input = encode_optional(input_expr)
-            program = new Closure(data.env, new Call(data.expr, input))
+            program = new Closure(data.env, new Apply(data.expr, input))
         } else {
             // Output
             const [output, next_program] = decode_pair(data)
