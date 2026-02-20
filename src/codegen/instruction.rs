@@ -61,10 +61,7 @@ impl InstructionDefinitionBuilder {
 
             End => {
                 if labels.len() == 1 {
-                    // FIXME This does not work. However, if I change this to exit(), it works
-                    // for minimal.wasm/walc
                     self.leave(info.function_type)
-                    // self.exit()
                 } else {
                     // TODO
                     todo!()
@@ -78,39 +75,19 @@ impl InstructionDefinitionBuilder {
 
     pub fn output_and_return(&mut self) -> Instruction {
         self.add_def("Output", |_| {
-            apply(
-                instruction(|mut ctx| {
-                    ctx.pop("a");
-                    ctx.def(
-                        "out",
-                        apply(
-                            instruction(|mut ctx| {
-                                ctx.ret();
-                                apply(
-                                    var("a"),
-                                    [abs(
-                                        (0..32).rev().map(|i| format!("b{i:x}")),
-                                        io_command::output(
-                                            abs(
-                                                ["n"],
-                                                apply(
-                                                    var("n"),
-                                                    (0..8).rev().map(|i| var(format!("b{i:x}"))),
-                                                ),
-                                            ),
-                                            ctx.build(),
-                                        ),
-                                    )],
-                                )
-                            }),
-                            [unreachable()],
-                        ),
-                    );
-                    ctx.set_next(var("out"));
+            let write_a_to_output = instruction(|mut ctx| {
+                // TODO convert a to byte
+                io_command::output(number::reverse_bits(var("a")), {
+                    ctx.ret();
                     ctx.build()
-                }),
-                [unreachable()],
-            )
+                })
+            });
+
+            instruction(|mut ctx| {
+                ctx.pop("a");
+                ctx.set_next(apply(write_a_to_output, [unreachable()]));
+                ctx.build()
+            })
         });
 
         var("Output")
@@ -121,16 +98,14 @@ impl InstructionDefinitionBuilder {
             apply(
                 instruction(|mut ctx| {
                     io_command::input(abs(["inp"], {
-                        ctx.def(
-                            "a",
-                            select(
-                                optional::is_some(var("inp")),
-                                def_ctx.consts.i32_const(u32::MAX),
-                                var("inp"),
-                            ),
+                        let input = select(
+                            optional::is_some(var("inp")),
+                            def_ctx.consts.i32_const(u32::MAX),
+                            // TODO convert input to i32
+                            optional::unwrap(var("inp")),
                         );
 
-                        ctx.push(var("a"));
+                        ctx.push(input);
 
                         ctx.build()
                     }))

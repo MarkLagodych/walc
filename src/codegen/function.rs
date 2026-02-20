@@ -13,7 +13,7 @@ pub struct FunctionBodyBuilder<'a> {
     /// Each variable is a "label" and stores a subchain of instructions in the function body.
     labels: Vec<Expr>,
 
-    label_id: std::ops::RangeFrom<usize>,
+    next_label_id: u32,
 
     defs: DefinitionBuilder,
 }
@@ -29,14 +29,16 @@ impl<'a> FunctionBodyBuilder<'a> {
             consts,
             instrs,
             labels: Vec::new(),
-            label_id: 0..,
+            next_label_id: 0,
             defs: DefinitionBuilder::new(),
         }
     }
 
     /// `chain` is the chain of instructions following the block end
     fn block_end(&mut self, chain: Expr) -> Expr {
-        let label = format!("_{:x}", self.label_id.next().unwrap());
+        let label = format!("_{:x}", self.next_label_id);
+        self.next_label_id += 1;
+
         self.defs.def(label.clone(), chain);
         self.labels.push(var(label.clone()));
         var(label)
@@ -92,11 +94,15 @@ pub fn function(
 }
 
 pub fn input_function(instrs: &mut instruction::InstructionDefinitionBuilder) -> FunctionBody {
-    instrs.input_and_return()
+    let mut expr = unreachable();
+    expr = apply(instrs.input_and_return(), [expr]);
+    expr
 }
 
 pub fn output_function(instrs: &mut instruction::InstructionDefinitionBuilder) -> FunctionBody {
-    instrs.output_and_return()
+    let mut expr = unreachable();
+    expr = apply(instrs.output_and_return(), [expr]);
+    expr
 }
 
 pub fn exit_function(instrs: &mut instruction::InstructionDefinitionBuilder) -> FunctionBody {

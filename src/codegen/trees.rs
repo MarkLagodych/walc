@@ -1,3 +1,7 @@
+//! All dummy trees are implicitly initialized with the null byte.
+//! This is because the only place where the default item matters is the main memory, which is
+//! zero-initialized in WASM.
+
 use super::*;
 
 pub mod tree {
@@ -5,9 +9,9 @@ pub mod tree {
 
     pub type Tree = Expr;
 
-    pub fn new(bitness: u8, initial_item: Expr) -> Tree {
+    pub fn new(bitness: u8) -> Tree {
         debug_assert!(bitness <= 32);
-        apply(var(format!("T{bitness:x}")), [initial_item])
+        var(format!("T{bitness}"))
     }
 
     pub fn node(left: Expr, right: Expr) -> Tree {
@@ -22,30 +26,33 @@ pub mod tree {
         pair::get_second(tree)
     }
 
+    pub fn select_subtree(tree: Tree, selector: Bit) -> Expr {
+        pair::select(tree, selector)
+    }
+
     /// The index bitness must match the tree bitness.
     pub fn index(tree: Tree, index: number::Number) -> Expr {
-        apply(index, [tree])
+        apply(var("Idx"), [tree, index])
     }
 
     /// The index bitness must match the tree bitness.
-    pub fn insert(bitness: u8, tree: Tree, index: number::Number, value: Expr) -> Tree {
-        debug_assert!(bitness <= 32);
-        apply(index, [apply(var(format!("I{bitness:x}")), [tree, value])])
+    pub fn insert(tree: Tree, index: number::Number, value: Expr) -> Tree {
+        apply(var("Ins"), [tree, index, value])
     }
 
     /// The index bitness must match the tree bitness.
-    pub fn from(bitness: u8, items: impl IntoIterator<Item = Expr>, default_item: Expr) -> Tree {
+    pub fn from(bitness: u8, items: impl IntoIterator<Item = Expr>) -> Tree {
         debug_assert!(bitness <= 32);
 
         let mut items = items.into_iter().collect::<Vec<Expr>>();
 
         if items.is_empty() {
-            return tree::new(bitness, default_item);
+            return tree::new(bitness);
         }
 
         for i in 0..bitness {
             if items.len() % 2 != 0 {
-                items.push(tree::new(i, default_item.clone()));
+                items.push(tree::new(i));
             }
 
             items = items
@@ -61,55 +68,86 @@ pub mod tree {
         // Dummy trees
 
         // Indexable by 0 bits (i.e. not indexable)
-        b.def("T0", abs(["x"], var("x")));
+        b.def("T0", number::null_byte());
         // Every node is indexable by i bits
         for i in 1..=32 {
-            let node_name = format!("T{:x}", i);
-            let item_name = format!("T{:x}", i - 1);
-            let item = apply(var(item_name), [var("x")]);
-            b.def(node_name, abs(["x"], tree::node(item.clone(), item)));
+            b.def(
+                format!("T{i}"),
+                tree::node(var(format!("T{}", i - 1)), var(format!("T{}", i - 1))),
+            )
         }
 
-        // Insertion helper
         b.def(
-            "I_",
-            abs(["insert", "tree", "value", "index_bit"], {
+            "Idx_",
+            abs(["idx", "tree", "index"], {
+                select(list::is_not_empty(var("index")), var("tree"), {
+                    let index_bit = list::get_head(var("index"));
+                    let index_tail = list::get_tail(var("index"));
+                    let subtree = tree::select_subtree(var("tree"), index_bit);
+                    apply(rec(var("idx")), [subtree, index_tail])
+                })
+            }),
+        );
+
+        b.def(
+            "Idx",
+            abs(
+                ["tree", "index"],
+                apply(
+                    rec(var("Idx_")),
+                    [var("tree"), number::reverse_bits(var("index"))],
+                ),
+            ),
+        );
+
+        b.def(
+            "Ins_",
+            abs(["ins", "tree", "index", "value"], {
                 let left = tree::get_left(var("tree"));
                 let right = tree::get_right(var("tree"));
 
-                let insert = |subtree| apply(var("insert"), [subtree, var("value")]);
+                let index_bit = list::get_head(var("index"));
+                let index_tail = list::get_tail(var("index"));
+
+                let insert =
+                    |subtree| apply(rec(var("ins")), [subtree, index_tail.clone(), var("value")]);
 
                 select(
-                    var("index_bit"),
-                    tree::node(insert(left.clone()), right.clone()),
-                    tree::node(left.clone(), insert(right.clone())),
+                    list::is_not_empty(var("index")),
+                    var("tree"),
+                    select(
+                        index_bit,
+                        tree::node(insert(left.clone()), right.clone()),
+                        tree::node(left.clone(), insert(right.clone())),
+                    ),
                 )
             }),
         );
 
-        // Insertion functions
-
-        b.def("I0", abs(["tree", "value"], var("value")));
-
-        // Each insertion function consumes i bits of the index
-        for i in 1..=32 {
-            b.def(
-                format!("I{:x}", i),
-                apply(var("I_"), [var(format!("I{:x}", i - 1))]),
-            );
-        }
+        b.def(
+            "Ins",
+            abs(
+                ["tree", "index", "value"],
+                apply(
+                    rec(var("Ins_")),
+                    [
+                        var("tree"),
+                        number::reverse_bits(var("index")),
+                        var("value"),
+                    ],
+                ),
+            ),
+        );
     }
 }
 
 pub mod memory {
     use super::*;
 
-    const BITNESS: u8 = 32;
-
     pub type Memory = tree::Tree;
 
     pub fn new() -> Memory {
-        tree::new(BITNESS, number::null_byte())
+        tree::new(32)
     }
 
     pub fn index(memory: Memory, address: number::I32) -> Expr {
@@ -117,19 +155,19 @@ pub mod memory {
     }
 
     pub fn insert(memory: Memory, address: number::I32, value: Expr) -> Memory {
-        tree::insert(BITNESS, memory, address, value)
+        tree::insert(memory, address, value)
     }
 }
+
+// TODO Store IDs already reversed (BE)
 
 pub mod table {
     use super::*;
 
-    const BITNESS: u8 = 16;
-
     pub type Table = tree::Tree;
 
     pub fn from(items: impl IntoIterator<Item = Expr>) -> Table {
-        tree::from(BITNESS, items, unreachable())
+        tree::from(16, items)
     }
 
     pub fn index(table: Table, address: number::Id) -> Expr {
@@ -137,6 +175,6 @@ pub mod table {
     }
 
     pub fn insert(table: Table, address: number::Id, value: Expr) -> Table {
-        tree::insert(BITNESS, table, address, value)
+        tree::insert(table, address, value)
     }
 }

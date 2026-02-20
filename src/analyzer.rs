@@ -86,7 +86,7 @@ impl Analyzer {
             Payload::DataSection(section) => self.handle_data(section)?,
 
             // Memory section is ignored because WASM 1.0 modules can only have one memory
-            // and its size properties are irrelevant for WALC because WALC memory
+            // and its size properties are irrelevant for WALC because its memory
             // is lazy and always has a virtual size of 4 GiB.
             Payload::MemorySection(_section) => {}
 
@@ -101,13 +101,6 @@ impl Analyzer {
         for import in section.into_imports() {
             let import = import?;
 
-            if import.module != "walc" {
-                Err(anyhow!(
-                    "Unknown import module: '{}', only 'walc' is supported",
-                    import.module
-                ))?
-            }
-
             let type_id = match import.ty {
                 TypeRef::Func(type_id) | TypeRef::FuncExact(type_id) => type_id,
                 _ => Err(anyhow!("Only function imports are supported"))?,
@@ -118,37 +111,36 @@ impl Analyzer {
 
             let func_type = self.type_info.get_type(type_id);
 
-            match import.name {
-                "input" => {
-                    if !(func_type.params().is_empty() && func_type.results() == [ValType::I32]) {
-                        Err(anyhow!(
-                            "'walc.input' must have type `(func (result i32))`, got `{}`",
-                            func_type
-                        ))?
-                    }
-                }
-                "output" => {
-                    if !(func_type.params() == [ValType::I32] && func_type.results().is_empty()) {
-                        Err(anyhow!(
-                            "'walc.output' must have type `(func (param i32))`, got `{}`",
-                            func_type
-                        ))?
-                    }
-                }
-                "exit" => {
-                    if !(func_type.params().is_empty() && func_type.results().is_empty()) {
-                        Err(anyhow!(
-                            "'walc.exit' must have type `(func)`, got `{}`",
-                            func_type
-                        ))?
-                    }
-                }
-                name => Err(anyhow!(
-                    "Unknown import: '{name}' (only 'input', 'output', and 'exit' are supported)",
-                ))?,
-            }
+            self.check_import(&import, func_type)?;
 
             self.program.handle_import(import.name);
+        }
+
+        Ok(())
+    }
+
+    fn check_import(&self, import: &Import, func_type: &FuncType) -> Result<()> {
+        if import.module != "walc" {
+            Err(anyhow!(
+                "Unknown import module: '{}', only 'walc' is supported",
+                import.module
+            ))?
+        }
+
+        let ty = match import.name {
+            "input" => FuncType::new([], [ValType::I32]),
+            "output" => FuncType::new([ValType::I32], []),
+            "exit" => FuncType::new([], []),
+            name => Err(anyhow!(
+                "Unknown import: '{name}' (only 'input', 'output', and 'exit' are supported)",
+            ))?,
+        };
+
+        if func_type != &ty {
+            Err(anyhow!(
+                "'walc.{name}' must have type `{ty}`, got `{func_type}`",
+                name = import.name,
+            ))?
         }
 
         Ok(())

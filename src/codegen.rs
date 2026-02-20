@@ -102,7 +102,7 @@ pub fn unreachable() -> Expr {
     if cfg!(feature = "unbound-unreachable") {
         var("UNREACHABLE")
     } else {
-        abs(["_"], var("_"))
+        var("_")
     }
 }
 
@@ -145,6 +145,8 @@ impl DefinitionBuilder {
     /// Provides definitions required for all basic codegen features.
     pub fn prelude() -> Self {
         let mut me = Self::new();
+
+        me.def("_", abs(["_"], var("_")));
 
         me.def("0", abs(["x0", "x1"], var("x0")));
         me.def("1", abs(["x0", "x1"], var("x1")));
@@ -189,6 +191,10 @@ pub mod pair {
 
     pub fn get_second(pair: Pair) -> Expr {
         apply(pair, [var("1")])
+    }
+
+    pub fn select(pair: Pair, selector: Bit) -> Expr {
+        apply(pair, [selector])
     }
 
     pub fn define_prelude(b: &mut DefinitionBuilder) {
