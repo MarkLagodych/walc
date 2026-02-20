@@ -112,6 +112,10 @@ pub fn bit(b: bool) -> Bit {
     if b { var("1") } else { var("0") }
 }
 
+pub fn rec(func: Expr) -> Expr {
+    apply(func.clone(), [func])
+}
+
 #[derive(Default)]
 pub struct DefinitionBuilder {
     defs: Vec<(String, Expr)>,
@@ -124,13 +128,6 @@ impl DefinitionBuilder {
 
     pub fn def(&mut self, name: impl ToString, value: Expr) {
         self.defs.push((name.to_string(), value));
-    }
-
-    pub fn def_rec(&mut self, name: impl ToString, value: Expr) {
-        self.defs.push((
-            name.to_string(),
-            apply(var("Y"), [abs([name.to_string()], value)]),
-        ));
     }
 
     pub fn append(&mut self, other: Self) {
@@ -151,18 +148,6 @@ impl DefinitionBuilder {
 
         me.def("0", abs(["x0", "x1"], var("x0")));
         me.def("1", abs(["x0", "x1"], var("x1")));
-
-        // Y combinator
-        me.def(
-            "Y",
-            abs(
-                ["f"],
-                apply(
-                    abs(["x"], apply(var("f"), [apply(var("x"), [var("x")])])),
-                    [abs(["x"], apply(var("f"), [apply(var("x"), [var("x")])]))],
-                ),
-            ),
-        );
 
         pair::define_prelude(&mut me);
         list::define_prelude(&mut me);

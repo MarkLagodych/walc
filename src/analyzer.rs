@@ -121,17 +121,26 @@ impl Analyzer {
             match import.name {
                 "input" => {
                     if !(func_type.params().is_empty() && func_type.results() == [ValType::I32]) {
-                        Err(anyhow!("'walc.input' must have type () -> (i32)"))?
+                        Err(anyhow!(
+                            "'walc.input' must have type `(func (result i32))`, got `{}`",
+                            func_type
+                        ))?
                     }
                 }
                 "output" => {
                     if !(func_type.params() == [ValType::I32] && func_type.results().is_empty()) {
-                        Err(anyhow!("'walc.output' must have type (i32) -> ()"))?
+                        Err(anyhow!(
+                            "'walc.output' must have type `(func (param i32))`, got `{}`",
+                            func_type
+                        ))?
                     }
                 }
                 "exit" => {
                     if !(func_type.params().is_empty() && func_type.results().is_empty()) {
-                        Err(anyhow!("'walc.exit' must have type () -> ()"))?
+                        Err(anyhow!(
+                            "'walc.exit' must have type `(func)`, got `{}`",
+                            func_type
+                        ))?
                     }
                 }
                 name => Err(anyhow!(

@@ -1,8 +1,3 @@
-//! Numbers are represented as simple tuples of bits:
-//! `[getter ((...((getter bit<N>) bit<N-1>)... bit1) bit0)]`.
-//! Thus when you want to get actual bits from a number, you must *apply a function to a number*,
-//! and not vice versa!
-
 use super::*;
 
 use crate::analyzer::{Operator, ValType};
@@ -24,34 +19,8 @@ pub type Byte = Expr;
 pub type Id = Expr;
 pub type I32 = Expr;
 pub type I64 = Expr;
-/// Any of: Byte, Id, I32, I64
+/// Any of: Id, I32, I64
 pub type Number = Expr;
-
-fn byte_expr(byte: u8) -> Byte {
-    let ith_bit = |i: u8| bit((byte >> i) & 1 != 0);
-
-    abs(["x"], apply(var("x"), (0..8).rev().map(ith_bit)))
-}
-
-fn number_expr(be_bytes: &[u8]) -> Number {
-    let mut expr = var("n");
-    for &byte in be_bytes {
-        expr = apply(var(format!("{:02X}", byte)), [expr]);
-    }
-    abs(["n"], expr)
-}
-
-pub fn null_byte() -> Byte {
-    var("00")
-}
-
-pub fn null_i32() -> I32 {
-    var("0i")
-}
-
-pub fn null_i64() -> I64 {
-    var("0I")
-}
 
 impl ConstantDefinitionBuilder {
     pub fn new() -> Self {
@@ -63,18 +32,18 @@ impl ConstantDefinitionBuilder {
 
         for &n in &self.bytes {
             if n == 0 {
-                continue; // "00" is pre-defined in the prelude
+                continue; // "0b" is pre-defined in the prelude
             }
-            b.def(format!("{:02X}", n), byte_expr(n));
+            b.def(format!("{:X}b", n), byte_expr(n));
         }
         for &n in &self.ids {
-            b.def(format!("{:04X}", n), number_expr(&n.to_be_bytes()));
+            b.def(format!("{:X}n", n), id_expr(n));
         }
         for &n in &self.i32s {
-            b.def(format!("{:08X}", n), number_expr(&n.to_be_bytes()));
+            b.def(format!("{:X}i", n), i32_expr(n));
         }
         for &n in &self.i64s {
-            b.def(format!("{:016X}", n), number_expr(&n.to_be_bytes()));
+            b.def(format!("{:X}l", n), i64_expr(n));
         }
 
         b
@@ -86,35 +55,25 @@ impl ConstantDefinitionBuilder {
         }
 
         self.bytes.insert(byte);
-        var(format!("{:02X}", byte))
+        var(format!("{:X}b", byte))
     }
 
     pub fn id_const(&mut self, id: u16) -> Id {
-        // The ID of 0 is not special and does not need to be optimized
-
         self.ids.insert(id);
         self.bytes.extend(id.to_be_bytes());
-        var(format!("{:04X}", id))
+        var(format!("{:X}n", id))
     }
 
     pub fn i32_const(&mut self, n: u32) -> I32 {
-        if n == 0 {
-            return null_i32();
-        }
-
         self.i32s.insert(n);
         self.bytes.extend(n.to_be_bytes());
-        var(format!("{:08X}", n))
+        var(format!("{:X}i", n))
     }
 
     pub fn i64_const(&mut self, n: u64) -> I64 {
-        if n == 0 {
-            return null_i64();
-        }
-
         self.i64s.insert(n);
         self.bytes.extend(n.to_be_bytes());
-        var(format!("{:016X}", n))
+        var(format!("{:X}l", n))
     }
 
     pub fn with_init_value(&mut self, init_value: &Operator) -> Number {
@@ -123,7 +82,7 @@ impl ConstantDefinitionBuilder {
             Operator::I64Const { value } => self.i64_const(*value as u64),
             Operator::F32Const { value } => self.i32_const(value.bits()),
             Operator::F64Const { value } => self.i64_const(value.bits()),
-            _ => unreachable!("WASM 1.0 cannot have const initializers other than I32/I64/F32/F64"),
+            _ => unreachable!("non-const initializers are unsupported"),
         }
     }
 
@@ -133,13 +92,91 @@ impl ConstantDefinitionBuilder {
             ValType::I64 => self.i64_const(0),
             ValType::F32 => self.i32_const(0),
             ValType::F64 => self.i64_const(0),
-            _ => unreachable!("WASM 1.0 cannot have value types other than I32/I64/F32/F64"),
+            _ => unreachable!("non-const initializers are unsupported"),
         }
     }
 }
 
 pub fn define_prelude(b: &mut DefinitionBuilder) {
-    b.def("00", byte_expr(0));
-    b.def("0i", number_expr(&0u32.to_be_bytes()));
-    b.def("0I", number_expr(&0u64.to_be_bytes()));
+    b.def(
+        "Byte",
+        abs(
+            (0..8).rev().map(|i| format!("{i}")),
+            list::from((0..8).rev().map(|i| var(format!("{i}")))),
+        ),
+    );
+
+    // Reverses the bits of "x" and places them on top of "tail"
+    b.def(
+        "Rev",
+        abs(["rev", "x", "tail"], {
+            select(
+                list::is_not_empty(var("x")),
+                var("tail"),
+                apply(
+                    rec(var("rev")),
+                    [
+                        list::get_tail(var("x")),
+                        list::node(list::get_head(var("x")), var("tail")),
+                    ],
+                ),
+            )
+        }),
+    );
+
+    for (name, byte_count) in [("Id", 2), ("Int", 4), ("Long", 8)] {
+        b.def(
+            name,
+            abs(
+                (0..byte_count).rev().map(|i| format!("{:X}b", i)),
+                join_bytes((0..byte_count).map(|i| var(format!("{:X}b", i)))),
+            ),
+        );
+    }
+}
+
+fn join_bytes(le_bytes: impl IntoIterator<Item = Expr>) -> Expr {
+    let mut expr = list::empty();
+    for byte in le_bytes {
+        expr = apply(rec(var("Rev")), [byte, expr]);
+    }
+
+    expr
+}
+
+pub fn reverse_bits(expr: Number) -> Number {
+    apply(rec(var("Rev")), [expr, list::empty()])
+}
+
+fn byte_expr(byte: u8) -> Byte {
+    let ith_bit = |i: u8| bit((byte >> i) & 1 != 0);
+
+    apply(var("Byte"), (0..8).rev().map(ith_bit))
+}
+
+fn id_expr(id: u16) -> Id {
+    apply(
+        var("Id"),
+        id.to_be_bytes().iter().map(|&b| var(format!("{:X}b", b))),
+    )
+}
+
+// TODO Make functions to construct numbers out of individual bytes
+
+fn i32_expr(n: u32) -> I32 {
+    apply(
+        var("Int"),
+        n.to_be_bytes().iter().map(|&b| var(format!("{:X}b", b))),
+    )
+}
+
+fn i64_expr(n: u64) -> I64 {
+    apply(
+        var("Int"),
+        n.to_be_bytes().iter().map(|&b| var(format!("{:X}b", b))),
+    )
+}
+
+pub fn null_byte() -> Byte {
+    var("0b")
 }
