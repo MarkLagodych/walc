@@ -159,8 +159,6 @@ pub mod memory {
     }
 }
 
-// TODO Store IDs already reversed (BE)
-
 pub mod table {
     use super::*;
 

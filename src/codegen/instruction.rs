@@ -47,7 +47,8 @@ impl InstructionDefinitionBuilder {
         op: &Operator,
         info: &FunctionInfo,
         consts: &mut number::ConstantDefinitionBuilder,
-        labels: &[Expr],
+        labels: &[function::LabelInfo],
+        else_labels: &[Expr],
     ) -> Instruction {
         use Operator::*;
 

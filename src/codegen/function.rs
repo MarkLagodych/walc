@@ -9,13 +9,47 @@ pub struct FunctionBodyBuilder<'a> {
     consts: &'a mut number::ConstantDefinitionBuilder,
     instrs: &'a mut instruction::InstructionDefinitionBuilder,
 
-    /// Stack of variable expressions.
-    /// Each variable is a "label" and stores a subchain of instructions in the function body.
-    labels: Vec<Expr>,
+    /// Stack of labels.
+    labels: Vec<LabelInfo<'a>>,
+
+    /// Stack of "else" labels.
+    else_labels: Vec<Expr>,
+
+    /// Stack of operators that open blocks.
+    /// When reading `End` operators, pop the corresponding block opening operators from this stack
+    block_opening_ops: Vec<Option<&'a Operator<'a>>>,
 
     next_label_id: u32,
 
     defs: DefinitionBuilder,
+}
+
+pub struct LabelInfo<'a> {
+    /// A subchain of instructions that the label points to.
+    expr: Expr,
+
+    // If None, this label is the function body's end label.
+    // Otherwise, this is the block opening operator corresponding to this label.
+    block_start: Option<&'a Operator<'a>>,
+}
+
+fn read_blocks<'a>(ops: &'a [Operator<'a>]) -> Vec<Option<&'a Operator<'a>>> {
+    let mut stack = Vec::new();
+    let mut blocks = Vec::new();
+
+    for op in ops.iter() {
+        match op {
+            Operator::Loop { .. } | Operator::Block { .. } | Operator::If { .. } => {
+                stack.push(op);
+            }
+            Operator::End => {
+                blocks.push(stack.pop());
+            }
+            _ => {}
+        }
+    }
+
+    blocks
 }
 
 impl<'a> FunctionBodyBuilder<'a> {
@@ -29,6 +63,8 @@ impl<'a> FunctionBodyBuilder<'a> {
             consts,
             instrs,
             labels: Vec::new(),
+            else_labels: Vec::new(),
+            block_opening_ops: read_blocks(info.operators),
             next_label_id: 0,
             defs: DefinitionBuilder::new(),
         }
@@ -40,27 +76,36 @@ impl<'a> FunctionBodyBuilder<'a> {
         self.next_label_id += 1;
 
         self.defs.def(label.clone(), chain);
-        self.labels.push(var(label.clone()));
+        self.labels.push(LabelInfo {
+            expr: var(label.clone()),
+            block_start: self.block_opening_ops.pop().unwrap(),
+        });
+        var(label)
+    }
+
+    fn block_else(&mut self, chain: Expr) -> Expr {
+        let label = format!("_{:x}", self.next_label_id);
+        self.next_label_id += 1;
+
+        self.defs.def(label.clone(), chain);
+        self.else_labels.push(var(label.clone()));
         var(label)
     }
 
     fn block_start(&mut self) -> Expr {
-        self.labels.pop().unwrap()
+        self.labels.pop().unwrap().expr
     }
 
     pub fn build(mut self) -> FunctionBody {
         let mut expr = unreachable();
 
-        // TODO track information of the kind of a block that "end" refers to, so that
-        // the codegen can generate the correct jump (forward/backward)
-        // This probably requires a preliminary forward pass over the instructions
-        // Label info: [{ is_backward_jump, label_expr }]
-        // OR! Rather build the function body in natural order and come up with how to fix everything
-
-        for instr in self.info.instructions.iter().rev() {
-            match instr {
-                Operator::Block { .. } | Operator::Loop { .. } | Operator::If { .. } => {
+        for op in self.info.operators.iter().rev() {
+            match op {
+                Operator::Loop { .. } | Operator::Block { .. } | Operator::If { .. } => {
                     expr = self.block_start();
+                }
+                Operator::Else { .. } => {
+                    expr = self.block_else(expr);
                 }
                 Operator::End => {
                     expr = self.block_end(expr);
@@ -68,9 +113,13 @@ impl<'a> FunctionBodyBuilder<'a> {
                 _ => {}
             }
 
-            let instr = self
-                .instrs
-                .instruction(instr, self.info, self.consts, &self.labels);
+            let instr = self.instrs.instruction(
+                op,
+                self.info,
+                self.consts,
+                &self.labels,
+                &self.else_labels,
+            );
 
             expr = apply(instr, [expr]);
         }

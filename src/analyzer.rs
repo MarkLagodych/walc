@@ -33,7 +33,7 @@ pub struct FunctionInfo<'a> {
     pub type_info: &'a TypeInfo,
     pub function_type: &'a FuncType,
     pub local_types: &'a [ValType],
-    pub instructions: &'a [Operator<'a>],
+    pub operators: &'a [Operator<'a>],
 }
 
 #[derive(Default)]
@@ -263,16 +263,16 @@ impl Analyzer {
 
         let local_types = Self::read_function_local_types(&func)?;
 
-        let instructions = func
+        let operators = func
             .get_operators_reader()?
             .into_iter()
-            .collect::<Result<Vec<Operator>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         self.program.handle_function(&FunctionInfo {
             type_info: &self.type_info,
             function_type: func_type,
             local_types: &local_types,
-            instructions: &instructions,
+            operators: &operators,
         });
 
         Ok(())

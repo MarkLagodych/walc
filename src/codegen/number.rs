@@ -134,7 +134,7 @@ pub fn define_prelude(b: &mut DefinitionBuilder) {
             name,
             abs(
                 (0..byte_count).rev().map(|i| format!("b{i}")),
-                join_bytes((0..byte_count).map(|i| var(format!("b{i}")))),
+                join_bytes((0..byte_count).rev().map(|i| var(format!("b{i}")))),
             ),
         );
     }
@@ -142,9 +142,9 @@ pub fn define_prelude(b: &mut DefinitionBuilder) {
     b.def("0b", byte_expr(0));
 }
 
-fn join_bytes(le_bytes: impl DoubleEndedIterator<Item = Expr>) -> Expr {
+fn join_bytes(be_bytes: impl IntoIterator<Item = Expr>) -> Expr {
     let mut expr = list::empty();
-    for byte in le_bytes.into_iter().rev() {
+    for byte in be_bytes.into_iter() {
         expr = apply(rec(var("RevEx")), [byte, expr]);
     }
 
