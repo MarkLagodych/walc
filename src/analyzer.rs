@@ -7,10 +7,9 @@ pub use wasmparser::{FuncType, Operator, ValType};
 
 pub type FuncId = u32;
 pub type TypeId = u32;
-pub type DataSegmentId = u32;
 
 #[derive(Default)]
-pub struct TypeInfo {
+pub struct GlobalTypeInfo {
     /// Indexed by TypeId
     types: Vec<FuncType>,
 
@@ -18,7 +17,7 @@ pub struct TypeInfo {
     functions: Vec<TypeId>,
 }
 
-impl TypeInfo {
+impl GlobalTypeInfo {
     pub fn get_type(&self, type_id: TypeId) -> &FuncType {
         &self.types[type_id as usize]
     }
@@ -29,9 +28,8 @@ impl TypeInfo {
     }
 }
 
-pub struct FunctionInfo<'a> {
-    pub type_info: &'a TypeInfo,
-    pub function_type: &'a FuncType,
+pub struct Func<'a> {
+    pub func_type: &'a FuncType,
     pub local_types: &'a [ValType],
     pub operators: &'a [Operator<'a>],
 }
@@ -39,7 +37,7 @@ pub struct FunctionInfo<'a> {
 #[derive(Default)]
 pub struct Analyzer {
     program: codegen::program::ProgramBuilder,
-    type_info: TypeInfo,
+    types: GlobalTypeInfo,
     next_function_id: u32,
 }
 
@@ -107,9 +105,9 @@ impl Analyzer {
             };
 
             self.next_function_id += 1;
-            self.type_info.functions.push(type_id);
+            self.types.functions.push(type_id);
 
-            let func_type = self.type_info.get_type(type_id);
+            let func_type = self.types.get_type(type_id);
 
             self.check_import(&import, func_type)?;
 
@@ -157,7 +155,7 @@ impl Analyzer {
                 continue;
             }
 
-            let func_type = self.type_info.get_function_type(export.index);
+            let func_type = self.types.get_function_type(export.index);
 
             if !(func_type.params().is_empty() && func_type.results().is_empty()) {
                 Err(anyhow!("'main' must have type () -> ()"))?
@@ -181,10 +179,10 @@ impl Analyzer {
     }
 
     fn handle_data(&mut self, section: DataSectionReader) -> Result<()> {
-        for (data_id, data_segment) in section.into_iter().enumerate() {
+        for data_segment in section.into_iter() {
             let data_segment = data_segment?;
 
-            let target_memory_offsest = match data_segment.kind {
+            let target_memory_offset = match data_segment.kind {
                 DataKind::Active { offset_expr, .. } => {
                     match offset_expr.get_operators_reader().read()? {
                         Operator::I32Const { value } => value as u32,
@@ -197,7 +195,7 @@ impl Analyzer {
             };
 
             self.program
-                .handle_data(data_id as u32, data_segment.data, target_memory_offsest);
+                .handle_data(data_segment.data, target_memory_offset);
         }
 
         Ok(())
@@ -216,7 +214,7 @@ impl Analyzer {
         });
 
         for func_type in func_types {
-            self.type_info.types.push(func_type?);
+            self.types.types.push(func_type?);
         }
 
         Ok(())
@@ -232,7 +230,7 @@ impl Analyzer {
         }
 
         for type_id in section.into_iter() {
-            self.type_info.functions.push(type_id?);
+            self.types.functions.push(type_id?);
         }
 
         Ok(())
@@ -258,7 +256,7 @@ impl Analyzer {
     }
 
     fn handle_function(&mut self, func: FunctionBody) -> Result<()> {
-        let func_type = self.type_info.get_function_type(self.next_function_id);
+        let func_type = self.types.get_function_type(self.next_function_id);
         self.next_function_id += 1;
 
         let local_types = Self::read_function_local_types(&func)?;
@@ -268,12 +266,14 @@ impl Analyzer {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
-        self.program.handle_function(&FunctionInfo {
-            type_info: &self.type_info,
-            function_type: func_type,
-            local_types: &local_types,
-            operators: &operators,
-        });
+        self.program.handle_function(
+            &Func {
+                func_type,
+                local_types: &local_types,
+                operators: &operators,
+            },
+            &self.types,
+        );
 
         Ok(())
     }

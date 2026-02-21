@@ -163,15 +163,17 @@ impl DefinitionBuilder {
 pub mod io_command {
     use super::*;
 
-    pub fn exit() -> Expr {
+    pub type IoCommand = Expr;
+
+    pub fn exit() -> IoCommand {
         optional::none()
     }
 
-    pub fn output(out_byte: number::Byte, next: Expr) -> Expr {
+    pub fn output(out_byte: number::Byte, next: Expr) -> IoCommand {
         optional::some(either::first(pair::new(out_byte, next)))
     }
 
-    pub fn input(input_func: Expr) -> Expr {
+    pub fn input(input_func: Expr) -> IoCommand {
         optional::some(either::second(input_func))
     }
 }

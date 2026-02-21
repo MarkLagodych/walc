@@ -8,18 +8,13 @@ pub struct ProgramBuilder {
     globals: Vec<number::Number>,
 
     data_segments: Vec<list::List>,
-    data_infos: Vec<DataSegmentInfo>,
+    data_memory_offsets: Vec<u32>,
 
-    functions: Vec<function::FunctionBody>,
+    functions: Vec<function::InstructionChain>,
     main_id: Option<FuncId>,
     start_id: Option<FuncId>,
 
     custom_func_table: Vec<Option<u32>>,
-}
-
-struct DataSegmentInfo {
-    id: DataSegmentId,
-    target_memory_offset: u32,
 }
 
 impl ProgramBuilder {
@@ -28,10 +23,10 @@ impl ProgramBuilder {
     }
 
     pub fn build(mut self) -> Expr {
-        let expr = unreachable();
+        let mut expr = unreachable();
 
         let instr = self.instrs.exit();
-        let expr = apply(instr, [expr]);
+        expr = apply(instr, [expr]);
 
         // TODO active data segments
 
@@ -42,7 +37,7 @@ impl ProgramBuilder {
         // The analyzer must ensure that a main function exists
         let main_id = self.main_id.unwrap();
         let instr = self.instrs.call(self.consts.id_const(main_id as u16));
-        let expr = apply(instr, [expr]);
+        expr = apply(instr, [expr]);
 
         let func_count = self.functions.len();
 
@@ -82,12 +77,14 @@ impl ProgramBuilder {
 
         toplevel.def("Memory", memory::new());
 
-        let expr = apply(
+        expr = apply(
             expr,
             [
                 pair::new(var("FunctionTable"), var("IndirectTable")),
                 var("Memory"),
                 var("Globals"),
+                // TODO replace this with proper initializers, preferably with some instruction
+                // move this to a "run" function
                 stack::empty(),
                 stack::empty(),
                 stack::empty(),
@@ -105,14 +102,11 @@ impl ProgramBuilder {
         self.start_id = Some(id);
     }
 
-    pub fn handle_data(&mut self, id: DataSegmentId, data: &[u8], active_offset: u32) {
+    pub fn handle_data(&mut self, data: &[u8], target_memory_offset: u32) {
         self.data_segments
             .push(list::from_bytes(&mut self.consts, data));
 
-        self.data_infos.push(DataSegmentInfo {
-            id,
-            target_memory_offset: active_offset,
-        });
+        self.data_memory_offsets.push(target_memory_offset);
     }
 
     pub fn handle_import(&mut self, name: &str) {
@@ -133,9 +127,15 @@ impl ProgramBuilder {
         }
     }
 
-    pub fn handle_function(&mut self, info: &FunctionInfo) {
-        self.functions
-            .push(function::function(info, &mut self.consts, &mut self.instrs));
+    pub fn handle_function(&mut self, func: &Func, types: &GlobalTypeInfo) {
+        let build_info = function::FunctionBuildInfo {
+            func,
+            types,
+            consts: &mut self.consts,
+            instrs: &mut self.instrs,
+        };
+
+        self.functions.push(function::function(build_info));
     }
 
     pub fn handle_global(&mut self, init: Operator) {

@@ -1,5 +1,5 @@
-mod context;
-use context::*;
+mod builder;
+use builder::*;
 
 mod arith;
 use arith::*;
@@ -8,15 +8,38 @@ use crate::{analyzer::*, codegen::*};
 
 use std::collections::BTreeMap as Map;
 
+/// An instruction is a function of `(N, F, M, G, L, S, T) -> IoCommand` where:
+/// - `N` is the next instruction (or `unreachable` is this is the last instruction in a function)
+/// - `F` is a pair of the global function table and the user-defined table for indirect calls
+/// - `M` is the memory
+/// - `G` is the global variable table
+/// - `L` is the local variable table
+/// - `S` is the data stack
+/// - `T` is the trace (i.e. control flow stack)
+///
+/// See also [`io_command::IoCommand`].
+///
+/// An instruction might return an `IoCommand` directly or by invoking the next instruction
+/// (or any other instruction in general).
 pub type Instruction = Expr;
 
-struct DefCtx<'a> {
+pub struct InstructionBuildInfo<'a> {
+    pub op: &'a Operator<'a>,
+    pub types: &'a GlobalTypeInfo,
+    pub consts: &'a mut number::ConstantDefinitionBuilder,
+    pub end_labels: &'a [function::EndLabel<'a>],
+    pub else_labels: &'a [function::ElseLabel],
+}
+
+struct InstructionDefinitionContext<'a> {
     consts: &'a mut number::ConstantDefinitionBuilder,
 }
 
+type InstructionDefinitionFn = fn(&mut InstructionDefinitionContext) -> Expr;
+
 #[derive(Default)]
 pub struct InstructionDefinitionBuilder {
-    map: Map<String, fn(&mut DefCtx) -> Expr>,
+    map: Map<String, InstructionDefinitionFn>,
 }
 
 impl InstructionDefinitionBuilder {
@@ -25,7 +48,7 @@ impl InstructionDefinitionBuilder {
     }
 
     /// Adds an instruction definition with the given name and definition function.
-    fn add_def(&mut self, name: impl ToString, def: fn(&mut DefCtx) -> Expr) {
+    fn def(&mut self, name: impl ToString, def: InstructionDefinitionFn) {
         self.map.insert(name.to_string(), def);
     }
 
@@ -33,7 +56,7 @@ impl InstructionDefinitionBuilder {
         let mut b = DefinitionBuilder::new();
 
         // TODO use ArithDefBuilder here
-        let mut ctx = DefCtx { consts };
+        let mut ctx = InstructionDefinitionContext { consts };
 
         for (def_name, def) in self.map.into_iter() {
             b.def(def_name, def(&mut ctx));
@@ -42,31 +65,19 @@ impl InstructionDefinitionBuilder {
         b
     }
 
-    pub fn instruction(
-        &mut self,
-        op: &Operator,
-        info: &FunctionInfo,
-        consts: &mut number::ConstantDefinitionBuilder,
-        labels: &[function::LabelInfo],
-        else_labels: &[Expr],
-    ) -> Instruction {
+    pub fn instruction(&mut self, info: &mut InstructionBuildInfo) -> Instruction {
         use Operator::*;
 
-        match op {
+        match info.op {
             I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
-                self.push(consts.with_init_value(op))
+                self.push(info.consts.with_init_value(info.op))
             }
 
-            Call { function_index } => self.call(consts.id_const(*function_index as u16)),
+            Call { function_index } => self.call(info.consts.id_const(*function_index as u16)),
             CallIndirect { .. } => self.call_indirect(),
 
             End => {
-                if labels.len() == 1 {
-                    self.leave(info.function_type)
-                } else {
-                    // TODO
-                    todo!()
-                }
+                todo!()
             }
 
             // TODO
@@ -75,90 +86,75 @@ impl InstructionDefinitionBuilder {
     }
 
     pub fn output_and_return(&mut self) -> Instruction {
-        self.add_def("Output", |_| {
-            let write_a_to_output = instruction(|mut ctx| {
-                // TODO convert a to byte
-                io_command::output(number::reverse_bits(var("a")), {
-                    ctx.ret();
-                    ctx.build()
-                })
-            });
-
-            instruction(|mut ctx| {
-                ctx.pop("a");
-                ctx.set_next(apply(write_a_to_output, [unreachable()]));
-                ctx.build()
-            })
+        self.def("Output", |_| {
+            let mut b = InstructionBuilder::new();
+            b.pop("a");
+            // TODO convert a to byte
+            b.set_output(number::reverse_bits(var("a")));
+            b.ret();
+            b.build()
         });
 
         var("Output")
     }
 
     pub fn input_and_return(&mut self) -> Instruction {
-        self.add_def("Input", |def_ctx| {
-            apply(
-                instruction(|mut ctx| {
-                    io_command::input(abs(["inp"], {
-                        let input = select(
-                            optional::is_some(var("inp")),
-                            def_ctx.consts.i32_const(u32::MAX),
-                            // TODO convert input to i32
-                            optional::unwrap(var("inp")),
-                        );
-
-                        ctx.push(input);
-
-                        ctx.build()
-                    }))
-                }),
-                [unreachable()],
-            )
+        self.def("Input", |ctx| {
+            let mut b = InstructionBuilder::new();
+            b.set_input("inp");
+            b.push(select(
+                optional::is_some(var("inp")),
+                ctx.consts.i32_const(u32::MAX),
+                // TODO convert input to i32
+                optional::unwrap(var("inp")),
+            ));
+            b.ret();
+            b.build()
         });
 
         var("Input")
     }
 
     pub fn exit(&mut self) -> Instruction {
-        self.add_def("Exit", |_| instruction(|_| io_command::exit()));
+        self.def("Exit", |_| {
+            let mut b = InstructionBuilder::new();
+            b.set_exit();
+            b.build()
+        });
 
         var("Exit")
     }
 
     pub fn push(&mut self, item: Expr) -> Instruction {
-        self.add_def("Push", |_| {
-            abs(
-                ["item"],
-                instruction(|mut ctx| {
-                    ctx.push(var("item"));
-                    ctx.build()
-                }),
-            )
+        self.def("Push", |_| {
+            abs(["item"], {
+                let mut b = InstructionBuilder::new();
+                b.push(var("item"));
+                b.build()
+            })
         });
 
         apply(var("Push"), [item])
     }
 
     pub fn call(&mut self, function_id: number::Id) -> Instruction {
-        self.add_def("Call", |_| {
-            abs(
-                ["funcid"],
-                instruction(|mut ctx| {
-                    ctx.call(var("funcid"));
-                    ctx.build()
-                }),
-            )
+        self.def("Call", |_| {
+            abs(["funcid"], {
+                let mut b = InstructionBuilder::new();
+                b.call(var("funcid"));
+                b.build()
+            })
         });
 
         apply(var("Call"), [function_id])
     }
 
     pub fn call_indirect(&mut self) -> Instruction {
-        self.add_def("CallIndirect", |_| {
-            instruction(|mut ctx| {
-                ctx.pop("a");
-                ctx.call_indirect(var("a"));
-                ctx.build()
-            })
+        self.def("CallIndirect", |_| {
+            let mut b = InstructionBuilder::new();
+            b.pop("a");
+            b.call_indirect(var("a"));
+            b.build()
         });
 
         var("CallIndirect")
@@ -166,45 +162,43 @@ impl InstructionDefinitionBuilder {
 
     pub fn enter(
         &self,
-        func_type: &FuncType,
-        local_types: &[ValType],
+        func: &Func,
         consts: &mut number::ConstantDefinitionBuilder,
     ) -> Instruction {
-        instruction(|mut ctx| {
-            let param_count = func_type.params().len();
+        let mut b = InstructionBuilder::new();
 
-            // Parameters are pushed left-to-right, so we pop them right-to-left
-            for i in (0..param_count).rev() {
-                ctx.pop(format!("p{i:x}"));
-            }
+        let param_count = func.func_type.params().len();
 
-            let mut locals = Vec::new();
-            locals.extend((0..param_count).map(|i| var(format!("p{i:x}"))));
-            locals.extend(local_types.iter().map(|ty| consts.default_const(*ty)));
+        // Parameters are pushed left-to-right, so we pop them right-to-left
+        for i in (0..param_count).rev() {
+            b.pop(format!("p{i:x}"));
+        }
 
-            ctx.push_frame(locals);
+        let mut locals = Vec::new();
+        locals.extend((0..param_count).map(|i| var(format!("p{i:x}"))));
+        locals.extend(func.local_types.iter().map(|ty| consts.default_const(*ty)));
 
-            ctx.build()
-        })
+        b.push_frame(locals);
+
+        b.build()
     }
 
-    pub fn leave(&self, func_type: &FuncType) -> Instruction {
-        instruction(|mut ctx| {
-            let result_count = func_type.results().len();
+    pub fn leave(&self, func: &Func) -> Instruction {
+        let mut b = InstructionBuilder::new();
 
-            for i in (0..result_count).rev() {
-                ctx.pop(format!("r{i:x}"));
-            }
+        let result_count = func.func_type.results().len();
 
-            ctx.pop_frame();
+        for i in (0..result_count).rev() {
+            b.pop(format!("r{i:x}"));
+        }
 
-            for i in 0..result_count {
-                ctx.push(var(format!("r{i:x}")));
-            }
+        b.pop_frame();
 
-            ctx.ret();
+        for i in 0..result_count {
+            b.push(var(format!("r{i:x}")));
+        }
 
-            ctx.build()
-        })
+        b.ret();
+        b.build()
     }
 }
