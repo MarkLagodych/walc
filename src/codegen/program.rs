@@ -1,20 +1,39 @@
+mod function;
+
 use crate::{analyzer::*, codegen::*};
 
 #[derive(Default)]
 pub struct ProgramBuilder {
     consts: number::ConstantDefinitionBuilder,
-    instrs: instruction::InstructionDefinitionBuilder,
+    instrs: function::InstructionDefinitionBuilder,
+
+    functions: Vec<function::InstructionChain>,
 
     globals: Vec<number::Number>,
 
     data_segments: Vec<list::List>,
     data_memory_offsets: Vec<u32>,
 
-    functions: Vec<function::InstructionChain>,
     main_id: Option<FuncId>,
     start_id: Option<FuncId>,
 
-    custom_func_table: Vec<Option<u32>>,
+    custom_func_table: Vec<Option<FuncId>>,
+}
+
+fn data_segment(id: usize) -> list::List {
+    var(format!("Data{id:x}"))
+}
+
+fn function_table() -> table::Table {
+    var("FunctionTable")
+}
+
+fn custom_table() -> table::Table {
+    var("CustomTable")
+}
+
+fn globals() -> table::Table {
+    var("Globals")
 }
 
 impl ProgramBuilder {
@@ -23,26 +42,21 @@ impl ProgramBuilder {
     }
 
     pub fn build(mut self) -> Expr {
-        let mut expr = unreachable();
-
-        let instr = self.instrs.exit();
-        expr = apply(instr, [expr]);
-
-        // TODO active data segments
-
-        if let Some(start_id) = self.start_id {
-            // TODO start
-        }
-
-        // The analyzer must ensure that a main function exists
-        let main_id = self.main_id.unwrap();
-        let instr = self.instrs.call(self.consts.id_const(main_id as u16));
-        expr = apply(instr, [expr]);
-
-        let func_count = self.functions.len();
+        let entrypoint = function::entrypoint(
+            &function::EntrypointInfo {
+                // The analyzer must ensure that a main function exists
+                main_id: self.main_id.unwrap(),
+                start_id: self.start_id,
+                data_memory_offsets: &self.data_memory_offsets,
+            },
+            &mut self.consts,
+            &mut self.instrs,
+        );
 
         let instrs = self.instrs.build(&mut self.consts);
         let consts = self.consts.build();
+
+        let func_count = self.functions.len();
 
         let mut toplevel = DefinitionBuilder::prelude();
         toplevel.append(consts);
@@ -62,36 +76,19 @@ impl ProgramBuilder {
         );
 
         toplevel.def(
-            "IndirectTable",
-            table::from(
-                self.custom_func_table
-                    .into_iter()
-                    .map(|opt_id| match opt_id {
-                        Some(id) => var(format!("Func{id:x}")),
-                        None => unreachable(),
-                    }),
-            ),
+            "CustomTable",
+            table::from(self.custom_func_table.into_iter().map(|opt_id| {
+                if let Some(id) = opt_id {
+                    var(format!("Func{id:x}"))
+                } else {
+                    unreachable()
+                }
+            })),
         );
 
         toplevel.def("Globals", table::from(self.globals));
 
-        toplevel.def("Memory", memory::new());
-
-        expr = apply(
-            expr,
-            [
-                pair::new(var("FunctionTable"), var("IndirectTable")),
-                var("Memory"),
-                var("Globals"),
-                // TODO replace this with proper initializers, preferably with some instruction
-                // move this to a "run" function
-                stack::empty(),
-                stack::empty(),
-                stack::empty(),
-            ],
-        );
-
-        toplevel.build(expr)
+        toplevel.build(entrypoint)
     }
 
     pub fn handle_main(&mut self, id: FuncId) {
@@ -110,32 +107,23 @@ impl ProgramBuilder {
     }
 
     pub fn handle_import(&mut self, name: &str) {
-        match name {
-            "input" => {
-                self.functions
-                    .push(function::input_function(&mut self.instrs));
-            }
-            "output" => {
-                self.functions
-                    .push(function::output_function(&mut self.instrs));
-            }
-            "exit" => {
-                self.functions
-                    .push(function::exit_function(&mut self.instrs));
-            }
-            _ => {}
-        }
+        let func = match name {
+            "input" => function::handle_input_function(&mut self.instrs),
+            "output" => function::handle_output_function(&mut self.instrs),
+            "exit" => function::handle_exit_function(&mut self.instrs),
+            _ => unreachable!(),
+        };
+
+        self.functions.push(func);
     }
 
     pub fn handle_function(&mut self, func: &Func, types: &GlobalTypeInfo) {
-        let build_info = function::FunctionBuildInfo {
+        self.functions.push(function::handle_function(
             func,
             types,
-            consts: &mut self.consts,
-            instrs: &mut self.instrs,
-        };
-
-        self.functions.push(function::function(build_info));
+            &mut self.consts,
+            &mut self.instrs,
+        ));
     }
 
     pub fn handle_global(&mut self, init: Operator) {

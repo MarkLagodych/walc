@@ -6,6 +6,8 @@ use arith::*;
 
 use crate::{analyzer::*, codegen::*};
 
+use super::labels::*;
+
 use std::collections::BTreeMap as Map;
 
 /// An instruction is a function of `(N, F, M, G, L, S, T) -> IoCommand` where:
@@ -23,12 +25,25 @@ use std::collections::BTreeMap as Map;
 /// (or any other instruction in general).
 pub type Instruction = Expr;
 
+pub fn start(entrypoint: Instruction) -> io_command::IoCommand {
+    apply(
+        entrypoint,
+        [
+            pair::new(program::function_table(), program::custom_table()),
+            memory::new(),
+            program::globals(),
+            locals::new(),
+            data_stack::empty(),
+            stack::empty(),
+        ],
+    )
+}
+
 pub struct InstructionBuildInfo<'a> {
     pub op: &'a Operator<'a>,
     pub types: &'a GlobalTypeInfo,
     pub consts: &'a mut number::ConstantDefinitionBuilder,
-    pub end_labels: &'a [function::EndLabel<'a>],
-    pub else_labels: &'a [function::ElseLabel],
+    pub labels: LabelInfo<'a>,
 }
 
 struct InstructionDefinitionContext<'a> {

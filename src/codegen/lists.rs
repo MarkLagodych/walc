@@ -102,3 +102,39 @@ pub mod stack {
         unsafe_list::get_tail(stack)
     }
 }
+
+pub mod data_stack {
+    use super::*;
+
+    /// Stack of stacks.
+    /// Every substack represents a call *or* a block frame.
+    pub type DataStack = stack::Stack;
+
+    pub fn empty() -> DataStack {
+        stack::empty()
+    }
+
+    pub fn push_frame(stack: DataStack) -> DataStack {
+        stack::push(stack, stack::empty())
+    }
+
+    pub fn pop_frame(stack: DataStack) -> DataStack {
+        stack::pop(stack)
+    }
+
+    pub fn push(stack: DataStack, item: Expr) -> DataStack {
+        let top_stack = stack::top(stack.clone());
+        let new_top = stack::push(top_stack, item);
+        stack::push(stack::pop(stack), new_top)
+    }
+
+    pub fn top(stack: DataStack) -> Expr {
+        stack::top(stack::top(stack))
+    }
+
+    pub fn pop(stack: DataStack) -> DataStack {
+        let top_stack = stack::top(stack.clone());
+        let new_top = stack::pop(top_stack);
+        stack::push(stack::pop(stack), new_top)
+    }
+}

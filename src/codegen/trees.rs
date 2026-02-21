@@ -176,3 +176,33 @@ pub mod table {
         tree::insert(table, address, value)
     }
 }
+
+pub mod locals {
+    use super::*;
+
+    /// Stack of tables.
+    /// Every table represents a call frame and contains locals of the corresponding function.
+    pub type Locals = stack::Stack;
+
+    pub fn new() -> Locals {
+        stack::empty()
+    }
+
+    pub fn push_frame(locals: Locals, items: table::Table) -> Locals {
+        stack::push(locals, items)
+    }
+
+    pub fn pop_frame(locals: Locals) -> Locals {
+        stack::pop(locals)
+    }
+
+    pub fn index(locals: Locals, local_id: number::Id) -> Expr {
+        table::index(stack::top(locals), local_id)
+    }
+
+    pub fn insert(locals: Locals, local_id: number::Id, value: Expr) -> Locals {
+        let top_table = stack::top(locals.clone());
+        let new_top = table::insert(top_table, local_id, value);
+        stack::push(stack::pop(locals), new_top)
+    }
+}

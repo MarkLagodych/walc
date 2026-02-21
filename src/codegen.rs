@@ -1,7 +1,5 @@
 //! WALC code generator
 
-pub mod function;
-pub mod instruction;
 pub mod number;
 pub mod program;
 

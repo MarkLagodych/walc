@@ -1,6 +1,6 @@
 use crate::codegen::*;
 
-use instruction::Instruction;
+use super::Instruction;
 
 enum IoOptions {
     Output(number::Byte),
@@ -220,71 +220,5 @@ impl InstructionBuilder {
     pub fn pop_frame(&mut self) {
         self.set_locals(locals::pop_frame(self.locals()));
         self.set_stack(data_stack::pop_frame(self.stack()));
-    }
-}
-
-pub mod locals {
-    use super::*;
-
-    /// Stack of tables.
-    /// Every table represents a call frame and contains locals of the corresponding function.
-    pub type Locals = stack::Stack;
-
-    pub fn new() -> Locals {
-        stack::empty()
-    }
-
-    pub fn push_frame(locals: Locals, items: table::Table) -> Locals {
-        stack::push(locals, items)
-    }
-
-    pub fn pop_frame(locals: Locals) -> Locals {
-        stack::pop(locals)
-    }
-
-    pub fn index(locals: Locals, local_id: number::Id) -> Expr {
-        table::index(stack::top(locals), local_id)
-    }
-
-    pub fn insert(locals: Locals, local_id: number::Id, value: Expr) -> Locals {
-        let top_table = stack::top(locals.clone());
-        let new_top = table::insert(top_table, local_id, value);
-        stack::push(stack::pop(locals), new_top)
-    }
-}
-
-pub mod data_stack {
-    use super::*;
-
-    /// Stack of stacks.
-    /// Every substack represents a call *or* a block frame.
-    pub type DataStack = stack::Stack;
-
-    pub fn empty() -> DataStack {
-        stack::empty()
-    }
-
-    pub fn push_frame(stack: DataStack) -> DataStack {
-        stack::push(stack, stack::empty())
-    }
-
-    pub fn pop_frame(stack: DataStack) -> DataStack {
-        stack::pop(stack)
-    }
-
-    pub fn push(stack: DataStack, item: Expr) -> DataStack {
-        let top_stack = stack::top(stack.clone());
-        let new_top = stack::push(top_stack, item);
-        stack::push(stack::pop(stack), new_top)
-    }
-
-    pub fn top(stack: DataStack) -> Expr {
-        stack::top(stack::top(stack))
-    }
-
-    pub fn pop(stack: DataStack) -> DataStack {
-        let top_stack = stack::top(stack.clone());
-        let new_top = stack::pop(top_stack);
-        stack::push(stack::pop(stack), new_top)
     }
 }

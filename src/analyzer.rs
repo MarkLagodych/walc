@@ -34,7 +34,6 @@ pub struct Func<'a> {
     pub operators: &'a [Operator<'a>],
 }
 
-#[derive(Default)]
 pub struct Analyzer {
     program: codegen::program::ProgramBuilder,
     types: GlobalTypeInfo,
@@ -53,7 +52,11 @@ impl Analyzer {
     const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1;
 
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            program: codegen::program::ProgramBuilder::new(),
+            types: GlobalTypeInfo::default(),
+            next_function_id: 0,
+        }
     }
 
     pub fn compile(mut self, source: &[u8]) -> Result<codegen::Expr> {
