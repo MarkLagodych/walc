@@ -125,13 +125,24 @@ impl InstructionBuilder {
         pair::get_second(self.function_tables())
     }
 
-    pub fn push(&mut self, item: Expr) {
-        self.set_stack(data_stack::push(self.stack(), item));
+    pub fn push(&mut self, items: impl IntoIterator<Item = Expr>) {
+        // Items are always pushed left-to-right in WASM
+        for item in items {
+            self.set_stack(data_stack::push(self.stack(), item));
+        }
     }
 
-    pub fn pop(&mut self, dest_var: impl ToString) {
-        self.def(dest_var, data_stack::top(self.stack()));
-        self.drop();
+    pub fn pop<ToStr, DestVars>(&mut self, dest_vars: DestVars)
+    where
+        ToStr: ToString,
+        DestVars: IntoIterator<Item = ToStr>,
+        DestVars::IntoIter: DoubleEndedIterator<Item = ToStr>,
+    {
+        // Pop right-to-left
+        for dest_var in dest_vars.into_iter().rev() {
+            self.def(dest_var.to_string(), data_stack::top(self.stack()));
+            self.drop();
+        }
     }
 
     pub fn drop(&mut self) {
@@ -201,7 +212,7 @@ impl InstructionBuilder {
         self.set_next(var("_ret"));
     }
 
-    pub fn push_frame(&mut self, locals: impl IntoIterator<Item = Expr>) {
+    pub fn push_frame(&mut self, locals: table::Table) {
         self.set_locals(locals::push_frame(self.locals(), locals));
         self.set_stack(data_stack::push_frame(self.stack()));
     }
@@ -223,8 +234,8 @@ pub mod locals {
         stack::empty()
     }
 
-    pub fn push_frame(locals: Locals, items: impl IntoIterator<Item = Expr>) -> Locals {
-        stack::push(locals, table::from(items))
+    pub fn push_frame(locals: Locals, items: table::Table) -> Locals {
+        stack::push(locals, items)
     }
 
     pub fn pop_frame(locals: Locals) -> Locals {

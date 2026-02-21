@@ -51,8 +51,8 @@ pub mod list {
         result
     }
 
-    pub fn from_bytes(store: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> List {
-        from(bytes.iter().map(|b| store.byte_const(*b)))
+    pub fn from_bytes(consts: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> List {
+        from(bytes.iter().map(|b| consts.byte_const(*b)))
     }
 
     pub fn is_not_empty(list: List) -> Expr {

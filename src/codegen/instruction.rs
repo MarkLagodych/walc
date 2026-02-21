@@ -88,7 +88,7 @@ impl InstructionDefinitionBuilder {
     pub fn output_and_return(&mut self) -> Instruction {
         self.def("Output", |_| {
             let mut b = InstructionBuilder::new();
-            b.pop("a");
+            b.pop(["a"]);
             // TODO convert a to byte
             b.set_output(number::reverse_bits(var("a")));
             b.ret();
@@ -102,12 +102,12 @@ impl InstructionDefinitionBuilder {
         self.def("Input", |ctx| {
             let mut b = InstructionBuilder::new();
             b.set_input("inp");
-            b.push(select(
+            b.push([select(
                 optional::is_some(var("inp")),
                 ctx.consts.i32_const(u32::MAX),
                 // TODO convert input to i32
                 optional::unwrap(var("inp")),
-            ));
+            )]);
             b.ret();
             b.build()
         });
@@ -129,7 +129,7 @@ impl InstructionDefinitionBuilder {
         self.def("Push", |_| {
             abs(["item"], {
                 let mut b = InstructionBuilder::new();
-                b.push(var("item"));
+                b.push([var("item")]);
                 b.build()
             })
         });
@@ -152,7 +152,7 @@ impl InstructionDefinitionBuilder {
     pub fn call_indirect(&mut self) -> Instruction {
         self.def("CallIndirect", |_| {
             let mut b = InstructionBuilder::new();
-            b.pop("a");
+            b.pop(["a"]);
             b.call_indirect(var("a"));
             b.build()
         });
@@ -169,16 +169,13 @@ impl InstructionDefinitionBuilder {
 
         let param_count = func.func_type.params().len();
 
-        // Parameters are pushed left-to-right, so we pop them right-to-left
-        for i in (0..param_count).rev() {
-            b.pop(format!("p{i:x}"));
-        }
+        b.pop((0..param_count).map(|i| format!("p{i:x}")));
 
         let mut locals = Vec::new();
         locals.extend((0..param_count).map(|i| var(format!("p{i:x}"))));
         locals.extend(func.local_types.iter().map(|ty| consts.default_const(*ty)));
 
-        b.push_frame(locals);
+        b.push_frame(table::from(locals));
 
         b.build()
     }
@@ -188,15 +185,11 @@ impl InstructionDefinitionBuilder {
 
         let result_count = func.func_type.results().len();
 
-        for i in (0..result_count).rev() {
-            b.pop(format!("r{i:x}"));
-        }
+        b.pop((0..result_count).map(|i| format!("r{i:x}")));
 
         b.pop_frame();
 
-        for i in 0..result_count {
-            b.push(var(format!("r{i:x}")));
-        }
+        b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
 
         b.ret();
         b.build()
