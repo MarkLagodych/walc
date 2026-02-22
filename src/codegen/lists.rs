@@ -13,14 +13,6 @@ pub mod unsafe_list {
         pair::new(head, tail)
     }
 
-    pub fn from(items: impl DoubleEndedIterator<Item = Expr>) -> UnsafeList {
-        let mut result = empty();
-        for item in items.rev() {
-            result = node(item, result);
-        }
-        result
-    }
-
     pub fn get_head(list: UnsafeList) -> Expr {
         pair::get_first(list)
     }

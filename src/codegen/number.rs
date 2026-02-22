@@ -23,6 +23,7 @@ pub type I64 = Expr;
 pub type Number = Expr;
 
 impl ConstantDefinitionBuilder {
+    #[allow(unused)]
     pub fn new() -> Self {
         Self::default()
     }

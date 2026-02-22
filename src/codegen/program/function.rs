@@ -57,15 +57,20 @@ pub fn handle_function(
 
     let mut ops = func.operators.iter().rev();
 
-    let function_end = ops.next().unwrap();
-
     let mut chain = unreachable();
 
-    let instr = instrs.leave(func);
+    let instr = instrs.ret();
+    chain = apply(instr, [chain]);
+
+    let function_end = ops.next().unwrap();
+
+    let instr = instrs.leave(func.func_type);
     chain = apply(instr, [chain]);
     chain = label_builder.insert_label_if_needed(chain, function_end);
 
     for op in ops {
+        label_builder.update_label_info(op);
+
         let instr = instrs.instruction(&mut instruction::InstructionBuildInfo {
             op,
             types,

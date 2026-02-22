@@ -46,16 +46,16 @@ pub struct InstructionBuildInfo<'a> {
     pub labels: LabelInfo<'a>,
 }
 
+#[derive(Default)]
+pub struct InstructionDefinitionBuilder {
+    map: Map<String, InstructionDefinitionFn>,
+}
+
 struct InstructionDefinitionContext<'a> {
     consts: &'a mut number::ConstantDefinitionBuilder,
 }
 
 type InstructionDefinitionFn = fn(&mut InstructionDefinitionContext) -> Expr;
-
-#[derive(Default)]
-pub struct InstructionDefinitionBuilder {
-    map: Map<String, InstructionDefinitionFn>,
-}
 
 impl InstructionDefinitionBuilder {
     pub fn new() -> Self {
@@ -91,9 +91,7 @@ impl InstructionDefinitionBuilder {
             Call { function_index } => self.call(info.consts.id_const(*function_index as u16)),
             CallIndirect { .. } => self.call_indirect(),
 
-            End => {
-                todo!()
-            }
+            End => self.end(info.types, &info.labels),
 
             // TODO
             _ => todo!(),
@@ -195,10 +193,10 @@ impl InstructionDefinitionBuilder {
         b.build()
     }
 
-    pub fn leave(&self, func: &Func) -> Instruction {
+    pub fn leave(&self, func_type: &FuncType) -> Instruction {
         let mut b = InstructionBuilder::new();
 
-        let result_count = func.func_type.results().len();
+        let result_count = func_type.results().len();
 
         b.pop((0..result_count).map(|i| format!("r{i:x}")));
 
@@ -206,7 +204,38 @@ impl InstructionDefinitionBuilder {
 
         b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
 
-        b.ret();
         b.build()
+    }
+
+    pub fn leave_block(&self, block_type: &BlockType, types: &GlobalTypeInfo) -> Instruction {
+        let block_func_type = match block_type {
+            BlockType::Empty => &FuncType::new([], []),
+            BlockType::Type(type_id) => &FuncType::new([], [*type_id]),
+            BlockType::FuncType(func_type) => types.get_type(*func_type),
+        };
+
+        self.leave(block_func_type)
+    }
+
+    pub fn ret(&mut self) -> Instruction {
+        self.def("Ret", |_| {
+            let mut b = InstructionBuilder::new();
+            b.ret();
+            b.build()
+        });
+
+        var("Ret")
+    }
+
+    pub fn end(&mut self, types: &GlobalTypeInfo, labels: &LabelInfo) -> Instruction {
+        let block = labels.blocks.last().unwrap();
+        match block {
+            Operator::Loop { blockty } | Operator::If { blockty } | Operator::Block { blockty } => {
+                // TODO pop trace for loop
+                self.leave_block(blockty, types)
+            }
+
+            _ => unreachable!(),
+        }
     }
 }

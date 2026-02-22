@@ -77,7 +77,7 @@ impl InstructionBuilder {
         var("M")
     }
 
-    pub fn set_memory(&mut self, memory: Expr) {
+    pub fn set_memory(&mut self, memory: memory::Memory) {
         self.def("M", memory);
     }
 
@@ -85,7 +85,7 @@ impl InstructionBuilder {
         var("G")
     }
 
-    pub fn set_globals(&mut self, globals: Expr) {
+    pub fn set_globals(&mut self, globals: table::Table) {
         self.def("G", globals);
     }
 
@@ -93,7 +93,7 @@ impl InstructionBuilder {
         var("L")
     }
 
-    pub fn set_locals(&mut self, locals: Expr) {
+    pub fn set_locals(&mut self, locals: locals::Locals) {
         self.def("L", locals);
     }
 
@@ -101,7 +101,7 @@ impl InstructionBuilder {
         var("S")
     }
 
-    pub fn set_stack(&mut self, stack: Expr) {
+    pub fn set_stack(&mut self, stack: data_stack::DataStack) {
         self.def("S", stack);
     }
 
@@ -109,7 +109,7 @@ impl InstructionBuilder {
         var("T")
     }
 
-    pub fn set_trace(&mut self, trace: Expr) {
+    pub fn set_trace(&mut self, trace: stack::Stack) {
         self.def("T", trace);
     }
 

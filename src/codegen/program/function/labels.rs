@@ -8,35 +8,30 @@ pub struct LabelDefinitionBuilder<'a> {
     defs: DefinitionBuilder,
 
     /// Stack of `end` labels (for `loop`, `if`, `block`).
-    end_labels: Vec<EndLabel<'a>>,
+    end_labels: Vec<InstructionChain>,
 
     /// Stack of `else` labels (only for `if` blocks).
-    else_labels: Vec<ElseLabel>,
+    else_labels: Vec<Option<InstructionChain>>,
 
-    /// Stack of operators that start blocks.
+    /// Stack of operators that start blocks corresponding to `end` operators.
     /// When reading `End` operators, pop the corresponding block start from this stack
-    block_start_ops: Vec<Option<&'a Operator<'a>>>,
+    block_start_ops: Vec<&'a Operator<'a>>,
+
+    /// Stack of block starting operators that tracks the current block nesting structure.
+    blocks: Vec<&'a Operator<'a>>,
 
     next_label_id: u32,
 }
 
 pub struct LabelInfo<'a> {
-    pub end_labels: &'a [EndLabel<'a>],
-    pub else_labels: &'a [ElseLabel],
-}
+    /// Stack of block opening operators (`loop`, `if`, `block`).
+    pub blocks: &'a [&'a Operator<'a>],
 
-pub struct EndLabel<'a> {
-    /// The subchain that the label points to.
-    subchain: InstructionChain,
+    /// Stack of `end` labels (for `loop`, `if`, `block`).
+    pub end_labels: &'a [InstructionChain],
 
-    // If None, this label is the function body's end label.
-    // Otherwise, this is the block opening operator corresponding to this label.
-    block_start_op: Option<&'a Operator<'a>>,
-}
-
-pub struct ElseLabel {
-    /// The subchain that the label points to.
-    subchain: InstructionChain,
+    /// `else` label corresponding to the current `if` block, if any.
+    pub else_label: Option<InstructionChain>,
 }
 
 impl<'a> LabelDefinitionBuilder<'a> {
@@ -51,15 +46,15 @@ impl<'a> LabelDefinitionBuilder<'a> {
     }
 
     fn read_block_start_ops(&mut self, ops: &'a [Operator<'a>]) {
-        let mut stack = Vec::new();
+        let mut blocks = Vec::new();
 
         for op in ops.iter() {
             match op {
                 Operator::Loop { .. } | Operator::Block { .. } | Operator::If { .. } => {
-                    stack.push(op);
+                    blocks.push(op);
                 }
                 Operator::End => {
-                    self.block_start_ops.push(stack.pop());
+                    self.block_start_ops.push(blocks.pop().unwrap());
                 }
                 _ => {}
             }
@@ -75,23 +70,16 @@ impl<'a> LabelDefinitionBuilder<'a> {
         var(label_name)
     }
 
-    fn push_end_label(&mut self, chain: InstructionChain) {
-        self.end_labels.push(EndLabel {
-            subchain: chain,
-            block_start_op: self.block_start_ops.pop().unwrap(),
-        });
-    }
-
-    fn pop_end_label(&mut self) -> EndLabel<'a> {
-        self.end_labels.pop().unwrap()
-    }
-
-    fn push_else_label(&mut self, chain: InstructionChain) {
-        self.else_labels.push(ElseLabel { subchain: chain });
-    }
-
-    fn pop_else_label(&mut self) -> ElseLabel {
-        self.else_labels.pop().unwrap()
+    pub fn update_label_info(&mut self, op: &Operator) {
+        match op {
+            Operator::Loop { .. } | Operator::Block { .. } | Operator::If { .. } => {
+                self.blocks.pop();
+            }
+            Operator::End => {
+                self.blocks.push(self.block_start_ops.pop().unwrap());
+            }
+            _ => {}
+        }
     }
 
     pub fn insert_label_if_needed(
@@ -103,25 +91,26 @@ impl<'a> LabelDefinitionBuilder<'a> {
             Operator::Loop { .. } | Operator::Block { .. } | Operator::If { .. } => {
                 chain = self.insert_label(chain);
 
-                self.pop_end_label();
+                self.end_labels.pop();
 
-                if matches!(op, Operator::If { .. }) {
-                    self.pop_else_label();
-                }
+                self.else_labels.pop();
 
                 chain
             }
             Operator::Else { .. } => {
                 chain = self.insert_label(chain);
 
-                self.push_else_label(chain.clone());
+                self.else_labels.pop();
+                self.else_labels.push(Some(chain.clone()));
 
                 chain
             }
             Operator::End => {
                 chain = self.insert_label(chain);
 
-                self.push_end_label(chain.clone());
+                self.end_labels.push(chain.clone());
+
+                self.else_labels.push(None);
 
                 chain
             }
@@ -131,8 +120,9 @@ impl<'a> LabelDefinitionBuilder<'a> {
 
     pub fn get_label_info(&self) -> LabelInfo<'_> {
         LabelInfo {
+            blocks: &self.blocks,
             end_labels: &self.end_labels,
-            else_labels: &self.else_labels,
+            else_label: self.else_labels.last().cloned().unwrap_or_default(),
         }
     }
 }
