@@ -2,13 +2,14 @@
     (import "walc" "output" (func $output (param i32)))
     (export "main" (func $main))
     (func $main
-        (i32.const 97) ;; 'a'
+        (i32.const 0x61) ;; 'a'
         (call $f)
         (call $output)
     )
-    (func $f (param i32) (result i32) (local i32)
-        local.get 0
-        local.set 1
-        local.get 1
+    (func $f (param $p i32) (result i32) (local $x i32)
+        local.get $p
+        local.set $x
+        local.get $x
+        return
     )
 )

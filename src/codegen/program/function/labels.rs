@@ -54,7 +54,9 @@ impl<'a> LabelDefinitionBuilder<'a> {
                     blocks.push(op);
                 }
                 Operator::End => {
-                    self.block_start_ops.push(blocks.pop().unwrap());
+                    if let Some(block) = blocks.pop() {
+                        self.block_start_ops.push(block);
+                    }
                 }
                 _ => {}
             }

@@ -49,10 +49,12 @@ pub struct InstructionBuildInfo<'a> {
 #[derive(Default)]
 pub struct InstructionDefinitionBuilder {
     map: Map<String, InstructionDefinitionFn>,
+    arith: ArithDefinitionBuilder,
 }
 
 struct InstructionDefinitionContext<'a> {
     consts: &'a mut number::ConstantDefinitionBuilder,
+    arith: &'a mut ArithDefinitionBuilder,
 }
 
 type InstructionDefinitionFn = fn(&mut InstructionDefinitionContext) -> Expr;
@@ -67,16 +69,20 @@ impl InstructionDefinitionBuilder {
         self.map.insert(name.to_string(), def);
     }
 
-    pub fn build(self, consts: &mut number::ConstantDefinitionBuilder) -> DefinitionBuilder {
-        let mut b = DefinitionBuilder::new();
+    pub fn build(mut self, consts: &mut number::ConstantDefinitionBuilder) -> DefinitionBuilder {
+        let mut instr_defs = DefinitionBuilder::new();
 
-        // TODO use ArithDefBuilder here
-        let mut ctx = InstructionDefinitionContext { consts };
+        let mut ctx = InstructionDefinitionContext {
+            consts,
+            arith: &mut self.arith,
+        };
 
         for (def_name, def) in self.map.into_iter() {
-            b.def(def_name, def(&mut ctx));
+            instr_defs.def(def_name, def(&mut ctx));
         }
 
+        let mut b = self.arith.build(consts);
+        b.append(instr_defs);
         b
     }
 
@@ -91,11 +97,38 @@ impl InstructionDefinitionBuilder {
             Call { function_index } => self.call(info.consts.id_const(*function_index as u16)),
             CallIndirect { .. } => self.call_indirect(),
 
-            End => self.end(info.types, &info.labels),
+            Loop { .. } | If { .. } | Block { .. } => {
+                self.enter_block(info.op, info.types, &info.labels)
+            }
+
+            End => self.leave_block(info.types, &info.labels),
+
+            LocalGet { local_index } => self.local_get(info.consts.id_const(*local_index as u16)),
+            LocalSet { local_index } => self.local_set(info.consts.id_const(*local_index as u16)),
+            GlobalGet { global_index } => {
+                self.global_get(info.consts.id_const(*global_index as u16))
+            }
+            GlobalSet { global_index } => {
+                self.global_set(info.consts.id_const(*global_index as u16))
+            }
+
+            Return => {
+                // TODO jump to the end
+                self.nop()
+            }
 
             // TODO
             _ => todo!(),
         }
+    }
+
+    fn nop(&mut self) -> Instruction {
+        self.def("Nop", |_| {
+            let b = InstructionBuilder::new();
+            b.build()
+        });
+
+        var("Nop")
     }
 
     pub fn output_and_return(&mut self) -> Instruction {
@@ -188,7 +221,8 @@ impl InstructionDefinitionBuilder {
         locals.extend((0..param_count).map(|i| var(format!("p{i:x}"))));
         locals.extend(func.local_types.iter().map(|ty| consts.default_const(*ty)));
 
-        b.push_frame(table::from(locals));
+        b.push_locals_frame(table::from(locals));
+        b.push_stack_frame();
 
         b.build()
     }
@@ -200,42 +234,145 @@ impl InstructionDefinitionBuilder {
 
         b.pop((0..result_count).map(|i| format!("r{i:x}")));
 
-        b.pop_frame();
+        b.pop_locals_frame();
+        b.pop_stack_frame();
 
         b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
+
+        b.ret();
 
         b.build()
     }
 
-    pub fn leave_block(&self, block_type: &BlockType, types: &GlobalTypeInfo) -> Instruction {
-        let block_func_type = match block_type {
-            BlockType::Empty => &FuncType::new([], []),
-            BlockType::Type(type_id) => &FuncType::new([], [*type_id]),
-            BlockType::FuncType(func_type) => types.get_type(*func_type),
+    fn enter_block(
+        &mut self,
+        block: &Operator,
+        types: &GlobalTypeInfo,
+        labels: &LabelInfo,
+    ) -> Instruction {
+        let func_type = match block {
+            Operator::Loop { blockty } | Operator::If { blockty } | Operator::Block { blockty } => {
+                match blockty {
+                    BlockType::Empty => &FuncType::new([], []),
+                    BlockType::Type(type_id) => &FuncType::new([], [*type_id]),
+                    BlockType::FuncType(func_type) => types.get_type(*func_type),
+                }
+            }
+            _ => unreachable!(),
         };
 
-        self.leave(block_func_type)
+        let param_count = func_type.params().len();
+
+        let mut b = InstructionBuilder::new();
+
+        match block {
+            Operator::Loop { .. } => {
+                b.push_trace(b.next());
+            }
+            Operator::If { .. } => {
+                let branch0 = match &labels.else_label {
+                    Some(label) => label.clone(),
+                    None => labels.end_labels.last().unwrap().clone(),
+                };
+
+                b.pop(["cond"]);
+
+                b.set_next(select(self.arith.neqz(var("cond")), branch0, b.next()));
+            }
+            _ => {}
+        }
+
+        b.pop((0..param_count).map(|i| format!("p{i:x}")));
+
+        b.push_stack_frame();
+
+        b.push((0..param_count).map(|i| var(format!("p{i:x}"))));
+
+        b.build()
     }
 
-    pub fn ret(&mut self) -> Instruction {
-        self.def("Ret", |_| {
-            let mut b = InstructionBuilder::new();
-            b.ret();
-            b.build()
+    fn leave_block(&self, types: &GlobalTypeInfo, labels: &LabelInfo) -> Instruction {
+        let block = labels.blocks.last().unwrap();
+
+        let func_type = match block {
+            Operator::Loop { blockty } | Operator::If { blockty } | Operator::Block { blockty } => {
+                match blockty {
+                    BlockType::Empty => &FuncType::new([], []),
+                    BlockType::Type(type_id) => &FuncType::new([], [*type_id]),
+                    BlockType::FuncType(func_type) => types.get_type(*func_type),
+                }
+            }
+            _ => unreachable!(),
+        };
+
+        let result_count = func_type.results().len();
+
+        let mut b = InstructionBuilder::new();
+
+        b.pop((0..result_count).map(|i| format!("r{i:x}")));
+
+        b.pop_stack_frame();
+
+        b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
+
+        if let Operator::Loop { .. } = block {
+            b.drop_trace();
+        }
+
+        b.build()
+    }
+
+    fn local_get(&mut self, local_index: number::Id) -> Instruction {
+        self.def("LGet", |_| {
+            abs(["id"], {
+                let mut b = InstructionBuilder::new();
+                b.get_local("a", var("id"));
+                b.push([var("a")]);
+                b.build()
+            })
         });
 
-        var("Ret")
+        apply(var("LGet"), [local_index])
     }
 
-    pub fn end(&mut self, types: &GlobalTypeInfo, labels: &LabelInfo) -> Instruction {
-        let block = labels.blocks.last().unwrap();
-        match block {
-            Operator::Loop { blockty } | Operator::If { blockty } | Operator::Block { blockty } => {
-                // TODO pop trace for loop
-                self.leave_block(blockty, types)
-            }
+    fn local_set(&mut self, local_index: number::Id) -> Instruction {
+        self.def("LSet", |_| {
+            abs(["id"], {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a"]);
+                b.set_local(var("id"), var("a"));
+                b.build()
+            })
+        });
 
-            _ => unreachable!(),
-        }
+        apply(var("LSet"), [local_index])
+    }
+
+    // TODO local.tee
+
+    fn global_get(&mut self, global_index: number::Id) -> Instruction {
+        self.def("GGet", |_| {
+            abs(["id"], {
+                let mut b = InstructionBuilder::new();
+                b.get_global("a", var("id"));
+                b.push([var("a")]);
+                b.build()
+            })
+        });
+
+        apply(var("GGet"), [global_index])
+    }
+
+    fn global_set(&mut self, global_index: number::Id) -> Instruction {
+        self.def("GSet", |_| {
+            abs(["id"], {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a"]);
+                b.set_global(var("id"), var("a"));
+                b.build()
+            })
+        });
+
+        apply(var("GSet"), [global_index])
     }
 }

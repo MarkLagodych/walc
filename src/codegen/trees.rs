@@ -114,7 +114,7 @@ pub mod tree {
 
                 select(
                     list::is_not_empty(var("index")),
-                    var("tree"),
+                    var("value"),
                     select(
                         index_bit,
                         tree::node(insert(left.clone()), right.clone()),

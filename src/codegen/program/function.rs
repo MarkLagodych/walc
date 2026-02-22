@@ -59,9 +59,6 @@ pub fn handle_function(
 
     let mut chain = unreachable();
 
-    let instr = instrs.ret();
-    chain = apply(instr, [chain]);
-
     let function_end = ops.next().unwrap();
 
     let instr = instrs.leave(func.func_type);

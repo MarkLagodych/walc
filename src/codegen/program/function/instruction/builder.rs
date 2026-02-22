@@ -162,6 +162,10 @@ impl InstructionBuilder {
         self.set_trace(stack::pop(self.trace()));
     }
 
+    pub fn drop_trace(&mut self) {
+        self.set_trace(stack::pop(self.trace()));
+    }
+
     pub fn get_global(&mut self, dest_var: impl ToString, global_id: number::Id) {
         self.def(dest_var, table::index(self.globals(), global_id));
     }
@@ -212,13 +216,21 @@ impl InstructionBuilder {
         self.set_next(var("_ret"));
     }
 
-    pub fn push_frame(&mut self, locals: table::Table) {
+    pub fn push_locals_frame(&mut self, locals: table::Table) {
         self.set_locals(locals::push_frame(self.locals(), locals));
         self.set_stack(data_stack::push_frame(self.stack()));
     }
 
-    pub fn pop_frame(&mut self) {
+    pub fn pop_locals_frame(&mut self) {
         self.set_locals(locals::pop_frame(self.locals()));
+        self.set_stack(data_stack::pop_frame(self.stack()));
+    }
+
+    pub fn push_stack_frame(&mut self) {
+        self.set_stack(data_stack::push_frame(self.stack()));
+    }
+
+    pub fn pop_stack_frame(&mut self) {
         self.set_stack(data_stack::pop_frame(self.stack()));
     }
 }
