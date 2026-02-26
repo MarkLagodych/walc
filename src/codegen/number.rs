@@ -6,9 +6,9 @@ use crate::analyzer::{Operator, ValType};
 use std::collections::BTreeSet as Set;
 
 /// This struct accumulates all numeric constants throughout the WASM module in order to
-/// reduce the resulting code size.
+/// define each only once and thus reduce the resulting code size.
 #[derive(Default)]
-pub struct ConstantDefinitionBuilder {
+pub struct NumberGenerator {
     bytes: Set<u8>,
     ids: Set<u16>,
     i32s: Set<u32>,
@@ -22,15 +22,13 @@ pub type I64 = Expr;
 /// Any of: Id, I32, I64
 pub type Number = Expr;
 
-impl ConstantDefinitionBuilder {
+impl NumberGenerator {
     #[allow(unused)]
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn build(self) -> DefinitionBuilder {
-        let mut b = DefinitionBuilder::new();
-
+    pub fn generate(self, b: &mut LetExprBuilder) {
         for &n in &self.bytes {
             if n == 0 {
                 continue; // "0b" is pre-defined in the prelude
@@ -46,8 +44,6 @@ impl ConstantDefinitionBuilder {
         for &n in &self.i64s {
             b.def(format!("{:X}l", n), i64_expr(n));
         }
-
-        b
     }
 
     pub fn byte_const(&mut self, byte: u8) -> Byte {
@@ -98,7 +94,7 @@ impl ConstantDefinitionBuilder {
     }
 }
 
-pub fn define_prelude(b: &mut DefinitionBuilder) {
+pub fn define_prelude(b: &mut LetExprBuilder) {
     b.def(
         "Byte",
         abs(
@@ -140,6 +136,7 @@ pub fn define_prelude(b: &mut DefinitionBuilder) {
         );
     }
 
+    // Trees depend on this as the default value for uninitialized elements.
     b.def("0b", byte_expr(0));
 }
 

@@ -43,10 +43,6 @@ pub mod list {
         result
     }
 
-    pub fn from_bytes(consts: &mut number::ConstantDefinitionBuilder, bytes: &[u8]) -> List {
-        from(bytes.iter().map(|b| consts.byte_const(*b)))
-    }
-
     pub fn is_not_empty(list: List) -> Expr {
         optional::is_some(list)
     }
@@ -59,7 +55,7 @@ pub mod list {
         pair::get_second(optional::unwrap(list))
     }
 
-    pub fn define_prelude(b: &mut DefinitionBuilder) {
+    pub fn define_prelude(b: &mut LetExprBuilder) {
         b.def("Empty", optional::none());
 
         b.def(

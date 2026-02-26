@@ -1,17 +1,43 @@
-use crate::codegen::*;
+use super::*;
 
-use super::Instruction;
+/// An instruction is a function of `(N, F, M, G, L, S, T) -> IoCommand` where:
+/// - `N` is the next instruction (or `unreachable` is this is the last instruction in a function)
+/// - `F` is a pair of the global function table and the user-defined table for indirect calls
+/// - `M` is the memory
+/// - `G` is the global variable table
+/// - `L` is the local variable table
+/// - `S` is the data stack
+/// - `T` is the trace (i.e. control flow stack)
+///
+/// See also [`io_command::IoCommand`].
+///
+/// An instruction might return an `IoCommand` directly or by invoking the next instruction
+/// (or any other instruction in general).
+pub type Instruction = Expr;
 
-enum IoOptions {
-    Output(number::Byte),
-    Input(String),
-    Exit,
+/// Starts program execution at the given start function and with the given environment.
+pub fn start(
+    start_function: code::Code,
+    function_table: table::Table,
+    custom_table: table::Table,
+    globals: table::Table,
+) -> io_command::IoCommand {
+    apply(
+        start_function,
+        [
+            pair::new(function_table, custom_table),
+            memory::new(),
+            globals,
+            locals::new(),
+            data_stack::empty(),
+            stack::empty(),
+        ],
+    )
 }
 
 #[derive(Default)]
 pub struct InstructionBuilder {
-    defs: DefinitionBuilder,
-    io_options: Option<IoOptions>,
+    defs: LetExprBuilder,
 }
 
 impl InstructionBuilder {
@@ -23,8 +49,39 @@ impl InstructionBuilder {
         self.defs.def(name, value);
     }
 
+    /// Builds a normal instruction that does not perform any I/O itself.
     pub fn build(self) -> io_command::IoCommand {
-        let next = apply(
+        let next = self.execute_next();
+        let body = self.defs.build_in(next);
+        Self::wrap_with_context(body)
+    }
+
+    /// Builds an instruction that unconditionally exits the program.
+    /// The instruction body is discarded.
+    pub fn build_exit(self) -> io_command::IoCommand {
+        Self::wrap_with_context(io_command::exit())
+    }
+
+    /// Builds an instruction that writes the given byte to the output *after* performing
+    /// all other operations inside itself.
+    pub fn build_output(self, byte: number::Byte) -> io_command::IoCommand {
+        let next = self.execute_next();
+        let cmd = io_command::output(byte, next);
+        let body = self.defs.build_in(cmd);
+        Self::wrap_with_context(body)
+    }
+
+    /// Builds an instruction that reads an input byte and stores it into the given variable
+    /// *before* performing all other operations inside itself.
+    pub fn build_input(self, dest_var: impl ToString) -> io_command::IoCommand {
+        let next = self.execute_next();
+        let body = self.defs.build_in(next);
+        let cmd = io_command::input(abs([dest_var.to_string()], body));
+        Self::wrap_with_context(cmd)
+    }
+
+    fn execute_next(&self) -> io_command::IoCommand {
+        apply(
             self.next(),
             [
                 self.function_tables(),
@@ -34,35 +91,11 @@ impl InstructionBuilder {
                 self.stack(),
                 self.trace(),
             ],
-        );
-
-        let result = match self.io_options {
-            Some(IoOptions::Output(byte)) => self.defs.build(io_command::output(byte, next)),
-            Some(IoOptions::Input(dest_var)) => {
-                io_command::input(abs([dest_var], self.defs.build(next)))
-            }
-            Some(IoOptions::Exit) => io_command::exit(),
-            None => self.defs.build(next),
-        };
-
-        abs(["N", "F", "M", "G", "L", "S", "T"], result)
+        )
     }
 
-    /// Makes the resulting instruction exit the program
-    pub fn set_exit(&mut self) {
-        self.io_options = Some(IoOptions::Exit);
-    }
-
-    /// Makes the resulting instruction write the given byte to the output *after* performing
-    /// all other operations inside itself.
-    pub fn set_output(&mut self, byte: number::Byte) {
-        self.io_options = Some(IoOptions::Output(byte));
-    }
-
-    /// Makes the resulting instruction read an input byte and store it in the given variable
-    /// *before* performing all other operations inside itself.
-    pub fn set_input(&mut self, dest_var: impl ToString) {
-        self.io_options = Some(IoOptions::Input(dest_var.to_string()));
+    fn wrap_with_context(body: Expr) -> Instruction {
+        abs(["N", "F", "M", "G", "L", "S", "T"], body)
     }
 
     pub fn next(&self) -> Instruction {

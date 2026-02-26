@@ -1,3 +1,4 @@
+//! Trees are lazy. Every subtree that is not initialized is represented by a dummy tree.
 //! All dummy trees are implicitly initialized with the null byte.
 //! This is because the only place where the default item matters is the main memory, which is
 //! zero-initialized in WASM.
@@ -64,7 +65,7 @@ pub mod tree {
         items[0].clone()
     }
 
-    pub fn define_prelude(b: &mut DefinitionBuilder) {
+    pub fn define_prelude(b: &mut LetExprBuilder) {
         // Dummy trees
 
         // Indexable by 0 bits (i.e. not indexable)
@@ -144,6 +145,7 @@ pub mod tree {
 pub mod memory {
     use super::*;
 
+    /// Zero-initialized, indexed by 32 bits.
     pub type Memory = tree::Tree;
 
     pub fn new() -> Memory {
@@ -162,6 +164,9 @@ pub mod memory {
 pub mod table {
     use super::*;
 
+    /// Used for storing functions, globals, and local frames.
+    /// Uses faster 16-bit indexing because 65536 entities should be more than enough
+    /// for this project.
     pub type Table = tree::Tree;
 
     pub fn from(items: impl IntoIterator<Item = Expr>) -> Table {

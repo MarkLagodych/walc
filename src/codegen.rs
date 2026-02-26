@@ -1,7 +1,12 @@
 //! WALC code generator
 
-pub mod number;
 pub mod program;
+
+mod instruction;
+
+mod code;
+
+mod number;
 
 mod lists;
 pub use lists::*;
@@ -114,48 +119,60 @@ pub fn rec(func: Expr) -> Expr {
     apply(func.clone(), [func])
 }
 
+/// Constructs a `let .. in` expression.
+///
+/// `let` expressions allow variable shadowing, which enables imperative-style code like this:
+/// ```text
+/// let x = make_x in
+/// let x = (do_something_with_x x) in
+/// let x = (do_something_else_with_x x) in
+/// body_using_x
+/// ```
 #[derive(Default)]
-pub struct DefinitionBuilder {
+pub struct LetExprBuilder {
     defs: Vec<(String, Expr)>,
 }
 
-impl DefinitionBuilder {
+impl LetExprBuilder {
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Defines a variable.
+    /// This is the same as adding a new `let {name} = {value} in` line  into a let expression.
     pub fn def(&mut self, name: impl ToString, value: Expr) {
         self.defs.push((name.to_string(), value));
     }
 
-    pub fn append(&mut self, other: Self) {
-        self.defs.extend(other.defs);
-    }
-
-    pub fn build(self, body: Expr) -> Expr {
+    /// Combines all the definitions with the given body expression to form a complete
+    /// `let .. in` expression:
+    /// ```text
+    /// let var1 = value1 in
+    /// let var2 = value2 in
+    /// ...
+    /// let varN = valueN in
+    /// body
+    /// ```
+    pub fn build_in(self, body: Expr) -> Expr {
         let mut result = body;
         for (var, value) in self.defs.into_iter().rev() {
             result = def(var, value, result);
         }
         result
     }
+}
 
-    /// Provides definitions required for all basic codegen features.
-    pub fn prelude() -> Self {
-        let mut me = Self::new();
+/// Provides definitions required for all basic codegen features.
+pub fn define_prelude(mut b: &mut LetExprBuilder) {
+    b.def("_", abs(["_"], var("_")));
 
-        me.def("_", abs(["_"], var("_")));
+    b.def("0", abs(["x0", "x1"], var("x0")));
+    b.def("1", abs(["x0", "x1"], var("x1")));
 
-        me.def("0", abs(["x0", "x1"], var("x0")));
-        me.def("1", abs(["x0", "x1"], var("x1")));
-
-        pair::define_prelude(&mut me);
-        list::define_prelude(&mut me);
-        number::define_prelude(&mut me);
-        tree::define_prelude(&mut me);
-
-        me
-    }
+    pair::define_prelude(&mut b);
+    list::define_prelude(&mut b);
+    number::define_prelude(&mut b);
+    tree::define_prelude(&mut b);
 }
 
 pub mod io_command {
@@ -197,7 +214,7 @@ pub mod pair {
         apply(pair, [selector])
     }
 
-    pub fn define_prelude(b: &mut DefinitionBuilder) {
+    pub fn define_prelude(b: &mut LetExprBuilder) {
         b.def(
             "P",
             abs(

@@ -1,45 +1,18 @@
-mod instruction;
-pub use instruction::InstructionDefinitionBuilder;
-
-mod labels;
-use labels::*;
-
 use crate::{analyzer::*, codegen::*};
 
-/// Made of instructions (see [`instruction::Instruction`]) similarly to (linked) lists
-/// (see [`list::List`]), so e.g. `(Instr1 (Instr2 (Instr3 unreachable)))` is a typical chain of
-/// simple (non-control) instructions.
-///
-/// However, instruction chains get more complicated when it comes to control instructions.
-/// For them we need special "labels" that point to specific segments of the chain, so that
-/// control instructions can "jump" to them.
-///
-/// This is done by constructing the chain in parts: each subchain is assigned to a variable
-/// (whose name is practically a label) and is used as a tail for the next subchain.
-///
-/// For example, consider the following instructions:
-/// ```wat
-/// block
-///     i32.eqz
-///     br_if 0     ;; refers to label 1
-///     call $foo
-/// end             ;; label 1
-/// call $bar
-/// ;;(unreachable) ;; label 0
-/// ```
-/// Note that labels are indexed relatively and refer to block nesting depth rather than
-/// concrete labels.
-///
-/// The corresponding instruction chain will look like this:
-/// ```text
-/// let label0 = unreachable in
-/// let label1 = (end (call<bar> label0)) in
-/// (block (i32_eqz (br_if<label1> (call<foo> label1))))
-/// ```
-///
-/// The resulting `br_if` instruction will jump either to the next instruction (i.e. `call<foo>`)
-/// or to `label1`.
-pub type InstructionChain = Expr;
+use program::runtime::{InstructionInfo, RuntimeGenerator};
+
+pub struct LabelInfo<'a> {
+    /// Stack of block opening operators (`loop`, `if`, `block`).
+    /// Given a `br X` operator, the block being breaked is `blocks[blocks.len() - 1 - X]`.
+    pub blocks: &'a [&'a Operator<'a>],
+
+    /// Stack of `end` labels (for `loop`, `if`, `block`).
+    pub end_labels: &'a [&'a code::Code],
+
+    /// If the current block is `if`, then this is its `else` label.
+    pub else_label: Option<code::Code>,
+}
 
 pub struct EntrypointInfo<'a> {
     pub main_id: FuncId,
@@ -47,66 +20,57 @@ pub struct EntrypointInfo<'a> {
     pub data_memory_offsets: &'a [u32],
 }
 
-pub fn handle_function(
-    func: &Func,
-    types: &GlobalTypeInfo,
-    consts: &mut number::ConstantDefinitionBuilder,
-    instrs: &mut InstructionDefinitionBuilder,
-) -> InstructionChain {
-    let mut label_builder = LabelDefinitionBuilder::new(func.operators);
+pub fn function(rt: &mut RuntimeGenerator, func: &Func, types: &GlobalTypeInfo) -> code::Code {
+    let mut code = code::CodeBuilder::new();
 
-    let mut ops = func.operators.iter().rev();
+    let function_end_label = code.make_label();
 
-    let mut chain = unreachable();
+    code.push(rt.enter(func));
 
-    let function_end = ops.next().unwrap();
-
-    let instr = instrs.leave(func.func_type);
-    chain = apply(instr, [chain]);
-    chain = label_builder.insert_label_if_needed(chain, function_end);
-
-    for op in ops {
-        label_builder.update_label_info(op);
-
-        let instr = instrs.instruction(&mut instruction::InstructionBuildInfo {
+    // Ignore the last "end" operator that ends the function
+    for op in &func.operators[..func.operators.len() - 1] {
+        let instr = rt.instruction(&mut InstructionInfo {
             op,
             types,
-            consts,
-            labels: label_builder.get_label_info(),
+            labels: LabelInfo {
+                blocks: &[],
+                end_labels: &[&function_end_label],
+                else_label: None,
+            },
         });
 
-        chain = apply(instr, [chain]);
-        chain = label_builder.insert_label_if_needed(chain, op);
+        code.push(instr);
     }
 
-    let instr = instrs.enter(func, consts);
-    chain = apply(instr, [chain]);
+    code.push_label(function_end_label);
 
-    chain = label_builder.build(chain);
+    code.push(rt.leave(func.func_type));
 
-    chain
+    code.build()
 }
 
-pub fn handle_input_function(instrs: &mut InstructionDefinitionBuilder) -> InstructionChain {
-    apply(instrs.input_and_return(), [unreachable()])
+pub fn input_function(rt: &mut RuntimeGenerator) -> code::Code {
+    let mut code = code::CodeBuilder::new();
+    code.push(rt.input_and_return());
+    code.build()
 }
 
-pub fn handle_output_function(instrs: &mut InstructionDefinitionBuilder) -> InstructionChain {
-    apply(instrs.output_and_return(), [unreachable()])
+pub fn output_function(rt: &mut RuntimeGenerator) -> code::Code {
+    let mut code = code::CodeBuilder::new();
+    code.push(rt.output_and_return());
+    code.build()
 }
 
-pub fn handle_exit_function(instrs: &mut InstructionDefinitionBuilder) -> InstructionChain {
-    apply(instrs.exit(), [unreachable()])
+pub fn exit_function(rt: &mut RuntimeGenerator) -> code::Code {
+    let mut code = code::CodeBuilder::new();
+    code.push(rt.exit());
+    code.build()
 }
 
-pub fn entrypoint(
-    info: &EntrypointInfo,
-    consts: &mut number::ConstantDefinitionBuilder,
-    instrs: &mut InstructionDefinitionBuilder,
-) -> io_command::IoCommand {
+pub fn entrypoint(rt: &mut RuntimeGenerator, info: &EntrypointInfo) -> io_command::IoCommand {
     let mut chain = unreachable();
 
-    let instr = instrs.exit();
+    let instr = rt.exit();
     chain = apply(instr, [chain]);
 
     for (data_id, target_offset) in info.data_memory_offsets.iter().enumerate() {
@@ -114,12 +78,14 @@ pub fn entrypoint(
     }
 
     if let Some(start_id) = info.start_id {
-        let instr = instrs.call(consts.id_const(start_id as u16));
+        let start_id = rt.num.id_const(start_id as u16);
+        let instr = rt.call(start_id);
         chain = apply(instr, [chain]);
     }
 
-    let instr = instrs.call(consts.id_const(info.main_id as u16));
+    let main_id = rt.num.id_const(info.main_id as u16);
+    let instr = rt.call(main_id);
     chain = apply(instr, [chain]);
 
-    instruction::start(chain)
+    chain
 }
