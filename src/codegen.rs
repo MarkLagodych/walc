@@ -163,16 +163,16 @@ impl LetExprBuilder {
 }
 
 /// Provides definitions required for all basic codegen features.
-pub fn define_prelude(mut b: &mut LetExprBuilder) {
+pub fn define_prelude(b: &mut LetExprBuilder) {
     b.def("_", abs(["_"], var("_")));
 
     b.def("0", abs(["x0", "x1"], var("x0")));
     b.def("1", abs(["x0", "x1"], var("x1")));
 
-    pair::define_prelude(&mut b);
-    list::define_prelude(&mut b);
-    number::define_prelude(&mut b);
-    tree::define_prelude(&mut b);
+    pair::define_prelude(b);
+    list::define_prelude(b);
+    number::define_prelude(b);
+    tree::define_prelude(b);
 }
 
 pub mod io_command {

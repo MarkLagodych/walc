@@ -4,12 +4,12 @@ use crate::{analyzer::*, codegen::*};
 
 use instruction::{Instruction, InstructionBuilder};
 
-use program::function::LabelInfo;
+use program::function::*;
 
 pub struct InstructionInfo<'a> {
     pub op: &'a Operator<'a>,
     pub types: &'a GlobalTypeInfo,
-    pub labels: LabelInfo<'a>,
+    pub blocks: &'a BlockStack,
 }
 
 impl RuntimeGenerator {
@@ -22,18 +22,14 @@ impl RuntimeGenerator {
                 self.push(num)
             }
 
-            Call { function_index } => {
-                let function_id = self.num.id_const(*function_index as u16);
-                self.call(function_id)
-            }
+            Call { function_index } => self.call(*function_index),
 
             CallIndirect { .. } => self.call_indirect(),
 
-            Loop { .. } | If { .. } | Block { .. } => {
-                self.enter_block(info.op, info.types, &info.labels)
-            }
+            // TODO else, br, be_if, etc.
+            Loop { .. } | If { .. } | Block { .. } => self.enter_block(info.blocks),
 
-            End => self.leave_block(info.types, &info.labels),
+            End => self.leave_block(info.blocks),
 
             LocalGet { local_index } => self.local_get(*local_index),
             LocalSet { local_index } => self.local_set(*local_index),
@@ -120,7 +116,7 @@ impl RuntimeGenerator {
         apply(var("Push"), [item])
     }
 
-    pub fn call(&mut self, function_id: number::Id) -> Instruction {
+    pub fn call(&mut self, function_id: FuncId) -> Instruction {
         if !self.has("Call") {
             self.def("Call", {
                 abs(["funcid"], {
@@ -131,7 +127,8 @@ impl RuntimeGenerator {
             });
         }
 
-        apply(var("Call"), [function_id])
+        let id = self.num.id_const(function_id as u16);
+        apply(var("Call"), [id])
     }
 
     pub fn call_indirect(&mut self) -> Instruction {
@@ -185,40 +182,20 @@ impl RuntimeGenerator {
         b.build()
     }
 
-    fn enter_block(
-        &mut self,
-        block: &Operator,
-        types: &GlobalTypeInfo,
-        labels: &LabelInfo,
-    ) -> Instruction {
-        let func_type = match block {
-            Operator::Loop { blockty } | Operator::If { blockty } | Operator::Block { blockty } => {
-                match blockty {
-                    BlockType::Empty => &FuncType::new([], []),
-                    BlockType::Type(type_id) => &FuncType::new([], [*type_id]),
-                    BlockType::FuncType(func_type) => types.get_type(*func_type),
-                }
-            }
-            _ => unreachable!(),
-        };
-
-        let param_count = func_type.params().len();
+    fn enter_block(&mut self, blocks: &BlockStack) -> Instruction {
+        let block = blocks.get(0);
+        let param_count = block.type_info.param_count;
 
         let mut b = InstructionBuilder::new();
 
-        match block {
-            Operator::Loop { .. } => {
+        match &block.label_info {
+            BlockLabelInfo::Loop => {
                 b.push_trace(b.next());
             }
-            Operator::If { .. } => {
-                let branch0 = match &labels.else_label {
-                    Some(label) => label.clone(),
-                    None => labels.end_labels.last().cloned().unwrap().clone(),
-                };
-
+            BlockLabelInfo::If { else_label, .. } => {
                 b.pop(["cond"]);
 
-                b.set_next(select(self.neqz(var("cond")), branch0, b.next()));
+                b.set_next(select(self.neqz(var("cond")), else_label.clone(), b.next()));
             }
             _ => {}
         }
@@ -232,21 +209,9 @@ impl RuntimeGenerator {
         b.build()
     }
 
-    fn leave_block(&self, types: &GlobalTypeInfo, labels: &LabelInfo) -> Instruction {
-        let block = labels.blocks.last().unwrap();
-
-        let func_type = match block {
-            Operator::Loop { blockty } | Operator::If { blockty } | Operator::Block { blockty } => {
-                match blockty {
-                    BlockType::Empty => &FuncType::new([], []),
-                    BlockType::Type(type_id) => &FuncType::new([], [*type_id]),
-                    BlockType::FuncType(func_type) => types.get_type(*func_type),
-                }
-            }
-            _ => unreachable!(),
-        };
-
-        let result_count = func_type.results().len();
+    fn leave_block(&self, blocks: &BlockStack) -> Instruction {
+        let block = blocks.get(0);
+        let result_count = block.type_info.result_count;
 
         let mut b = InstructionBuilder::new();
 
@@ -256,7 +221,7 @@ impl RuntimeGenerator {
 
         b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
 
-        if let Operator::Loop { .. } = block {
+        if let BlockLabelInfo::Loop = block.label_info {
             b.drop_trace();
         }
 
