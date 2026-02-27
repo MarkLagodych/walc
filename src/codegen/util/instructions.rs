@@ -10,24 +10,24 @@ impl UtilGenerator {
         use Operator::*;
 
         match op {
-            Nop => self.nop(),
-
+            Nop => instruction::nop(),
             Unreachable => self.exit(),
 
-            I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
-                self.push_const(op)
-            }
-
             Call { function_index } => self.call(*function_index),
-
             CallIndirect { .. } => self.call_indirect(),
 
             Loop { .. } | If { .. } | Block { .. } => self.begin_block(blocks),
             Else => self.block_else(blocks),
             End => self.end_block(blocks),
 
-            // TODO br, be_if, etc.
+            Br { relative_depth } => self.br(blocks, *relative_depth),
+            BrIf { relative_depth } => self.br_if(blocks, *relative_depth),
+            BrTable { targets } => self.br_table(blocks, targets),
             Return => self.ret(blocks),
+
+            I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
+                self.push_const(op)
+            }
 
             LocalGet { local_index } => self.local_get(*local_index),
             LocalSet { local_index } => self.local_set(*local_index),
@@ -37,10 +37,6 @@ impl UtilGenerator {
             // TODO
             _ => todo!(),
         }
-    }
-
-    fn nop(&mut self) -> Instruction {
-        abs(["nop"], var("nop"))
     }
 
     pub fn output_and_return(&mut self) -> Instruction {
@@ -87,21 +83,6 @@ impl UtilGenerator {
         }
 
         var("Exit")
-    }
-
-    pub fn push_const(&mut self, op: &Operator) -> Instruction {
-        if !self.has("Push") {
-            self.def("Push", {
-                abs(["item"], {
-                    let mut b = InstructionBuilder::new();
-                    b.push([var("item")]);
-                    b.build()
-                })
-            });
-        }
-
-        let item = self.num.with_init_value(op);
-        apply(var("Push"), [item])
     }
 
     pub fn call(&mut self, function_id: FuncId) -> Instruction {
@@ -214,8 +195,8 @@ impl UtilGenerator {
         let mut b = InstructionBuilder::new();
 
         match &blocks.get(0).label_info {
-            BlockLabelInfo::If { else_label, .. } => {
-                b.set_next(else_label.clone());
+            BlockLabelInfo::If { end_label, .. } => {
+                b.set_next(end_label.clone());
             }
             _ => unreachable!(),
         }
@@ -227,8 +208,93 @@ impl UtilGenerator {
         self.br(blocks, blocks.get_depth())
     }
 
-    fn br(&mut self, blocks: &BlockStack, label_index: u32) -> Instruction {
-        todo!()
+    fn br(&mut self, blocks: &BlockStack, depth: u32) -> Instruction {
+        let mut b = InstructionBuilder::new();
+
+        let target_block = blocks.get(depth);
+        let pop_count = match &target_block.label_info {
+            BlockLabelInfo::Loop => target_block.type_info.param_count,
+            _ => target_block.type_info.result_count,
+        };
+
+        b.pop((0..pop_count).map(|i| format!("x{i:x}")));
+
+        if depth > 0 {
+            for i in 0..depth - 1 {
+                b.pop_stack_frame();
+
+                if matches!(blocks.get(i).label_info, BlockLabelInfo::Loop) {
+                    b.drop_trace();
+                }
+            }
+        }
+
+        b.push((0..pop_count).map(|i| var(format!("x{i:x}"))));
+
+        match &target_block.label_info {
+            BlockLabelInfo::Loop => {
+                b.get_trace_top("loop");
+                b.set_next(var("loop"));
+            }
+            BlockLabelInfo::If { end_label, .. }
+            | BlockLabelInfo::Block { end_label }
+            | BlockLabelInfo::Func { end_label } => {
+                b.set_next(end_label.clone());
+            }
+        }
+
+        b.build()
+    }
+
+    fn br_if(&mut self, blocks: &BlockStack, depth: u32) -> Instruction {
+        let mut b = InstructionBuilder::new();
+
+        b.pop(["cond"]);
+
+        b.set_next(select(
+            self.num_is_not_zero(var("cond")),
+            b.next(),
+            self.br(blocks, depth),
+        ));
+
+        b.build()
+    }
+
+    fn br_table(&mut self, blocks: &BlockStack, targets: &BrTable) -> Instruction {
+        let mut b = InstructionBuilder::new();
+
+        b.pop(["idx"]);
+
+        let mut next = self.br(blocks, targets.default());
+
+        // Here `targets` contain parsing `Result`s.
+        // The validator should catch all parsing errors, so we can just unwrap it.
+        let break_targets = targets.targets().collect::<Result<Vec<_>, _>>().unwrap();
+
+        for (i, target) in break_targets.into_iter().enumerate().rev() {
+            let i = self.num.i32_const(i as u32);
+            let target = self.br(blocks, target);
+            next = select(self.num_equal(var("idx"), i), next, target);
+        }
+
+        b.set_next(next);
+
+        b.build()
+    }
+
+    fn push_const(&mut self, op: &Operator) -> Instruction {
+        if !self.has("Push") {
+            self.def("Push", {
+                abs(["item"], {
+                    let mut b = InstructionBuilder::new();
+                    b.push([var("item")]);
+                    b.build()
+                })
+            });
+        }
+
+        let item = self.num.with_init_value(op);
+        apply(var("Push"), [item])
     }
 
     fn local_get(&mut self, local_index: u32) -> Instruction {

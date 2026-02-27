@@ -2,7 +2,7 @@ use super::*;
 
 use util::UtilGenerator;
 
-use crate::analyzer::*;
+use crate::analyzer::Operator;
 
 /// No control flow instructions that operate on blocks need parameter/result types, just the counts
 pub struct BlockTypeInfo {
@@ -40,6 +40,7 @@ pub enum BlockLabelInfo {
     Func {
         end_label: code::Code,
     },
+    /// `loop` pushes the instruction following it to the trace
     Loop,
     If {
         else_label: code::Code,
@@ -197,15 +198,6 @@ impl<'a> FunctionBuilder<'a> {
                 self.blocks.push(block_info);
             }
 
-            Operator::Else => match &self.blocks.get(0).label_info {
-                BlockLabelInfo::If { else_label, .. } => {
-                    self.code.push_label(else_label.clone());
-
-                    *self.if_has_else.last_mut().unwrap() = true;
-                }
-                _ => unreachable!(),
-            },
-
             Operator::End => match &self.blocks.get(0).label_info {
                 BlockLabelInfo::If {
                     end_label,
@@ -230,8 +222,21 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn after_instruction(&mut self, op: &Operator) {
-        if let Operator::End = op {
-            self.blocks.pop();
+        match op {
+            Operator::End => {
+                self.blocks.pop();
+            }
+
+            Operator::Else => match &self.blocks.get(0).label_info {
+                BlockLabelInfo::If { else_label, .. } => {
+                    self.code.push_label(else_label.clone());
+
+                    *self.if_has_else.last_mut().unwrap() = true;
+                }
+                _ => unreachable!(),
+            },
+
+            _ => {}
         }
     }
 }

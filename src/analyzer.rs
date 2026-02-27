@@ -3,7 +3,7 @@ use anyhow::{Result, anyhow};
 use crate::codegen;
 
 use wasmparser::*;
-pub use wasmparser::{BlockType, FuncType, Operator, ValType};
+pub use wasmparser::{BlockType, BrTable, FuncType, Operator, ValType};
 
 pub type FuncId = u32;
 pub type TypeId = u32;

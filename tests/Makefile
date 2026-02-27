@@ -7,7 +7,10 @@ bin \
 bin/minimal.wasm \
 bin/simple.wasm \
 bin/function.wasm \
-bin/function-locals.wasm
+bin/function-locals.wasm \
+bin/if.wasm \
+bin/br.wasm \
+bin/loop.wasm
 
 bin:
 	mkdir -p bin

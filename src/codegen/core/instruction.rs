@@ -1,13 +1,16 @@
 use super::*;
 
 /// An instruction is a function of `(N, F, M, G, L, S, T) -> IoCommand` where:
-/// - `N` is the next instruction (or `unreachable` is this is the last instruction in a function)
+/// - `N` is the next code segment (or `unreachable` is this is the last instruction in a function).
+///   See [`code::Code`].
 /// - `F` is a pair of the global function table and the user-defined table for indirect calls
-/// - `M` is the memory
-/// - `G` is the global variable table
-/// - `L` is the local variable table
-/// - `S` is the data stack
-/// - `T` is the trace (i.e. control flow stack)
+/// - `M` is the memory. See [`memory::Memory`].
+/// - `G` is the global variable table. See [`table::Table`].
+/// - `L` is the stack of local variable tables. See [`locals::Locals`].
+/// - `S` is the data stack. See [`data_stack::DataStack`].
+/// - `T` is the trace (i.e. control flow stack).
+///   This is only used for jumps directed backwards (`loop`) and function calls.
+///   This is a normal stack (see [`stack::Stack`]) that stores code segments where to return to.
 ///
 /// See also [`io_command::IoCommand`].
 ///
@@ -35,6 +38,10 @@ pub fn start(
     )
 }
 
+pub fn nop() -> Instruction {
+    abs(["nop"], var("nop"))
+}
+
 #[derive(Default)]
 pub struct InstructionBuilder {
     defs: LetExprBuilder,
@@ -45,7 +52,7 @@ impl InstructionBuilder {
         Self::default()
     }
 
-    pub fn set(&mut self, name: impl ToString, value: Expr) {
+    pub fn def(&mut self, name: impl ToString, value: Expr) {
         self.defs.def(name, value);
     }
 
@@ -98,12 +105,12 @@ impl InstructionBuilder {
         abs(["N", "F", "M", "G", "L", "S", "T"], body)
     }
 
-    pub fn next(&self) -> Instruction {
+    pub fn next(&self) -> code::Code {
         var("N")
     }
 
-    pub fn set_next(&mut self, next: Expr) {
-        self.set("N", next);
+    pub fn set_next(&mut self, next: code::Code) {
+        self.def("N", next);
     }
 
     pub fn memory(&self) -> memory::Memory {
@@ -111,7 +118,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_memory(&mut self, memory: memory::Memory) {
-        self.set("M", memory);
+        self.def("M", memory);
     }
 
     pub fn globals(&self) -> table::Table {
@@ -119,7 +126,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_globals(&mut self, globals: table::Table) {
-        self.set("G", globals);
+        self.def("G", globals);
     }
 
     pub fn locals(&self) -> locals::Locals {
@@ -127,7 +134,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_locals(&mut self, locals: locals::Locals) {
-        self.set("L", locals);
+        self.def("L", locals);
     }
 
     pub fn stack(&self) -> data_stack::DataStack {
@@ -135,7 +142,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_stack(&mut self, stack: data_stack::DataStack) {
-        self.set("S", stack);
+        self.def("S", stack);
     }
 
     pub fn trace(&self) -> stack::Stack {
@@ -143,7 +150,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_trace(&mut self, trace: stack::Stack) {
-        self.set("T", trace);
+        self.def("T", trace);
     }
 
     fn function_tables(&self) -> pair::Pair {
@@ -173,7 +180,7 @@ impl InstructionBuilder {
     {
         // Pop right-to-left
         for dest_var in dest_vars.into_iter().rev() {
-            self.set(dest_var.to_string(), data_stack::top(self.stack()));
+            self.def(dest_var.to_string(), data_stack::top(self.stack()));
             self.drop();
         }
     }
@@ -183,7 +190,7 @@ impl InstructionBuilder {
     }
 
     pub fn get_top(&mut self, dest_var: impl ToString) {
-        self.set(dest_var, data_stack::top(self.stack()));
+        self.def(dest_var, data_stack::top(self.stack()));
     }
 
     pub fn push_trace(&mut self, item: Expr) {
@@ -191,8 +198,12 @@ impl InstructionBuilder {
     }
 
     pub fn pop_trace(&mut self, dest_var: impl ToString) {
-        self.set(dest_var, stack::top(self.trace()));
+        self.def(dest_var, stack::top(self.trace()));
         self.set_trace(stack::pop(self.trace()));
+    }
+
+    pub fn get_trace_top(&mut self, dest_var: impl ToString) {
+        self.def(dest_var, stack::top(self.trace()));
     }
 
     pub fn drop_trace(&mut self) {
@@ -200,7 +211,7 @@ impl InstructionBuilder {
     }
 
     pub fn get_global(&mut self, dest_var: impl ToString, global_id: number::Id) {
-        self.set(dest_var, table::index(self.globals(), global_id));
+        self.def(dest_var, table::index(self.globals(), global_id));
     }
 
     pub fn set_global(&mut self, global_id: number::Id, value: Expr) {
@@ -208,7 +219,7 @@ impl InstructionBuilder {
     }
 
     pub fn get_local(&mut self, dest_var: impl ToString, local_id: number::Id) {
-        self.set(dest_var, locals::index(self.locals(), local_id));
+        self.def(dest_var, locals::index(self.locals(), local_id));
     }
 
     pub fn set_local(&mut self, local_id: number::Id, value: Expr) {
@@ -216,7 +227,7 @@ impl InstructionBuilder {
     }
 
     pub fn load(&mut self, dest_var: impl ToString, address: number::I32) {
-        self.set(dest_var, memory::index(self.memory(), address));
+        self.def(dest_var, memory::index(self.memory(), address));
     }
 
     pub fn store(&mut self, address: number::I32, value: Expr) {
@@ -224,11 +235,11 @@ impl InstructionBuilder {
     }
 
     pub fn get_function(&mut self, dest_var: impl ToString, function_id: number::Id) {
-        self.set(dest_var, table::index(self.function_table(), function_id));
+        self.def(dest_var, table::index(self.function_table(), function_id));
     }
 
     pub fn get_function_indirect(&mut self, dest_var: impl ToString, function_id: number::Id) {
-        self.set(
+        self.def(
             dest_var,
             table::index(self.indirect_function_table(), function_id),
         );
