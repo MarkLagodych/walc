@@ -5,40 +5,34 @@ use instruction::{Instruction, InstructionBuilder};
 
 use crate::analyzer::*;
 
-pub struct InstructionInfo<'a> {
-    pub op: &'a Operator<'a>,
-    pub types: &'a GlobalTypeInfo,
-    pub blocks: &'a BlockStack,
-}
-
 impl UtilGenerator {
-    pub fn instruction(&mut self, info: &mut InstructionInfo) -> Instruction {
+    pub fn instruction(&mut self, op: &Operator, blocks: &BlockStack) -> Instruction {
         use Operator::*;
 
-        match info.op {
+        match op {
+            Nop => self.nop(),
+
+            Unreachable => self.exit(),
+
             I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
-                let num = self.num.with_init_value(info.op);
-                self.push(num)
+                self.push_const(op)
             }
 
             Call { function_index } => self.call(*function_index),
 
             CallIndirect { .. } => self.call_indirect(),
 
-            // TODO else, br, be_if, etc.
-            Loop { .. } | If { .. } | Block { .. } => self.enter_block(info.blocks),
+            Loop { .. } | If { .. } | Block { .. } => self.begin_block(blocks),
+            Else => self.block_else(blocks),
+            End => self.end_block(blocks),
 
-            End => self.leave_block(info.blocks),
+            // TODO br, be_if, etc.
+            Return => self.ret(blocks),
 
             LocalGet { local_index } => self.local_get(*local_index),
             LocalSet { local_index } => self.local_set(*local_index),
             GlobalGet { global_index } => self.global_get(*global_index),
             GlobalSet { global_index } => self.global_set(*global_index),
-
-            Return => {
-                // TODO jump to the end
-                self.nop()
-            }
 
             // TODO
             _ => todo!(),
@@ -46,13 +40,7 @@ impl UtilGenerator {
     }
 
     fn nop(&mut self) -> Instruction {
-        if !self.has("Nop") {
-            self.def("Nop", {
-                let b = InstructionBuilder::new();
-                b.build()
-            });
-        }
-        var("Nop")
+        abs(["nop"], var("nop"))
     }
 
     pub fn output_and_return(&mut self) -> Instruction {
@@ -101,7 +89,7 @@ impl UtilGenerator {
         var("Exit")
     }
 
-    pub fn push(&mut self, item: Expr) -> Instruction {
+    pub fn push_const(&mut self, op: &Operator) -> Instruction {
         if !self.has("Push") {
             self.def("Push", {
                 abs(["item"], {
@@ -112,6 +100,7 @@ impl UtilGenerator {
             });
         }
 
+        let item = self.num.with_init_value(op);
         apply(var("Push"), [item])
     }
 
@@ -143,7 +132,7 @@ impl UtilGenerator {
         var("CallIndirect")
     }
 
-    pub fn enter(&mut self, func: &Func) -> Instruction {
+    pub fn func_prologue(&mut self, func: &Func) -> Instruction {
         let mut b = InstructionBuilder::new();
 
         let param_count = func.func_type.params().len();
@@ -164,24 +153,7 @@ impl UtilGenerator {
         b.build()
     }
 
-    pub fn leave(&self, func_type: &FuncType) -> Instruction {
-        let mut b = InstructionBuilder::new();
-
-        let result_count = func_type.results().len();
-
-        b.pop((0..result_count).map(|i| format!("r{i:x}")));
-
-        b.pop_locals_frame();
-        b.pop_stack_frame();
-
-        b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
-
-        b.ret();
-
-        b.build()
-    }
-
-    fn enter_block(&mut self, blocks: &BlockStack) -> Instruction {
+    fn begin_block(&mut self, blocks: &BlockStack) -> Instruction {
         let block = blocks.get(0);
         let param_count = block.type_info.param_count;
 
@@ -212,7 +184,7 @@ impl UtilGenerator {
         b.build()
     }
 
-    fn leave_block(&self, blocks: &BlockStack) -> Instruction {
+    fn end_block(&self, blocks: &BlockStack) -> Instruction {
         let block = blocks.get(0);
         let result_count = block.type_info.result_count;
 
@@ -224,11 +196,39 @@ impl UtilGenerator {
 
         b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
 
-        if let BlockLabelInfo::Loop = block.label_info {
-            b.drop_trace();
+        match block.label_info {
+            BlockLabelInfo::Loop => {
+                b.drop_trace();
+            }
+            BlockLabelInfo::Func { .. } => {
+                b.pop_locals_frame();
+                b.ret();
+            }
+            _ => {}
         }
 
         b.build()
+    }
+
+    fn block_else(&mut self, blocks: &BlockStack) -> Instruction {
+        let mut b = InstructionBuilder::new();
+
+        match &blocks.get(0).label_info {
+            BlockLabelInfo::If { else_label, .. } => {
+                b.set_next(else_label.clone());
+            }
+            _ => unreachable!(),
+        }
+
+        b.build()
+    }
+
+    fn ret(&mut self, blocks: &BlockStack) -> Instruction {
+        self.br(blocks, blocks.get_depth())
+    }
+
+    fn br(&mut self, blocks: &BlockStack, label_index: u32) -> Instruction {
+        todo!()
     }
 
     fn local_get(&mut self, local_index: u32) -> Instruction {
