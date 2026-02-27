@@ -65,32 +65,32 @@ pub mod tree {
         items[0].clone()
     }
 
-    pub fn define_prelude(b: &mut LetExprBuilder) {
+    pub fn generate_defs(b: &mut LetExprBuilder) {
         // Dummy trees
 
         // Indexable by 0 bits (i.e. not indexable)
-        b.def("T0", number::null_byte());
+        b.let_var("T0", number::null_byte());
         // Every node is indexable by i bits
         for i in 1..=32 {
-            b.def(
+            b.let_var(
                 format!("T{i}"),
                 tree::node(var(format!("T{}", i - 1)), var(format!("T{}", i - 1))),
             )
         }
 
-        b.def(
+        b.let_rec(
             "Idx_",
-            abs(["idx", "tree", "index"], {
+            abs(["tree", "index"], {
                 select(list::is_not_empty(var("index")), var("tree"), {
                     let index_bit = list::get_head(var("index"));
                     let index_tail = list::get_tail(var("index"));
                     let subtree = tree::select_subtree(var("tree"), index_bit);
-                    apply(rec(var("idx")), [subtree, index_tail])
+                    apply(rec(var("Idx_")), [subtree, index_tail])
                 })
             }),
         );
 
-        b.def(
+        b.let_var(
             "Idx",
             abs(
                 ["tree", "index"],
@@ -101,17 +101,21 @@ pub mod tree {
             ),
         );
 
-        b.def(
+        b.let_rec(
             "Ins_",
-            abs(["ins", "tree", "index", "value"], {
+            abs(["tree", "index", "value"], {
                 let left = tree::get_left(var("tree"));
                 let right = tree::get_right(var("tree"));
 
                 let index_bit = list::get_head(var("index"));
                 let index_tail = list::get_tail(var("index"));
 
-                let insert =
-                    |subtree| apply(rec(var("ins")), [subtree, index_tail.clone(), var("value")]);
+                let insert = |subtree| {
+                    apply(
+                        rec(var("Ins_")),
+                        [subtree, index_tail.clone(), var("value")],
+                    )
+                };
 
                 select(
                     list::is_not_empty(var("index")),
@@ -125,7 +129,7 @@ pub mod tree {
             }),
         );
 
-        b.def(
+        b.let_var(
             "Ins",
             abs(
                 ["tree", "index", "value"],

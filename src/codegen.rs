@@ -52,24 +52,24 @@ impl ProgramBuilder {
 
         let mut defs = LetExprBuilder::new();
 
-        define_prelude(&mut defs);
+        generate_core_definitions(&mut defs);
 
         self.util.generate(&mut defs);
 
         for (id, data) in self.data_segments.into_iter().enumerate() {
-            defs.def(format!("Data{id:x}"), data);
+            defs.let_var(format!("Data{id:x}"), data);
         }
 
         for (id, func) in self.functions.into_iter().enumerate() {
-            defs.def(format!("Func{id:x}"), func);
+            defs.let_var(format!("Func{id:x}"), func);
         }
 
-        defs.def(
+        defs.let_var(
             "FunctionTable",
             table::from((0..func_count).map(|id| var(format!("Func{id:x}")))),
         );
 
-        defs.def(
+        defs.let_var(
             "CustomTable",
             table::from(self.custom_func_table.into_iter().map(|opt_id| {
                 if let Some(id) = opt_id {
@@ -80,7 +80,7 @@ impl ProgramBuilder {
             })),
         );
 
-        defs.def("Globals", table::from(self.globals));
+        defs.let_var("Globals", table::from(self.globals));
 
         defs.build_in(start)
     }

@@ -3,7 +3,7 @@ pub use instructions::*;
 
 mod math;
 
-use crate::codegen::*;
+use super::*;
 
 use std::collections::HashSet as Set;
 
@@ -20,12 +20,19 @@ pub struct UtilGenerator {
 }
 
 impl UtilGenerator {
-    pub fn has(&self, definition_name: &str) -> bool {
+    fn has(&self, definition_name: &str) -> bool {
         self.already_defined.contains(definition_name)
     }
 
     /// Before defining a new utility, first check if it has already been defined with [`Self::has`]
-    pub fn def(&mut self, name: impl ToString, value: Expr) {
+    fn def(&mut self, name: impl ToString, value: Expr) {
+        self.already_defined.insert(name.to_string());
+        self.defs.push((name.to_string(), value));
+    }
+
+    /// Same as [`Self::def`] but for recursive definitions.
+    fn def_rec(&mut self, name: impl ToString, value: Expr) {
+        let value = abs([name.to_string()], value);
         self.already_defined.insert(name.to_string());
         self.defs.push((name.to_string(), value));
     }
@@ -34,7 +41,7 @@ impl UtilGenerator {
         self.num.generate(b);
 
         for (name, value) in self.defs.into_iter() {
-            b.def(name, value);
+            b.let_var(name, value);
         }
     }
 }

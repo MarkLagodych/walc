@@ -45,8 +45,8 @@ impl InstructionBuilder {
         Self::default()
     }
 
-    pub fn def(&mut self, name: impl ToString, value: Expr) {
-        self.defs.def(name, value);
+    pub fn set(&mut self, name: impl ToString, value: Expr) {
+        self.defs.let_var(name, value);
     }
 
     /// Builds a normal instruction that does not perform any I/O itself.
@@ -103,7 +103,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_next(&mut self, next: Expr) {
-        self.def("N", next);
+        self.set("N", next);
     }
 
     pub fn memory(&self) -> memory::Memory {
@@ -111,7 +111,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_memory(&mut self, memory: memory::Memory) {
-        self.def("M", memory);
+        self.set("M", memory);
     }
 
     pub fn globals(&self) -> table::Table {
@@ -119,7 +119,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_globals(&mut self, globals: table::Table) {
-        self.def("G", globals);
+        self.set("G", globals);
     }
 
     pub fn locals(&self) -> locals::Locals {
@@ -127,7 +127,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_locals(&mut self, locals: locals::Locals) {
-        self.def("L", locals);
+        self.set("L", locals);
     }
 
     pub fn stack(&self) -> data_stack::DataStack {
@@ -135,7 +135,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_stack(&mut self, stack: data_stack::DataStack) {
-        self.def("S", stack);
+        self.set("S", stack);
     }
 
     pub fn trace(&self) -> stack::Stack {
@@ -143,7 +143,7 @@ impl InstructionBuilder {
     }
 
     pub fn set_trace(&mut self, trace: stack::Stack) {
-        self.def("T", trace);
+        self.set("T", trace);
     }
 
     fn function_tables(&self) -> pair::Pair {
@@ -173,7 +173,7 @@ impl InstructionBuilder {
     {
         // Pop right-to-left
         for dest_var in dest_vars.into_iter().rev() {
-            self.def(dest_var.to_string(), data_stack::top(self.stack()));
+            self.set(dest_var.to_string(), data_stack::top(self.stack()));
             self.drop();
         }
     }
@@ -183,7 +183,7 @@ impl InstructionBuilder {
     }
 
     pub fn get_top(&mut self, dest_var: impl ToString) {
-        self.def(dest_var, data_stack::top(self.stack()));
+        self.set(dest_var, data_stack::top(self.stack()));
     }
 
     pub fn push_trace(&mut self, item: Expr) {
@@ -191,7 +191,7 @@ impl InstructionBuilder {
     }
 
     pub fn pop_trace(&mut self, dest_var: impl ToString) {
-        self.def(dest_var, stack::top(self.trace()));
+        self.set(dest_var, stack::top(self.trace()));
         self.set_trace(stack::pop(self.trace()));
     }
 
@@ -200,7 +200,7 @@ impl InstructionBuilder {
     }
 
     pub fn get_global(&mut self, dest_var: impl ToString, global_id: number::Id) {
-        self.def(dest_var, table::index(self.globals(), global_id));
+        self.set(dest_var, table::index(self.globals(), global_id));
     }
 
     pub fn set_global(&mut self, global_id: number::Id, value: Expr) {
@@ -208,7 +208,7 @@ impl InstructionBuilder {
     }
 
     pub fn get_local(&mut self, dest_var: impl ToString, local_id: number::Id) {
-        self.def(dest_var, locals::index(self.locals(), local_id));
+        self.set(dest_var, locals::index(self.locals(), local_id));
     }
 
     pub fn set_local(&mut self, local_id: number::Id, value: Expr) {
@@ -216,7 +216,7 @@ impl InstructionBuilder {
     }
 
     pub fn load(&mut self, dest_var: impl ToString, address: number::I32) {
-        self.def(dest_var, memory::index(self.memory(), address));
+        self.set(dest_var, memory::index(self.memory(), address));
     }
 
     pub fn store(&mut self, address: number::I32, value: Expr) {
@@ -224,11 +224,11 @@ impl InstructionBuilder {
     }
 
     pub fn get_function(&mut self, dest_var: impl ToString, function_id: number::Id) {
-        self.def(dest_var, table::index(self.function_table(), function_id));
+        self.set(dest_var, table::index(self.function_table(), function_id));
     }
 
     pub fn get_function_indirect(&mut self, dest_var: impl ToString, function_id: number::Id) {
-        self.def(
+        self.set(
             dest_var,
             table::index(self.indirect_function_table(), function_id),
         );

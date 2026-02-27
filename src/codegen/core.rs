@@ -88,10 +88,6 @@ pub fn apply(func: Expr, args: impl IntoIterator<Item = Expr>) -> Expr {
     result
 }
 
-pub fn def(var: impl ToString, value: Expr, body: Expr) -> Expr {
-    apply(abs([var], body), [value])
-}
-
 /// `branch0` is selected if `condition` is 0, `branch1` is selected if `condition` is 1.
 pub fn select(condition: Bit, branch0: Expr, branch1: Expr) -> Expr {
     apply(condition, [branch0, branch1])
@@ -111,6 +107,12 @@ pub fn bit(b: bool) -> Bit {
     if b { var("1") } else { var("0") }
 }
 
+/// Constructs a simple `let {var} = {value} in {body}` expression.
+pub fn let_in(var: impl ToString, value: Expr, body: Expr) -> Expr {
+    apply(abs([var], body), [value])
+}
+
+/// Applies the function to itself, which allows the function to call itself recursively.
 pub fn rec(func: Expr) -> Expr {
     apply(func.clone(), [func])
 }
@@ -136,8 +138,16 @@ impl LetExprBuilder {
 
     /// Defines a variable.
     /// This is the same as adding a new `let {name} = {value} in` line  into a let expression.
-    pub fn def(&mut self, name: impl ToString, value: Expr) {
+    pub fn let_var(&mut self, name: impl ToString, value: Expr) {
         self.defs.push((name.to_string(), value));
+    }
+
+    /// Defines a recursive function, i.e. a function takes itself as the first argument and
+    /// therefore can call itself.
+    ///
+    /// To call the function, use [`rec`].
+    pub fn let_rec(&mut self, name: impl ToString, value: Expr) {
+        self.defs.push((name.to_string(), abs([name], value)));
     }
 
     /// Combines all the definitions with the given body expression to form a complete
@@ -152,23 +162,23 @@ impl LetExprBuilder {
     pub fn build_in(self, body: Expr) -> Expr {
         let mut result = body;
         for (var, value) in self.defs.into_iter().rev() {
-            result = def(var, value, result);
+            result = let_in(var, value, result);
         }
         result
     }
 }
 
-/// Provides definitions required for all basic codegen features.
-pub fn define_prelude(b: &mut LetExprBuilder) {
-    b.def("_", abs(["_"], var("_")));
+/// Provides definitions required for all core types and functions.
+pub fn generate_core_definitions(b: &mut LetExprBuilder) {
+    b.let_var("_", abs(["_"], var("_")));
 
-    b.def("0", abs(["x0", "x1"], var("x0")));
-    b.def("1", abs(["x0", "x1"], var("x1")));
+    b.let_var("0", abs(["x0", "x1"], var("x0")));
+    b.let_var("1", abs(["x0", "x1"], var("x1")));
 
-    pair::define_prelude(b);
-    list::define_prelude(b);
-    number::define_prelude(b);
-    tree::define_prelude(b);
+    pair::generate_defs(b);
+    list::generate_defs(b);
+    number::generate_defs(b);
+    tree::generate_defs(b);
 }
 
 pub mod io_command {
@@ -210,8 +220,8 @@ pub mod pair {
         apply(pair, [selector])
     }
 
-    pub fn define_prelude(b: &mut LetExprBuilder) {
-        b.def(
+    pub fn generate_defs(b: &mut LetExprBuilder) {
+        b.let_var(
             "P",
             abs(
                 ["first", "second"],
@@ -234,12 +244,10 @@ pub mod either {
         pair::new(var("1"), value)
     }
 
-    #[allow(unused)]
     pub fn is_second(either: Either) -> Expr {
         pair::get_first(either)
     }
 
-    #[allow(unused)]
     pub fn unwrap(either: Either) -> Expr {
         pair::get_second(either)
     }

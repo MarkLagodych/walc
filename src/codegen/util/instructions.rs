@@ -194,7 +194,11 @@ impl UtilGenerator {
             BlockLabelInfo::If { else_label, .. } => {
                 b.pop(["cond"]);
 
-                b.set_next(select(self.neqz(var("cond")), else_label.clone(), b.next()));
+                b.set_next(select(
+                    self.num_is_not_zero(var("cond")),
+                    else_label.clone(),
+                    b.next(),
+                ));
             }
             _ => {}
         }

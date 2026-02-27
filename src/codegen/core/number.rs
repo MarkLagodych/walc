@@ -33,16 +33,16 @@ impl NumberGenerator {
             if n == 0 {
                 continue; // "0b" is pre-defined in the prelude
             }
-            b.def(format!("{:X}b", n), byte_expr(n));
+            b.let_var(format!("{:X}b", n), byte_expr(n));
         }
         for &n in &self.ids {
-            b.def(format!("{:X}n", n), id_expr(n));
+            b.let_var(format!("{:X}n", n), id_expr(n));
         }
         for &n in &self.i32s {
-            b.def(format!("{:X}i", n), i32_expr(n));
+            b.let_var(format!("{:X}i", n), i32_expr(n));
         }
         for &n in &self.i64s {
-            b.def(format!("{:X}l", n), i64_expr(n));
+            b.let_var(format!("{:X}l", n), i64_expr(n));
         }
     }
 
@@ -94,8 +94,8 @@ impl NumberGenerator {
     }
 }
 
-pub fn define_prelude(b: &mut LetExprBuilder) {
-    b.def(
+pub fn generate_defs(b: &mut LetExprBuilder) {
+    b.let_var(
         "Byte",
         abs(
             (0..8).rev().map(|i| format!("{i}")),
@@ -104,7 +104,7 @@ pub fn define_prelude(b: &mut LetExprBuilder) {
     );
 
     // Reverses the bits of "x" and places them on top of "tail"
-    b.def(
+    b.let_var(
         "RevEx",
         abs(["rev", "x", "tail"], {
             select(
@@ -121,13 +121,13 @@ pub fn define_prelude(b: &mut LetExprBuilder) {
         }),
     );
 
-    b.def(
+    b.let_var(
         "Rev",
         abs(["x"], apply(rec(var("RevEx")), [var("x"), list::empty()])),
     );
 
     for (name, byte_count) in [("Id", 2), ("Int", 4), ("Long", 8)] {
-        b.def(
+        b.let_var(
             name,
             abs(
                 (0..byte_count).rev().map(|i| format!("b{i}")),
@@ -137,7 +137,7 @@ pub fn define_prelude(b: &mut LetExprBuilder) {
     }
 
     // Trees depend on this as the default value for uninitialized elements.
-    b.def("0b", byte_expr(0));
+    b.let_var("0b", byte_expr(0));
 }
 
 fn join_bytes(be_bytes: impl IntoIterator<Item = Expr>) -> Expr {

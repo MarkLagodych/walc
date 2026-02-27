@@ -55,10 +55,10 @@ pub mod list {
         pair::get_second(optional::unwrap(list))
     }
 
-    pub fn define_prelude(b: &mut LetExprBuilder) {
-        b.def("Empty", optional::none());
+    pub fn generate_defs(b: &mut LetExprBuilder) {
+        b.let_var("Empty", optional::none());
 
-        b.def(
+        b.let_var(
             // Cons (list constructor)
             "C",
             abs(

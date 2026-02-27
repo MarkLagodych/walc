@@ -1,6 +1,8 @@
-use crate::{analyzer::*, codegen::*};
+use super::*;
 
 use util::{InstructionInfo, UtilGenerator};
+
+use crate::analyzer::*;
 
 /// No control flow instructions that operate on blocks need parameter/result types, just the counts
 pub struct BlockTypeInfo {
