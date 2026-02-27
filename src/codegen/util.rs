@@ -41,7 +41,7 @@ impl UtilGenerator {
         self.num.generate(b);
 
         for (name, value) in self.defs.into_iter() {
-            b.let_var(name, value);
+            b.def(name, value);
         }
     }
 }

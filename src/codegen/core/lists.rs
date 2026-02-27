@@ -56,9 +56,9 @@ pub mod list {
     }
 
     pub fn generate_defs(b: &mut LetExprBuilder) {
-        b.let_var("Empty", optional::none());
+        b.def("Empty", optional::none());
 
-        b.let_var(
+        b.def(
             // Cons (list constructor)
             "C",
             abs(

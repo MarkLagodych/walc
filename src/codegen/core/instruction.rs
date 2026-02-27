@@ -46,7 +46,7 @@ impl InstructionBuilder {
     }
 
     pub fn set(&mut self, name: impl ToString, value: Expr) {
-        self.defs.let_var(name, value);
+        self.defs.def(name, value);
     }
 
     /// Builds a normal instruction that does not perform any I/O itself.

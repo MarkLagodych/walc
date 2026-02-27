@@ -69,16 +69,16 @@ pub mod tree {
         // Dummy trees
 
         // Indexable by 0 bits (i.e. not indexable)
-        b.let_var("T0", number::null_byte());
+        b.def("T0", number::null_byte());
         // Every node is indexable by i bits
         for i in 1..=32 {
-            b.let_var(
+            b.def(
                 format!("T{i}"),
                 tree::node(var(format!("T{}", i - 1)), var(format!("T{}", i - 1))),
             )
         }
 
-        b.let_rec(
+        b.det_rec(
             "Idx_",
             abs(["tree", "index"], {
                 select(list::is_not_empty(var("index")), var("tree"), {
@@ -90,7 +90,7 @@ pub mod tree {
             }),
         );
 
-        b.let_var(
+        b.def(
             "Idx",
             abs(
                 ["tree", "index"],
@@ -101,7 +101,7 @@ pub mod tree {
             ),
         );
 
-        b.let_rec(
+        b.det_rec(
             "Ins_",
             abs(["tree", "index", "value"], {
                 let left = tree::get_left(var("tree"));
@@ -129,7 +129,7 @@ pub mod tree {
             }),
         );
 
-        b.let_var(
+        b.def(
             "Ins",
             abs(
                 ["tree", "index", "value"],

@@ -59,7 +59,7 @@ impl CodeBuilder {
             match item {
                 ChainItem::Instruction(instr) => chain = apply(instr, [chain]),
                 ChainItem::Label(label) => {
-                    defs.let_var(label.clone(), chain);
+                    defs.def(label.clone(), chain);
                     chain = var(label);
                 }
             }

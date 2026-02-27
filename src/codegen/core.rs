@@ -138,7 +138,7 @@ impl LetExprBuilder {
 
     /// Defines a variable.
     /// This is the same as adding a new `let {name} = {value} in` line  into a let expression.
-    pub fn let_var(&mut self, name: impl ToString, value: Expr) {
+    pub fn def(&mut self, name: impl ToString, value: Expr) {
         self.defs.push((name.to_string(), value));
     }
 
@@ -146,7 +146,7 @@ impl LetExprBuilder {
     /// therefore can call itself.
     ///
     /// To call the function, use [`rec`].
-    pub fn let_rec(&mut self, name: impl ToString, value: Expr) {
+    pub fn det_rec(&mut self, name: impl ToString, value: Expr) {
         self.defs.push((name.to_string(), abs([name], value)));
     }
 
@@ -170,10 +170,10 @@ impl LetExprBuilder {
 
 /// Provides definitions required for all core types and functions.
 pub fn generate_core_definitions(b: &mut LetExprBuilder) {
-    b.let_var("_", abs(["_"], var("_")));
+    b.def("_", abs(["_"], var("_")));
 
-    b.let_var("0", abs(["x0", "x1"], var("x0")));
-    b.let_var("1", abs(["x0", "x1"], var("x1")));
+    b.def("0", abs(["x0", "x1"], var("x0")));
+    b.def("1", abs(["x0", "x1"], var("x1")));
 
     pair::generate_defs(b);
     list::generate_defs(b);
@@ -221,7 +221,7 @@ pub mod pair {
     }
 
     pub fn generate_defs(b: &mut LetExprBuilder) {
-        b.let_var(
+        b.def(
             "P",
             abs(
                 ["first", "second"],

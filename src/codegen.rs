@@ -57,19 +57,19 @@ impl ProgramBuilder {
         self.util.generate(&mut defs);
 
         for (id, data) in self.data_segments.into_iter().enumerate() {
-            defs.let_var(format!("Data{id:x}"), data);
+            defs.def(format!("Data{id:x}"), data);
         }
 
         for (id, func) in self.functions.into_iter().enumerate() {
-            defs.let_var(format!("Func{id:x}"), func);
+            defs.def(format!("Func{id:x}"), func);
         }
 
-        defs.let_var(
+        defs.def(
             "FunctionTable",
             table::from((0..func_count).map(|id| var(format!("Func{id:x}")))),
         );
 
-        defs.let_var(
+        defs.def(
             "CustomTable",
             table::from(self.custom_func_table.into_iter().map(|opt_id| {
                 if let Some(id) = opt_id {
@@ -80,7 +80,7 @@ impl ProgramBuilder {
             })),
         );
 
-        defs.let_var("Globals", table::from(self.globals));
+        defs.def("Globals", table::from(self.globals));
 
         defs.build_in(start)
     }
