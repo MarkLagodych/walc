@@ -12,14 +12,14 @@ use std::collections::HashSet as Set;
 /// The definitions are internally created on demand, with no name sorting,
 /// but obeying the depdendency order.
 #[derive(Default)]
-pub struct RuntimeGenerator {
+pub struct UtilGenerator {
     pub num: number::NumberGenerator,
 
     defs: Vec<(String, Expr)>,
     already_defined: Set<String>,
 }
 
-impl RuntimeGenerator {
+impl UtilGenerator {
     pub fn has(&self, definition_name: &str) -> bool {
         self.already_defined.contains(definition_name)
     }

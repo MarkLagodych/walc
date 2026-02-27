@@ -1,8 +1,6 @@
 use super::*;
 
-use crate::codegen::*;
-
-impl RuntimeGenerator {
+impl UtilGenerator {
     /// Bit inversion
     pub fn bit_inv(&mut self, a: Bit) -> Bit {
         select(a, bit(true), bit(false))

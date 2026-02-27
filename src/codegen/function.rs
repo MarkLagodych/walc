@@ -1,6 +1,6 @@
 use crate::{analyzer::*, codegen::*};
 
-use program::runtime::{InstructionInfo, RuntimeGenerator};
+use util::{InstructionInfo, UtilGenerator};
 
 /// No control flow instructions that operate on blocks need parameter/result types, just the counts
 pub struct BlockTypeInfo {
@@ -57,7 +57,7 @@ impl BlockInfo {
     fn from_func(func: &Func, end_label: code::Code) -> Self {
         Self {
             label_info: BlockLabelInfo::Func { end_label },
-            type_info: BlockTypeInfo::from_func_type(&func.func_type),
+            type_info: BlockTypeInfo::from_func_type(func.func_type),
         }
     }
 
@@ -115,7 +115,7 @@ impl BlockStack {
     }
 }
 
-pub fn function(rt: &mut RuntimeGenerator, func: &Func, types: &GlobalTypeInfo) -> code::Code {
+pub fn function(rt: &mut UtilGenerator, func: &Func, types: &GlobalTypeInfo) -> code::Code {
     let mut code = code::CodeBuilder::new();
 
     let mut blocks = BlockStack::new();
@@ -177,19 +177,19 @@ pub fn function(rt: &mut RuntimeGenerator, func: &Func, types: &GlobalTypeInfo) 
     code.build()
 }
 
-pub fn input_function(rt: &mut RuntimeGenerator) -> code::Code {
+pub fn input_function(rt: &mut UtilGenerator) -> code::Code {
     let mut code = code::CodeBuilder::new();
     code.push(rt.input_and_return());
     code.build()
 }
 
-pub fn output_function(rt: &mut RuntimeGenerator) -> code::Code {
+pub fn output_function(rt: &mut UtilGenerator) -> code::Code {
     let mut code = code::CodeBuilder::new();
     code.push(rt.output_and_return());
     code.build()
 }
 
-pub fn exit_function(rt: &mut RuntimeGenerator) -> code::Code {
+pub fn exit_function(rt: &mut UtilGenerator) -> code::Code {
     let mut code = code::CodeBuilder::new();
     code.push(rt.exit());
     code.build()
@@ -201,7 +201,7 @@ pub struct EntrypointInfo<'a> {
     pub data_memory_offsets: &'a [u32],
 }
 
-pub fn entrypoint(rt: &mut RuntimeGenerator, info: &EntrypointInfo) -> io_command::IoCommand {
+pub fn entrypoint(rt: &mut UtilGenerator, info: &EntrypointInfo) -> io_command::IoCommand {
     let mut code = code::CodeBuilder::new();
 
     for (data_id, target_offset) in info.data_memory_offsets.iter().enumerate() {

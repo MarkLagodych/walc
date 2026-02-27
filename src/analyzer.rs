@@ -35,7 +35,7 @@ pub struct Func<'a> {
 }
 
 pub struct Analyzer {
-    program: codegen::program::ProgramBuilder,
+    program: codegen::ProgramBuilder,
     types: GlobalTypeInfo,
     next_function_id: u32,
 }
@@ -53,7 +53,7 @@ impl Analyzer {
 
     pub fn new() -> Self {
         Self {
-            program: codegen::program::ProgramBuilder::new(),
+            program: codegen::ProgramBuilder::new(),
             types: GlobalTypeInfo::default(),
             next_function_id: 0,
         }

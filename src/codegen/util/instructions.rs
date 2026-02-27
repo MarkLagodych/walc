@@ -1,10 +1,9 @@
 use super::*;
 
-use crate::{analyzer::*, codegen::*};
-
+use function::*;
 use instruction::{Instruction, InstructionBuilder};
 
-use program::function::*;
+use crate::analyzer::*;
 
 pub struct InstructionInfo<'a> {
     pub op: &'a Operator<'a>,
@@ -12,7 +11,7 @@ pub struct InstructionInfo<'a> {
     pub blocks: &'a BlockStack,
 }
 
-impl RuntimeGenerator {
+impl UtilGenerator {
     pub fn instruction(&mut self, info: &mut InstructionInfo) -> Instruction {
         use Operator::*;
 
