@@ -53,6 +53,8 @@ impl UtilGenerator {
                 abs(["a", "b"], {
                     select(
                         list::is_not_empty(var("a")),
+                        // a is empty here. If b is not empty (i.e. of different bit length),
+                        // this is a logical error.
                         bit(true),
                         select(
                             heads_equal,
@@ -67,5 +69,10 @@ impl UtilGenerator {
         }
 
         apply(var("EQ"), [a, b])
+    }
+
+    pub fn num_not_equal(&mut self, a: number::Number, b: number::Number) -> Bit {
+        let a_is_equal_to_b = self.num_equal(a, b);
+        self.bit_not(a_is_equal_to_b)
     }
 }

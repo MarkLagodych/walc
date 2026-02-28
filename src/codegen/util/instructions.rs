@@ -27,14 +27,25 @@ impl UtilGenerator {
             BrTable { targets } => self.br_table(blocks, targets),
             Return => self.ret(blocks),
 
+            Drop => self.drop(),
+            Select => self.select(),
+
             I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
                 self.push_const(op)
             }
 
             LocalGet { local_index } => self.local_get(*local_index),
             LocalSet { local_index } => self.local_set(*local_index),
+            LocalTee { local_index } => self.local_tee(*local_index),
             GlobalGet { global_index } => self.global_get(*global_index),
             GlobalSet { global_index } => self.global_set(*global_index),
+
+            MemorySize { .. } => self.memory_size(),
+            MemoryGrow { .. } => self.memory_grow(),
+
+            I32Eqz | I64Eqz => self.eqz(),
+            I32Eq | I64Eq => self.eq(),
+            I32Ne | I64Ne => self.ne(),
 
             // TODO
             _ => todo!(),
@@ -286,6 +297,36 @@ impl UtilGenerator {
         b.build()
     }
 
+    fn drop(&mut self) -> Instruction {
+        if !self.has("Drop") {
+            self.def("Drop", {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a"]);
+                b.build()
+            });
+        }
+
+        var("Drop")
+    }
+
+    fn select(&mut self) -> Instruction {
+        if !self.has("Select") {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+
+                b.pop(["a", "b", "c"]);
+
+                b.push([select(self.num_is_zero(var("c")), var("a"), var("b"))]);
+
+                b.build()
+            };
+
+            self.def("Select", definition);
+        }
+
+        var("Select")
+    }
+
     fn push_const(&mut self, op: &Operator) -> Instruction {
         if !self.has("Push") {
             self.def("Push", {
@@ -333,7 +374,21 @@ impl UtilGenerator {
         apply(var("LSet"), [id])
     }
 
-    // TODO local.tee
+    fn local_tee(&mut self, local_index: u32) -> Instruction {
+        if !self.has("LTee") {
+            self.def("LTee", {
+                abs(["id"], {
+                    let mut b = InstructionBuilder::new();
+                    b.get_top("a");
+                    b.set_local(var("id"), var("a"));
+                    b.build()
+                })
+            });
+        }
+
+        let id = self.num.id_const(local_index as u16);
+        apply(var("LTee"), [id])
+    }
 
     fn global_get(&mut self, global_index: u32) -> Instruction {
         if !self.has("GGet") {
@@ -365,5 +420,78 @@ impl UtilGenerator {
 
         let id = self.num.id_const(global_index as u16);
         apply(var("GSet"), [id])
+    }
+
+    /// WALC memory size is 2^32 bytes and WASM memory page size is 2^16 bytes,
+    /// so there are 2^16 pages.
+    const MEMORY_SIZE_IN_PAGES: u32 = 1 << 16;
+
+    fn memory_size(&mut self) -> Instruction {
+        if !self.has("MemSize") {
+            let memory_size = self.num.i32_const(Self::MEMORY_SIZE_IN_PAGES);
+            self.def("MemSize", {
+                let mut b = InstructionBuilder::new();
+                b.push([memory_size]);
+                b.build()
+            });
+        }
+
+        var("MemSize")
+    }
+
+    fn memory_grow(&mut self) -> Instruction {
+        if !self.has("MemGrow") {
+            let memory_size = self.num.i32_const(Self::MEMORY_SIZE_IN_PAGES);
+            self.def("MemGrow", {
+                let mut b = InstructionBuilder::new();
+                b.pop(["ngrow"]);
+                b.push([memory_size]);
+                b.build()
+            });
+        }
+
+        var("MemGrow")
+    }
+
+    fn eqz(&mut self) -> Instruction {
+        if !self.has("Eqz") {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a"]);
+                b.push([self.num_is_zero(var("a"))]);
+                b.build()
+            };
+            self.def("Eqz", definition);
+        }
+
+        var("Eqz")
+    }
+
+    fn eq(&mut self) -> Instruction {
+        if !self.has("Eq") {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a", "b"]);
+                b.push([self.num_equal(var("a"), var("b"))]);
+                b.build()
+            };
+            self.def("Eq", definition);
+        }
+
+        var("Eq")
+    }
+
+    fn ne(&mut self) -> Instruction {
+        if !self.has("Ne") {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a", "b"]);
+                b.push([self.num_not_equal(var("a"), var("b"))]);
+                b.build()
+            };
+            self.def("Ne", definition);
+        }
+
+        var("Ne")
     }
 }
