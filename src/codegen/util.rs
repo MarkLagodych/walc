@@ -3,8 +3,6 @@ mod math;
 
 use crate::codegen::core::*;
 
-use std::collections::HashSet as Set;
-
 /// Generates all runtime utilities (instructions & maths) needed for the program.
 ///
 /// The definitions are internally created on demand, with no name sorting,
@@ -14,7 +12,7 @@ pub struct UtilGenerator {
     pub num: number::NumberGenerator,
 
     defs: Vec<(String, Expr)>,
-    already_defined: Set<String>,
+    already_defined: std::collections::HashSet<String>,
 }
 
 impl UtilGenerator {

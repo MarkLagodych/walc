@@ -1,17 +1,26 @@
+mod control_flow;
+mod memory;
+mod numeric;
+mod variable;
+mod walc_io;
+
 use super::*;
 
 use crate::codegen::{
-    function::{BlockLabels, BlockStack},
+    function::BlockStack,
     instruction::{Instruction, InstructionBuilder},
 };
 
-use crate::analyzer::*;
+use crate::analyzer::{Func, Operator};
 
 impl UtilGenerator {
     pub fn instruction(&mut self, op: &Operator, blocks: &BlockStack) -> Instruction {
         use Operator::*;
 
         match op {
+            Drop => self.drop(),
+            Select => self.select(),
+
             Nop => instruction::nop(),
             Unreachable => self.exit(),
 
@@ -27,13 +36,6 @@ impl UtilGenerator {
             BrTable { targets } => self.br_table(blocks, targets),
             Return => self.ret(blocks),
 
-            Drop => self.drop(),
-            Select => self.select(),
-
-            I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
-                self.push_const(op)
-            }
-
             LocalGet { local_index } => self.local_get(*local_index),
             LocalSet { local_index } => self.local_set(*local_index),
             LocalTee { local_index } => self.local_tee(*local_index),
@@ -43,6 +45,10 @@ impl UtilGenerator {
             MemorySize { .. } => self.memory_size(),
             MemoryGrow { .. } => self.memory_grow(),
 
+            I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
+                self.push_const(op)
+            }
+
             I32Eqz | I64Eqz => self.eqz(),
             I32Eq | I64Eq => self.eq(),
             I32Ne | I64Ne => self.ne(),
@@ -50,80 +56,6 @@ impl UtilGenerator {
             // TODO
             _ => todo!(),
         }
-    }
-
-    pub fn output_and_return(&mut self) -> Instruction {
-        if !self.has("Output") {
-            self.def("Output", {
-                let mut b = InstructionBuilder::new();
-                b.pop(["a"]);
-                // TODO convert a to byte
-                let byte = number::reverse_bits(var("a"));
-                b.ret();
-                b.build_output(byte)
-            });
-        }
-
-        var("Output")
-    }
-
-    pub fn input_and_return(&mut self) -> Instruction {
-        if !self.has("Input") {
-            let invalid_input = self.num.i32_const(u32::MAX);
-
-            self.def("Input", {
-                let mut b = InstructionBuilder::new();
-                b.push([select(
-                    optional::is_some(var("inp")),
-                    invalid_input,
-                    // TODO convert input to i32
-                    optional::unwrap(var("inp")),
-                )]);
-                b.ret();
-                b.build_input("inp")
-            });
-        }
-
-        var("Input")
-    }
-
-    pub fn exit(&mut self) -> Instruction {
-        if !self.has("Exit") {
-            self.def("Exit", {
-                let b = InstructionBuilder::new();
-                b.build_exit()
-            });
-        }
-
-        var("Exit")
-    }
-
-    pub fn call(&mut self, function_id: FuncId) -> Instruction {
-        if !self.has("Call") {
-            self.def("Call", {
-                abs(["funcid"], {
-                    let mut b = InstructionBuilder::new();
-                    b.call(var("funcid"));
-                    b.build()
-                })
-            });
-        }
-
-        let id = self.num.id_const(function_id as u16);
-        apply(var("Call"), [id])
-    }
-
-    pub fn call_indirect(&mut self) -> Instruction {
-        if !self.has("CallIndirect") {
-            self.def("CallIndirect", {
-                let mut b = InstructionBuilder::new();
-                b.pop(["a"]);
-                b.call_indirect(var("a"));
-                b.build()
-            });
-        }
-
-        var("CallIndirect")
     }
 
     pub fn func_prologue(&mut self, func: &Func) -> Instruction {
@@ -143,156 +75,6 @@ impl UtilGenerator {
 
         b.push_locals_frame(table::from(locals));
         b.push_stack_frame();
-
-        b.build()
-    }
-
-    fn begin_block(&mut self, blocks: &BlockStack) -> Instruction {
-        let block = blocks.get(0);
-
-        let mut b = InstructionBuilder::new();
-
-        match &block.labels {
-            BlockLabels::Loop => {
-                b.push_trace(b.next());
-            }
-            BlockLabels::If { else_label, .. } => {
-                b.pop(["cond"]);
-
-                b.set_next(select(
-                    self.num_is_not_zero(var("cond")),
-                    else_label.clone(),
-                    b.next(),
-                ));
-            }
-            _ => {}
-        }
-
-        let param_count = block.block_type.param_count;
-
-        b.pop((0..param_count).map(|i| format!("p{i:x}")));
-
-        b.push_stack_frame();
-
-        b.push((0..param_count).map(|i| var(format!("p{i:x}"))));
-
-        b.build()
-    }
-
-    fn end_block(&self, blocks: &BlockStack) -> Instruction {
-        let block = blocks.get(0);
-
-        let mut b = InstructionBuilder::new();
-
-        let result_count = block.block_type.result_count;
-
-        b.pop((0..result_count).map(|i| format!("r{i:x}")));
-
-        b.pop_stack_frame();
-
-        b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
-
-        match block.labels {
-            BlockLabels::Loop => {
-                b.drop_trace();
-            }
-            BlockLabels::Func { .. } => {
-                b.pop_locals_frame();
-                b.ret();
-            }
-            _ => {}
-        }
-
-        b.build()
-    }
-
-    fn block_else(&mut self, blocks: &BlockStack) -> Instruction {
-        let mut b = InstructionBuilder::new();
-
-        match &blocks.get(0).labels {
-            BlockLabels::If { end_label, .. } => {
-                b.set_next(end_label.clone());
-            }
-            _ => unreachable!(),
-        }
-
-        b.build()
-    }
-
-    fn ret(&mut self, blocks: &BlockStack) -> Instruction {
-        self.br(blocks, blocks.get_outermost_index())
-    }
-
-    fn br(&mut self, blocks: &BlockStack, depth: u32) -> Instruction {
-        let mut b = InstructionBuilder::new();
-
-        let target_block = blocks.get(depth);
-        let pop_count = match &target_block.labels {
-            BlockLabels::Loop => target_block.block_type.param_count,
-            _ => target_block.block_type.result_count,
-        };
-
-        b.pop((0..pop_count).map(|i| format!("x{i:x}")));
-
-        if depth > 0 {
-            for i in 0..depth - 1 {
-                b.pop_stack_frame();
-
-                if matches!(blocks.get(i).labels, BlockLabels::Loop) {
-                    b.drop_trace();
-                }
-            }
-        }
-
-        b.push((0..pop_count).map(|i| var(format!("x{i:x}"))));
-
-        match &target_block.labels {
-            BlockLabels::Loop => {
-                b.get_trace_top("loop");
-                b.set_next(var("loop"));
-            }
-            BlockLabels::If { end_label, .. }
-            | BlockLabels::Block { end_label }
-            | BlockLabels::Func { end_label } => {
-                b.set_next(end_label.clone());
-            }
-        }
-
-        b.build()
-    }
-
-    fn br_if(&mut self, blocks: &BlockStack, depth: u32) -> Instruction {
-        let mut b = InstructionBuilder::new();
-
-        b.pop(["cond"]);
-
-        b.set_next(select(
-            self.num_is_not_zero(var("cond")),
-            b.next(),
-            self.br(blocks, depth),
-        ));
-
-        b.build()
-    }
-
-    fn br_table(&mut self, blocks: &BlockStack, targets: &BrTable) -> Instruction {
-        let mut b = InstructionBuilder::new();
-
-        b.pop(["idx"]);
-
-        let mut next = self.br(blocks, targets.default());
-
-        // Here `targets` contain parsing `Result`s.
-        // The validator should catch all parsing errors, so we can just unwrap it.
-        let break_targets = targets.targets().collect::<Result<Vec<_>, _>>().unwrap();
-
-        for (i, target) in break_targets.into_iter().enumerate().rev() {
-            let i = self.num.i32_const(i as u32);
-            let target = self.br(blocks, target);
-            next = select(self.num_equal(var("idx"), i), next, target);
-        }
-
-        b.set_next(next);
 
         b.build()
     }
@@ -325,173 +107,5 @@ impl UtilGenerator {
         }
 
         var("Select")
-    }
-
-    fn push_const(&mut self, op: &Operator) -> Instruction {
-        if !self.has("Push") {
-            self.def("Push", {
-                abs(["item"], {
-                    let mut b = InstructionBuilder::new();
-                    b.push([var("item")]);
-                    b.build()
-                })
-            });
-        }
-
-        let item = self.num.with_init_value(op);
-        apply(var("Push"), [item])
-    }
-
-    fn local_get(&mut self, local_index: u32) -> Instruction {
-        if !self.has("LGet") {
-            self.def("LGet", {
-                abs(["id"], {
-                    let mut b = InstructionBuilder::new();
-                    b.get_local("a", var("id"));
-                    b.push([var("a")]);
-                    b.build()
-                })
-            });
-        }
-
-        let id = self.num.id_const(local_index as u16);
-        apply(var("LGet"), [id])
-    }
-
-    fn local_set(&mut self, local_index: u32) -> Instruction {
-        if !self.has("LSet") {
-            self.def("LSet", {
-                abs(["id"], {
-                    let mut b = InstructionBuilder::new();
-                    b.pop(["a"]);
-                    b.set_local(var("id"), var("a"));
-                    b.build()
-                })
-            });
-        }
-
-        let id = self.num.id_const(local_index as u16);
-        apply(var("LSet"), [id])
-    }
-
-    fn local_tee(&mut self, local_index: u32) -> Instruction {
-        if !self.has("LTee") {
-            self.def("LTee", {
-                abs(["id"], {
-                    let mut b = InstructionBuilder::new();
-                    b.get_top("a");
-                    b.set_local(var("id"), var("a"));
-                    b.build()
-                })
-            });
-        }
-
-        let id = self.num.id_const(local_index as u16);
-        apply(var("LTee"), [id])
-    }
-
-    fn global_get(&mut self, global_index: u32) -> Instruction {
-        if !self.has("GGet") {
-            self.def("GGet", {
-                abs(["id"], {
-                    let mut b = InstructionBuilder::new();
-                    b.get_global("a", var("id"));
-                    b.push([var("a")]);
-                    b.build()
-                })
-            });
-        }
-
-        let id = self.num.id_const(global_index as u16);
-        apply(var("GGet"), [id])
-    }
-
-    fn global_set(&mut self, global_index: u32) -> Instruction {
-        if !self.has("GSet") {
-            self.def("GSet", {
-                abs(["id"], {
-                    let mut b = InstructionBuilder::new();
-                    b.pop(["a"]);
-                    b.set_global(var("id"), var("a"));
-                    b.build()
-                })
-            });
-        }
-
-        let id = self.num.id_const(global_index as u16);
-        apply(var("GSet"), [id])
-    }
-
-    /// WALC memory size is 2^32 bytes and WASM memory page size is 2^16 bytes,
-    /// so there are 2^16 pages.
-    const MEMORY_SIZE_IN_PAGES: u32 = 1 << 16;
-
-    fn memory_size(&mut self) -> Instruction {
-        if !self.has("MemSize") {
-            let memory_size = self.num.i32_const(Self::MEMORY_SIZE_IN_PAGES);
-            self.def("MemSize", {
-                let mut b = InstructionBuilder::new();
-                b.push([memory_size]);
-                b.build()
-            });
-        }
-
-        var("MemSize")
-    }
-
-    fn memory_grow(&mut self) -> Instruction {
-        if !self.has("MemGrow") {
-            let memory_size = self.num.i32_const(Self::MEMORY_SIZE_IN_PAGES);
-            self.def("MemGrow", {
-                let mut b = InstructionBuilder::new();
-                b.pop(["ngrow"]);
-                b.push([memory_size]);
-                b.build()
-            });
-        }
-
-        var("MemGrow")
-    }
-
-    fn eqz(&mut self) -> Instruction {
-        if !self.has("Eqz") {
-            let definition = {
-                let mut b = InstructionBuilder::new();
-                b.pop(["a"]);
-                b.push([self.num_is_zero(var("a"))]);
-                b.build()
-            };
-            self.def("Eqz", definition);
-        }
-
-        var("Eqz")
-    }
-
-    fn eq(&mut self) -> Instruction {
-        if !self.has("Eq") {
-            let definition = {
-                let mut b = InstructionBuilder::new();
-                b.pop(["a", "b"]);
-                b.push([self.num_equal(var("a"), var("b"))]);
-                b.build()
-            };
-            self.def("Eq", definition);
-        }
-
-        var("Eq")
-    }
-
-    fn ne(&mut self) -> Instruction {
-        if !self.has("Ne") {
-            let definition = {
-                let mut b = InstructionBuilder::new();
-                b.pop(["a", "b"]);
-                b.push([self.num_not_equal(var("a"), var("b"))]);
-                b.build()
-            };
-            self.def("Ne", definition);
-        }
-
-        var("Ne")
     }
 }
