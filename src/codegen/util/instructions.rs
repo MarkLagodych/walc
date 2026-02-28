@@ -1,7 +1,9 @@
 use super::*;
 
-use function::*;
-use instruction::{Instruction, InstructionBuilder};
+use crate::codegen::{
+    function::{BlockLabels, BlockStack},
+    instruction::{Instruction, InstructionBuilder},
+};
 
 use crate::analyzer::*;
 
@@ -136,15 +138,14 @@ impl UtilGenerator {
 
     fn begin_block(&mut self, blocks: &BlockStack) -> Instruction {
         let block = blocks.get(0);
-        let param_count = block.type_info.param_count;
 
         let mut b = InstructionBuilder::new();
 
-        match &block.label_info {
-            BlockLabelInfo::Loop => {
+        match &block.labels {
+            BlockLabels::Loop => {
                 b.push_trace(b.next());
             }
-            BlockLabelInfo::If { else_label, .. } => {
+            BlockLabels::If { else_label, .. } => {
                 b.pop(["cond"]);
 
                 b.set_next(select(
@@ -155,6 +156,8 @@ impl UtilGenerator {
             }
             _ => {}
         }
+
+        let param_count = block.block_type.param_count;
 
         b.pop((0..param_count).map(|i| format!("p{i:x}")));
 
@@ -167,9 +170,10 @@ impl UtilGenerator {
 
     fn end_block(&self, blocks: &BlockStack) -> Instruction {
         let block = blocks.get(0);
-        let result_count = block.type_info.result_count;
 
         let mut b = InstructionBuilder::new();
+
+        let result_count = block.block_type.result_count;
 
         b.pop((0..result_count).map(|i| format!("r{i:x}")));
 
@@ -177,11 +181,11 @@ impl UtilGenerator {
 
         b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
 
-        match block.label_info {
-            BlockLabelInfo::Loop => {
+        match block.labels {
+            BlockLabels::Loop => {
                 b.drop_trace();
             }
-            BlockLabelInfo::Func { .. } => {
+            BlockLabels::Func { .. } => {
                 b.pop_locals_frame();
                 b.ret();
             }
@@ -194,8 +198,8 @@ impl UtilGenerator {
     fn block_else(&mut self, blocks: &BlockStack) -> Instruction {
         let mut b = InstructionBuilder::new();
 
-        match &blocks.get(0).label_info {
-            BlockLabelInfo::If { end_label, .. } => {
+        match &blocks.get(0).labels {
+            BlockLabels::If { end_label, .. } => {
                 b.set_next(end_label.clone());
             }
             _ => unreachable!(),
@@ -205,16 +209,16 @@ impl UtilGenerator {
     }
 
     fn ret(&mut self, blocks: &BlockStack) -> Instruction {
-        self.br(blocks, blocks.get_depth())
+        self.br(blocks, blocks.get_outermost_index())
     }
 
     fn br(&mut self, blocks: &BlockStack, depth: u32) -> Instruction {
         let mut b = InstructionBuilder::new();
 
         let target_block = blocks.get(depth);
-        let pop_count = match &target_block.label_info {
-            BlockLabelInfo::Loop => target_block.type_info.param_count,
-            _ => target_block.type_info.result_count,
+        let pop_count = match &target_block.labels {
+            BlockLabels::Loop => target_block.block_type.param_count,
+            _ => target_block.block_type.result_count,
         };
 
         b.pop((0..pop_count).map(|i| format!("x{i:x}")));
@@ -223,7 +227,7 @@ impl UtilGenerator {
             for i in 0..depth - 1 {
                 b.pop_stack_frame();
 
-                if matches!(blocks.get(i).label_info, BlockLabelInfo::Loop) {
+                if matches!(blocks.get(i).labels, BlockLabels::Loop) {
                     b.drop_trace();
                 }
             }
@@ -231,14 +235,14 @@ impl UtilGenerator {
 
         b.push((0..pop_count).map(|i| var(format!("x{i:x}"))));
 
-        match &target_block.label_info {
-            BlockLabelInfo::Loop => {
+        match &target_block.labels {
+            BlockLabels::Loop => {
                 b.get_trace_top("loop");
                 b.set_next(var("loop"));
             }
-            BlockLabelInfo::If { end_label, .. }
-            | BlockLabelInfo::Block { end_label }
-            | BlockLabelInfo::Func { end_label } => {
+            BlockLabels::If { end_label, .. }
+            | BlockLabels::Block { end_label }
+            | BlockLabels::Func { end_label } => {
                 b.set_next(end_label.clone());
             }
         }

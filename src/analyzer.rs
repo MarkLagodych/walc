@@ -34,7 +34,7 @@ pub struct Func<'a> {
     pub operators: &'a [Operator<'a>],
 }
 
-pub struct Analyzer {
+struct Analyzer {
     program: codegen::ProgramBuilder,
     types: GlobalTypeInfo,
     next_function_id: u32,
@@ -62,7 +62,7 @@ impl Analyzer {
     pub fn compile(mut self, source: &[u8]) -> Result<codegen::Expr> {
         Validator::new_with_features(Self::SUPPORTED_FEATURES)
             .validate_all(source)
-            .map_err(|e| anyhow!("validation failed: {e}"))?;
+            .map_err(|e| anyhow!("WASM 1.0 validation failed: {e}"))?;
 
         let mut parser = Parser::new(0);
         parser.set_features(Self::SUPPORTED_FEATURES);
@@ -128,7 +128,7 @@ impl Analyzer {
             ))?
         }
 
-        let ty = match import.name {
+        let required_type = match import.name {
             "input" => FuncType::new([], [ValType::I32]),
             "output" => FuncType::new([ValType::I32], []),
             "exit" => FuncType::new([], []),
@@ -137,9 +137,9 @@ impl Analyzer {
             ))?,
         };
 
-        if func_type != &ty {
+        if func_type != &required_type {
             Err(anyhow!(
-                "'walc.{name}' must have type `{ty}`, got `{func_type}`",
+                "'walc.{name}' must have type {required_type}, got {func_type}",
                 name = import.name,
             ))?
         }
@@ -160,8 +160,12 @@ impl Analyzer {
 
             let func_type = self.types.get_function_type(export.index);
 
-            if !(func_type.params().is_empty() && func_type.results().is_empty()) {
-                Err(anyhow!("'main' must have type () -> ()"))?
+            let required_type = FuncType::new([], []);
+
+            if func_type != &required_type {
+                Err(anyhow!(
+                    "'main' must have type {required_type}, got {func_type}"
+                ))?
             }
 
             has_main = true;

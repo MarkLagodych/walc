@@ -234,17 +234,6 @@ impl InstructionBuilder {
         self.set_memory(memory::insert(self.memory(), address, value));
     }
 
-    pub fn get_function(&mut self, dest_var: impl ToString, function_id: number::Id) {
-        self.def(dest_var, table::index(self.function_table(), function_id));
-    }
-
-    pub fn get_function_indirect(&mut self, dest_var: impl ToString, function_id: number::Id) {
-        self.def(
-            dest_var,
-            table::index(self.indirect_function_table(), function_id),
-        );
-    }
-
     pub fn call(&mut self, function_id: number::Id) {
         self.push_trace(self.next());
         self.set_next(table::index(self.function_table(), function_id));

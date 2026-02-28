@@ -1,10 +1,8 @@
-use super::*;
+use crate::codegen::{core::*, util::UtilGenerator};
 
-use util::UtilGenerator;
+use crate::analyzer::{BlockType, Func, FuncId, FuncType, GlobalTypeInfo, Operator};
 
-use crate::analyzer::Operator;
-
-/// No control flow instructions that operate on blocks need parameter/result types, just the counts
+/// No control flow instructions need parameter/result types, just the counts
 pub struct BlockTypeInfo {
     pub param_count: u32,
     pub result_count: u32,
@@ -28,83 +26,43 @@ impl BlockTypeInfo {
                 param_count: 0,
                 result_count: 1,
             },
-            BlockType::FuncType(type_id) => {
-                let func_type = &types.get_type(*type_id);
-                Self::from_func_type(func_type)
-            }
+            BlockType::FuncType(type_id) => Self::from_func_type(types.get_type(*type_id)),
         }
     }
 }
 
-pub enum BlockLabelInfo {
+pub enum BlockLabels {
     Func {
-        end_label: code::Code,
-    },
-    /// `loop` pushes the instruction following it to the trace
-    Loop,
-    If {
-        else_label: code::Code,
         end_label: code::Code,
     },
     Block {
         end_label: code::Code,
     },
-}
-
-pub struct BlockInfo {
-    pub label_info: BlockLabelInfo,
-    pub type_info: BlockTypeInfo,
-}
-
-impl BlockInfo {
-    fn from_func(func: &Func, end_label: code::Code) -> Self {
-        Self {
-            label_info: BlockLabelInfo::Func { end_label },
-            type_info: BlockTypeInfo::from_func_type(func.func_type),
-        }
-    }
-
-    fn from_loop(blockty: &BlockType, types: &GlobalTypeInfo) -> Self {
-        Self {
-            label_info: BlockLabelInfo::Loop,
-            type_info: BlockTypeInfo::from_block_type(blockty, types),
-        }
-    }
-
-    fn from_if(
-        blockty: &BlockType,
-        types: &GlobalTypeInfo,
-        else_label: code::Code,
+    If {
         end_label: code::Code,
-    ) -> Self {
-        Self {
-            label_info: BlockLabelInfo::If {
-                else_label,
-                end_label,
-            },
-            type_info: BlockTypeInfo::from_block_type(blockty, types),
-        }
-    }
+        else_label: code::Code,
+    },
+    /// `loop` performs a backward jump, i.e. it only pushes the instruction following it
+    /// to the trace, so no labels are needed.
+    Loop,
+}
 
-    fn from_block(blockty: &BlockType, types: &GlobalTypeInfo, end_label: code::Code) -> Self {
-        Self {
-            label_info: BlockLabelInfo::Block { end_label },
-            type_info: BlockTypeInfo::from_block_type(blockty, types),
-        }
-    }
+pub struct Block {
+    pub labels: BlockLabels,
+    pub block_type: BlockTypeInfo,
 }
 
 #[derive(Default)]
 pub struct BlockStack {
-    blocks: Vec<BlockInfo>,
+    blocks: Vec<Block>,
 }
 
 impl BlockStack {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self::default()
     }
 
-    fn push(&mut self, block_info: BlockInfo) {
+    fn push(&mut self, block_info: Block) {
         self.blocks.push(block_info);
     }
 
@@ -112,13 +70,16 @@ impl BlockStack {
         self.blocks.pop();
     }
 
-    pub fn get(&self, level: u32) -> &BlockInfo {
-        let idx = self.blocks.len() - 1 - level as usize;
+    /// Gets the block at the given relative index counting from the innermost block,
+    /// i.e. `get(0)` returns the innermost block, `get(1)` returns the next outer block, etc.
+    pub fn get(&self, relative_index: u32) -> &Block {
+        let idx = self.blocks.len() - 1 - relative_index as usize;
         &self.blocks[idx]
     }
 
-    pub fn get_depth(&self) -> u32 {
-        self.blocks.len() as u32
+    /// Gets relative index of the outermost block.
+    pub fn get_outermost_index(&self) -> u32 {
+        self.blocks.len() as u32 - 1
     }
 }
 
@@ -155,9 +116,11 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn generate_prologue_code(&mut self) {
-        let function_end_label = self.code.make_label();
-        let block_info = BlockInfo::from_func(self.func, function_end_label.clone());
-        self.blocks.push(block_info);
+        let end_label = self.code.make_label();
+        self.blocks.push(Block {
+            block_type: BlockTypeInfo::from_func_type(self.func.func_type),
+            labels: BlockLabels::Func { end_label },
+        });
 
         let instr = self.util.func_prologue(self.func);
         self.code.push(instr);
@@ -177,45 +140,54 @@ impl<'a> FunctionBuilder<'a> {
     fn before_instruction(&mut self, op: &Operator) {
         match op {
             Operator::Loop { blockty } => {
-                let block_info = BlockInfo::from_loop(blockty, self.types);
-
-                self.blocks.push(block_info);
+                self.blocks.push(Block {
+                    block_type: BlockTypeInfo::from_block_type(blockty, self.types),
+                    labels: BlockLabels::Loop,
+                });
             }
 
             Operator::If { blockty } => {
                 let else_label = self.code.make_label();
                 let end_label = self.code.make_label();
-                let block_info = BlockInfo::from_if(blockty, self.types, else_label, end_label);
+                self.blocks.push(Block {
+                    block_type: BlockTypeInfo::from_block_type(blockty, self.types),
+                    labels: BlockLabels::If {
+                        else_label,
+                        end_label,
+                    },
+                });
 
-                self.blocks.push(block_info);
                 self.if_has_else.push(false);
             }
 
             Operator::Block { blockty } => {
                 let end_label = self.code.make_label();
-                let block_info = BlockInfo::from_block(blockty, self.types, end_label);
-
-                self.blocks.push(block_info);
+                self.blocks.push(Block {
+                    block_type: BlockTypeInfo::from_block_type(blockty, self.types),
+                    labels: BlockLabels::Block { end_label },
+                });
             }
 
-            Operator::End => match &self.blocks.get(0).label_info {
-                BlockLabelInfo::If {
-                    end_label,
-                    else_label,
-                } => {
+            Operator::End => {
+                let block_labels = &self.blocks.get(0).labels;
+
+                if let BlockLabels::If { else_label, .. } = block_labels {
                     let has_else = self.if_has_else.pop().unwrap();
 
                     if !has_else {
                         self.code.push_label(else_label.clone());
                     }
+                }
 
-                    self.code.push_label(end_label.clone());
+                match block_labels {
+                    BlockLabels::If { end_label, .. }
+                    | BlockLabels::Block { end_label }
+                    | BlockLabels::Func { end_label } => {
+                        self.code.push_label(end_label.clone());
+                    }
+                    _ => {}
                 }
-                BlockLabelInfo::Block { end_label } | BlockLabelInfo::Func { end_label } => {
-                    self.code.push_label(end_label.clone());
-                }
-                _ => {}
-            },
+            }
 
             _ => {}
         }
@@ -227,14 +199,16 @@ impl<'a> FunctionBuilder<'a> {
                 self.blocks.pop();
             }
 
-            Operator::Else => match &self.blocks.get(0).label_info {
-                BlockLabelInfo::If { else_label, .. } => {
+            Operator::Else => {
+                let block_labels = &self.blocks.get(0).labels;
+
+                if let BlockLabels::If { else_label, .. } = block_labels {
                     self.code.push_label(else_label.clone());
 
-                    *self.if_has_else.last_mut().unwrap() = true;
+                    let has_else = self.if_has_else.last_mut().unwrap();
+                    *has_else = true;
                 }
-                _ => unreachable!(),
-            },
+            }
 
             _ => {}
         }

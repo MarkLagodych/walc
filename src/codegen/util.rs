@@ -1,9 +1,7 @@
 mod instructions;
-pub use instructions::*;
-
 mod math;
 
-use super::*;
+use crate::codegen::core::*;
 
 use std::collections::HashSet as Set;
 
