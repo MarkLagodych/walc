@@ -18,9 +18,11 @@ impl UtilGenerator {
         use Operator::*;
 
         match op {
+            // Parametric instructions ///////////////////////////////////////
             Drop => self.drop(),
             Select => self.select(),
 
+            // Constrol flow instructions /////////////////////////////////////
             Nop => instruction::nop(),
             Unreachable => self.exit(),
 
@@ -36,22 +38,39 @@ impl UtilGenerator {
             BrTable { targets } => self.br_table(blocks, targets),
             Return => self.ret(blocks),
 
+            // Variable instructions ///////////////////////////////////////////
             LocalGet { local_index } => self.local_get(*local_index),
             LocalSet { local_index } => self.local_set(*local_index),
             LocalTee { local_index } => self.local_tee(*local_index),
             GlobalGet { global_index } => self.global_get(*global_index),
             GlobalSet { global_index } => self.global_set(*global_index),
 
+            // Memory instructions //////////////////////////////////////////
             MemorySize { .. } => self.memory_size(),
             MemoryGrow { .. } => self.memory_grow(),
 
+            // Numeric instructions //////////////////////////////////////////
             I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
-                self.push_const(op)
+                self.const_push(op)
             }
 
             I32Eqz | I64Eqz => self.eqz(),
             I32Eq | I64Eq => self.eq(),
             I32Ne | I64Ne => self.ne(),
+
+            I32And | I64And => self.and(),
+            I32Or | I64Or => self.or(),
+            I32Xor | I64Xor => self.xor(),
+
+            I32LtU | I64LtU => self.lt_u(),
+            I32LeU | I64LeU => self.le_u(),
+            I32GtU | I64GtU => self.gt_u(),
+            I32GeU | I64GeU => self.ge_u(),
+
+            I32LtS | I64LtS => self.lt_s(),
+            I32LeS | I64LeS => self.le_s(),
+            I32GtS | I64GtS => self.gt_s(),
+            I32GeS | I64GeS => self.ge_s(),
 
             // TODO
             _ => todo!(),
