@@ -1,31 +1,31 @@
 use super::*;
 
 impl UtilGenerator {
-    fn bit_not(&mut self, a: Bit) -> Bit {
+    fn bit_not(&self, a: Bit) -> Bit {
         select(a, bit(true), bit(false))
     }
 
-    fn bit_and(&mut self, a: Bit, b: Bit) -> Bit {
+    fn bit_and(&self, a: Bit, b: Bit) -> Bit {
         select(a, bit(false), b)
     }
 
-    fn bit_or(&mut self, a: Bit, b: Bit) -> Bit {
+    fn bit_or(&self, a: Bit, b: Bit) -> Bit {
         select(a, b, bit(true))
     }
 
-    fn bit_less(&mut self, a: Bit, b: Bit) -> Bit {
+    fn bit_less(&self, a: Bit, b: Bit) -> Bit {
         select(a, b, bit(false))
     }
 
-    fn bit_less_equal(&mut self, a: Bit, b: Bit) -> Bit {
+    fn bit_less_equal(&self, a: Bit, b: Bit) -> Bit {
         select(a, bit(true), b)
     }
 
-    fn bit_xor(&mut self, a: Bit, b: Bit) -> Bit {
+    fn bit_xor(&self, a: Bit, b: Bit) -> Bit {
         select(a, b.clone(), self.bit_not(b))
     }
 
-    fn bit_equal(&mut self, a: Bit, b: Bit) -> Bit {
+    fn bit_equal(&self, a: Bit, b: Bit) -> Bit {
         select(a, self.bit_not(b.clone()), b)
     }
 
@@ -355,5 +355,112 @@ impl UtilGenerator {
     pub fn num_greater_equal_signed(&mut self, a: number::Number, b: number::Number) -> Bit {
         let a_less_than_b = self.num_less_signed(a, b);
         self.bit_not(a_less_than_b)
+    }
+
+    pub fn num_add(&mut self, a: number::Number, b: number::Number) -> number::Number {
+        if !self.has("ADD") {
+            // Full adder for two bits and a carry-in:
+            // In: A, B, Cin (carry in)
+            // Out: Sum, Cout (carry out)
+            // 1. X = A xor B
+            // 2. Sum = X xor Cin
+            // 3. Cout = (A and B) or (X and Cin)
+
+            let mut b = LetExprBuilder::new();
+
+            let a_head = list::get_head(var("a"));
+            let a_tail = list::get_tail(var("a"));
+
+            let b_head = list::get_head(var("b"));
+            let b_tail = list::get_tail(var("b"));
+
+            b.def("x", self.bit_xor(a_head.clone(), b_head.clone()));
+
+            let sum_head = self.bit_xor(var("x"), var("c"));
+
+            let carry_out = self.bit_or(
+                self.bit_and(a_head, b_head),
+                self.bit_and(var("x"), var("c")),
+            );
+
+            let sum_tail = apply(rec(var("_ADD")), [carry_out, a_tail, b_tail]);
+
+            let body = select(
+                list::is_not_empty(var("a")),
+                list::empty(),
+                list::node(sum_head, sum_tail),
+            );
+
+            self.def_rec("_ADD", abs(["c", "a", "b"], b.build_in(body)));
+
+            self.def("ADD", apply(rec(var("_ADD")), [bit(false)]));
+        }
+
+        apply(var("ADD"), [a, b])
+    }
+
+    /// Fast algorithm for adding 1 to a number.
+    fn num_inc(&mut self, a: number::Number) -> number::Number {
+        if !self.has("INC") {
+            // Adding 1 is equivalent to flipping leading ones and the first zero bit. For example:
+            //
+            // INC(000000_LE) = 100000_LE
+            //     *            *
+            //
+            // INC(111000_LE) = 000100_LE
+            //     ^^^*         ^^^*
+            //
+            // INC(111111_LE) = 000000_LE
+            //     ^^^^^^       ^^^^^^
+
+            let a_head = list::get_head(var("a"));
+            let a_tail = list::get_tail(var("a"));
+
+            let body = select(
+                list::is_not_empty(var("a")),
+                list::empty(),
+                select(
+                    a_head,
+                    list::node(bit(true), a_tail.clone()),
+                    list::node(bit(false), apply(rec(var("_INC")), [a_tail])),
+                ),
+            );
+
+            self.def_rec("_INC", abs(["a"], body));
+
+            self.def("INC", rec(var("_INC")));
+        }
+
+        apply(var("INC"), [a])
+    }
+
+    /// Applies bit NOT to every bit
+    fn num_invert(&mut self, a: number::Number) -> number::Number {
+        if !self.has("INV") {
+            let a_head = list::get_head(var("a"));
+            let a_tail = list::get_tail(var("a"));
+
+            let body = select(
+                list::is_not_empty(var("a")),
+                list::empty(),
+                list::node(self.bit_not(a_head), apply(rec(var("_INV")), [a_tail])),
+            );
+
+            self.def_rec("_INV", abs(["a"], body));
+
+            self.def("INV", rec(var("_INV")));
+        }
+
+        apply(var("INV"), [a])
+    }
+
+    fn num_negate(&mut self, a: number::Number) -> number::Number {
+        let a_inverted = self.num_invert(a);
+        self.num_inc(a_inverted)
+    }
+
+    pub fn num_sub(&mut self, a: number::Number, b: number::Number) -> number::Number {
+        let b_negated = self.num_negate(b);
+        self.num_add(a, b_negated)
     }
 }

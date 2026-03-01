@@ -211,4 +211,32 @@ impl UtilGenerator {
 
         var("GeS")
     }
+
+    pub fn add(&mut self) -> Instruction {
+        if !self.has("Add") {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a", "b"]);
+                b.push([self.num_add(var("a"), var("b"))]);
+                b.build()
+            };
+            self.def("Add", definition);
+        }
+
+        var("Add")
+    }
+
+    pub fn sub(&mut self) -> Instruction {
+        if !self.has("Sub") {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a", "b"]);
+                b.push([self.num_sub(var("a"), var("b"))]);
+                b.build()
+            };
+            self.def("Sub", definition);
+        }
+
+        var("Sub")
+    }
 }

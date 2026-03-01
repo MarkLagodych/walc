@@ -72,6 +72,9 @@ impl UtilGenerator {
             I32GtS | I64GtS => self.gt_s(),
             I32GeS | I64GeS => self.ge_s(),
 
+            I32Add | I64Add => self.add(),
+            I32Sub | I64Sub => self.sub(),
+
             // TODO
             _ => todo!(),
         }
