@@ -49,7 +49,7 @@ impl Analyzer {
     const MAX_ID: u32 = u16::MAX as u32;
     const MAX_COUNT: u32 = Self::MAX_ID + 1;
 
-    const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1;
+    const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1.union(WasmFeatures::MULTI_VALUE);
 
     pub fn new() -> Self {
         Self {
@@ -62,7 +62,7 @@ impl Analyzer {
     pub fn compile(mut self, source: &[u8]) -> Result<codegen::Expr> {
         Validator::new_with_features(Self::SUPPORTED_FEATURES)
             .validate_all(source)
-            .map_err(|e| anyhow!("WASM 1.0 validation failed: {e}"))?;
+            .map_err(|e| anyhow!("WASM validation failed: {e}"))?;
 
         let mut parser = Parser::new(0);
         parser.set_features(Self::SUPPORTED_FEATURES);

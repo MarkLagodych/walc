@@ -108,7 +108,8 @@ IN
 The key is to always use the function `f` applying it to itself: `(f f)`.
 This way it can always refer to itself by its first argument.
 
-TODO Explain how this becomes simpler with the Y combinator
+TODO Explain how this becomes simpler with the Y combinator and why we don't
+use it.
 
 ```
 LETREC f<x,y,z> =
@@ -144,39 +145,6 @@ To compute the loop, simply use `loop<initial_state, 0, max>`.
 
 TODO
 
-Short, with fixed numbers of bits, mostly need access to all the bits at once.
-
--> tuples of bits
-
-## Dynamic arrays
-
-Large, variable-sized, never shrink (WASM-specific), need good random access
-time.
-
--> binary trees
-
-## Stacks
-
--> linked lists are sufficient
-
 ## Binary trees
 
-```
-let tree<left,right> = pair<left, right>
-```
-
-The leaves are optionals.
-
-Empty subtrees are assigned to empty dummy tree constants:
-
-```
-let dummy_tree_2 = tree<none, none>
-let dummy_tree_4 = tree<dummy_tree_2, dummy_tree_2>
-let dummy_tree_8 = tree<dummy_tree_4, dummy_tree_4>
-...
-```
-
-To index a tree, just apply all index bits to it.
-To remove from a tree, just assign its element to `none`.
-
-TODO Update basics to match all the codegen primitives
+TODO
