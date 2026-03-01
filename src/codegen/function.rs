@@ -221,21 +221,15 @@ pub fn function(util: &mut UtilGenerator, func: &Func, types: &GlobalTypeInfo) -
 }
 
 pub fn input_function(util: &mut UtilGenerator) -> code::Code {
-    let mut code = code::CodeBuilder::new();
-    code.push(util.input_and_return());
-    code.build()
+    code::single(util.input_and_return())
 }
 
 pub fn output_function(util: &mut UtilGenerator) -> code::Code {
-    let mut code = code::CodeBuilder::new();
-    code.push(util.output_and_return());
-    code.build()
+    code::single(util.output_and_return())
 }
 
 pub fn exit_function(util: &mut UtilGenerator) -> code::Code {
-    let mut code = code::CodeBuilder::new();
-    code.push(util.exit());
-    code.build()
+    code::single(util.exit())
 }
 
 pub struct EntrypointInfo<'a> {

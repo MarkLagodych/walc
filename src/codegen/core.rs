@@ -95,9 +95,19 @@ pub fn select(condition: Bit, branch0: Expr, branch1: Expr) -> Expr {
 
 pub fn unreachable() -> Expr {
     if cfg!(feature = "unbound-unreachable") {
-        var("UNREACHABLE")
+        static mut NEXT_ID: u32 = 0;
+
+        // Generates a unique identifier of an unbound variable.
+        // We don't care about thread safety here
+        let next_id = unsafe {
+            let id = NEXT_ID;
+            NEXT_ID += 1;
+            id
+        };
+
+        var(format!("UNREACHABLE_{}", next_id))
     } else {
-        var("_")
+        abs(["_"], var("_"))
     }
 }
 

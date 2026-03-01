@@ -254,7 +254,7 @@ impl InstructionBuilder {
         self.set_stack(data_stack::push_frame(self.stack()));
     }
 
-    pub fn pop_locals_frame(&mut self) {
+    pub fn drop_locals_frame(&mut self) {
         self.set_locals(locals::pop_frame(self.locals()));
         self.set_stack(data_stack::pop_frame(self.stack()));
     }
@@ -263,7 +263,7 @@ impl InstructionBuilder {
         self.set_stack(data_stack::push_frame(self.stack()));
     }
 
-    pub fn pop_stack_frame(&mut self) {
+    pub fn drop_stack_frame(&mut self) {
         self.set_stack(data_stack::pop_frame(self.stack()));
     }
 }

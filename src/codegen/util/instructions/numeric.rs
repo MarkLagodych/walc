@@ -21,7 +21,15 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a"]);
-                b.push([self.num_is_zero(var("a"))]);
+
+                let result = select(
+                    self.num_is_zero(var("a")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
+
                 b.build()
             };
             self.def("Eqz", definition);
@@ -35,7 +43,15 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_equal(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_equal(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
+
                 b.build()
             };
             self.def("Eq", definition);
@@ -49,7 +65,15 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_not_equal(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_not_equal(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
+
                 b.build()
             };
             self.def("Ne", definition);
@@ -104,8 +128,17 @@ impl UtilGenerator {
         if !self.has("Lt") {
             let definition = {
                 let mut b = InstructionBuilder::new();
+
                 b.pop(["a", "b"]);
-                b.push([self.num_less_unsigned(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_less_unsigned(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
+
                 b.build()
             };
             self.def("Lt", definition);
@@ -119,7 +152,15 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_less_equal_unsigned(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_less_equal_unsigned(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
+
                 b.build()
             };
             self.def("Le", definition);
@@ -133,7 +174,15 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_greater_unsigned(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_greater_unsigned(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
+
                 b.build()
             };
             self.def("Gt", definition);
@@ -147,7 +196,15 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_greater_equal_unsigned(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_greater_equal_unsigned(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
+
                 b.build()
             };
             self.def("Ge", definition);
@@ -161,7 +218,15 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_less_signed(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_less_signed(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
+
                 b.build()
             };
             self.def("LtS", definition);
@@ -175,7 +240,14 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_less_equal_signed(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_less_equal_signed(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
                 b.build()
             };
             self.def("LeS", definition);
@@ -189,7 +261,14 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_greater_signed(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_greater_signed(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
                 b.build()
             };
             self.def("GtS", definition);
@@ -203,7 +282,14 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a", "b"]);
-                b.push([self.num_greater_equal_signed(var("a"), var("b"))]);
+
+                let result = select(
+                    self.num_greater_equal_signed(var("a"), var("b")),
+                    self.num.i32_const(0),
+                    self.num.i32_const(1),
+                );
+
+                b.push([result]);
                 b.build()
             };
             self.def("GeS", definition);

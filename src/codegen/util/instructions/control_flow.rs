@@ -74,7 +74,7 @@ impl UtilGenerator {
 
         b.pop((0..result_count).map(|i| format!("r{i:x}")));
 
-        b.pop_stack_frame();
+        b.drop_stack_frame();
 
         b.push((0..result_count).map(|i| var(format!("r{i:x}"))));
 
@@ -83,7 +83,7 @@ impl UtilGenerator {
                 b.drop_trace();
             }
             BlockLabels::Func { .. } => {
-                b.pop_locals_frame();
+                b.drop_locals_frame();
                 b.ret();
             }
             _ => {}
@@ -120,13 +120,11 @@ impl UtilGenerator {
 
         b.pop((0..pop_count).map(|i| format!("x{i:x}")));
 
-        if depth > 0 {
-            for i in 0..depth - 1 {
-                b.pop_stack_frame();
+        for i in 0..depth {
+            b.drop_stack_frame();
 
-                if matches!(blocks.get(i).labels, BlockLabels::Loop) {
-                    b.drop_trace();
-                }
+            if matches!(blocks.get(i).labels, BlockLabels::Loop) {
+                b.drop_trace();
             }
         }
 
@@ -153,9 +151,9 @@ impl UtilGenerator {
         b.pop(["cond"]);
 
         b.set_next(select(
-            self.num_is_not_zero(var("cond")),
+            self.num_is_zero(var("cond")),
+            code::single(self.br(blocks, depth)),
             b.next(),
-            self.br(blocks, depth),
         ));
 
         b.build()
@@ -174,7 +172,7 @@ impl UtilGenerator {
 
         for (i, target) in break_targets.into_iter().enumerate().rev() {
             let i = self.num.i32_const(i as u32);
-            let target = self.br(blocks, target);
+            let target = code::single(self.br(blocks, target));
             next = select(self.num_equal(var("idx"), i), next, target);
         }
 

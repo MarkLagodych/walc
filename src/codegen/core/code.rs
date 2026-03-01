@@ -35,6 +35,11 @@ use super::*;
 /// or to `labelX`.
 pub type Code = Expr;
 
+/// Builds a chain consisting of a single instruction.
+pub fn single(instr: instruction::Instruction) -> Code {
+    apply(instr, [unreachable()])
+}
+
 enum ChainItem {
     Instruction(instruction::Instruction),
     Label(Code),
