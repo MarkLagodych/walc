@@ -48,6 +48,8 @@ impl UtilGenerator {
             // Memory instructions //////////////////////////////////////////
             MemorySize { .. } => self.memory_size(),
             MemoryGrow { .. } => self.memory_grow(),
+            I32Load { memarg, .. } => self.i32_load(memarg.offset as u32),
+            I64Load { memarg, .. } => self.i64_load(memarg.offset as u32),
 
             // Numeric instructions //////////////////////////////////////////
             I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {

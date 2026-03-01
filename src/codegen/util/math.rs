@@ -400,7 +400,7 @@ impl UtilGenerator {
     }
 
     /// Fast algorithm for adding 1 to a number.
-    fn num_inc(&mut self, a: number::Number) -> number::Number {
+    pub fn num_increment(&mut self, a: number::Number) -> number::Number {
         if !self.has("INC") {
             // Adding 1 is equivalent to flipping leading ones and the first zero bit. For example:
             //
@@ -456,7 +456,7 @@ impl UtilGenerator {
 
     fn num_negate(&mut self, a: number::Number) -> number::Number {
         let a_inverted = self.num_invert(a);
-        self.num_inc(a_inverted)
+        self.num_increment(a_inverted)
     }
 
     pub fn num_sub(&mut self, a: number::Number, b: number::Number) -> number::Number {

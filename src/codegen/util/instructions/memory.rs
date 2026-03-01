@@ -31,4 +31,64 @@ impl UtilGenerator {
 
         var("MemGrow")
     }
+
+    pub fn i32_load(&mut self, offset: u32) -> Instruction {
+        if !self.has("I32Load") {
+            let body = abs(["offset"], {
+                let mut b = InstructionBuilder::new();
+                b.pop(["base_addr"]);
+
+                for i in 1..4 {
+                    b.def(
+                        format!("addr{i}"),
+                        self.num_increment(var(format!("addr{}", i - 1))),
+                    );
+                }
+
+                for i in 0..4 {
+                    b.load(format!("b{i}"), var(format!("addr{i}")));
+                }
+
+                b.push([number::make_i32((0..4).map(|i| var(format!("b{i}"))))]);
+
+                b.build()
+            });
+
+            self.def("I32Load", body);
+        }
+
+        let offset = self.num.i32_const(offset);
+        apply(var("I32Load"), [offset])
+    }
+
+    pub fn i64_load(&mut self, offset: u32) -> Instruction {
+        if !self.has("I64Load") {
+            let body = abs(["offset"], {
+                let mut b = InstructionBuilder::new();
+                b.pop(["base_addr"]);
+
+                b.def("addr0", self.num_add(var("base_addr"), var("offset")));
+
+                for i in 1..8 {
+                    b.def(
+                        format!("addr{i}"),
+                        self.num_increment(var(format!("addr{}", i - 1))),
+                    );
+                }
+
+                for i in 0..8 {
+                    b.load(format!("b{i}"), var(format!("addr{i}")));
+                }
+
+                b.push([number::make_i64((0..8).map(|i| var(format!("b{i}"))))]);
+
+                b.build()
+            });
+
+            self.def("I64Load", body);
+        }
+
+        let offset = self.num.i32_const(offset);
+        apply(var("I64Load"), [offset])
+    }
 }

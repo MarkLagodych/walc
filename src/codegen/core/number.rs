@@ -166,16 +166,18 @@ fn id_expr(id: u16) -> Id {
     )
 }
 
-pub fn make_i32(bytes: impl IntoIterator<Item = Expr>) -> I32 {
-    apply(var("Int"), bytes)
+/// Makes an I32 from little-endian sequence of 4 bytes.
+pub fn make_i32(le_bytes: impl IntoIterator<Item = Expr>) -> I32 {
+    apply(var("Int"), le_bytes)
 }
 
 fn i32_expr(n: u32) -> I32 {
     make_i32(n.to_be_bytes().iter().map(|&b| var(format!("{b:X}b"))))
 }
 
-pub fn make_i64(bytes: impl IntoIterator<Item = Expr>) -> I64 {
-    apply(var("Long"), bytes)
+/// Makes an I64 from little-endian sequence of 8 bytes.
+pub fn make_i64(le_bytes: impl IntoIterator<Item = Expr>) -> I64 {
+    apply(var("Long"), le_bytes)
 }
 
 fn i64_expr(n: u64) -> I64 {
