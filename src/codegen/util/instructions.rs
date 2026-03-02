@@ -56,6 +56,8 @@ impl UtilGenerator {
                 self.const_push(op)
             }
 
+            I32WrapI64 => self.i32_wrap_i64(),
+
             I32Eqz | I64Eqz => self.eqz(),
             I32Eq | I64Eq => self.eq(),
             I32Ne | I64Ne => self.ne(),

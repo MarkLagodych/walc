@@ -78,7 +78,7 @@ pub mod tree {
             )
         }
 
-        b.det_rec(
+        b.def_rec(
             "Idx_",
             abs(["tree", "index"], {
                 select(list::is_not_empty(var("index")), var("tree"), {
@@ -101,7 +101,7 @@ pub mod tree {
             ),
         );
 
-        b.det_rec(
+        b.def_rec(
             "Ins_",
             abs(["tree", "index", "value"], {
                 let left = tree::get_left(var("tree"));

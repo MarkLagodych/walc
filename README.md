@@ -1,6 +1,7 @@
 # WebAssembly to Lambda Calculus compiler
 
 WALC /wɑlts/ compiles stand-alone modules in [WebAssembly 1.0](https://w3.org/TR/wasm-core-1/)
+([pdf](https://webassembly.github.io/spec/versions/core/WebAssembly-1.0.pdf))
 into [untyped lambda expressions](https://en.wikipedia.org/wiki/Lambda_calculus).
 
 The compiler naturally supports the [`multi-value`](https://webassembly.github.io/multi-value/core/_download/WebAssembly.pdf)
@@ -29,7 +30,6 @@ The only things left are arithmetic instructions.
 - [X] `and`, `or`, `xor`
 - [X] `add`, `sub`
 - [ ] integer conversions (between 8/16/32/64 bits, including sign extensions)
-- [ ] fix input and output by using integer conversions from/to bytes
 - [ ] `load` with byte conversions and `store`
 - [ ] data segment initialization
 - [ ] `mul`

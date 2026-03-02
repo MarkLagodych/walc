@@ -3,14 +3,18 @@ use super::*;
 impl UtilGenerator {
     pub fn output_and_return(&mut self) -> Instruction {
         if !self.has("Output") {
-            self.def("Output", {
+            let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a"]);
-                // TODO convert a to byte
-                let byte = number::reverse_bits(var("a"));
+
+                // Get the least significant byte of the value
+                let byte = self.i32_to_byte(var("a"));
+
                 b.ret();
                 b.build_output(byte)
-            });
+            };
+
+            self.def("Output", definition);
         }
 
         var("Output")
@@ -18,19 +22,31 @@ impl UtilGenerator {
 
     pub fn input_and_return(&mut self) -> Instruction {
         if !self.has("Input") {
-            let invalid_input = self.num.i32_const(u32::MAX);
-
-            self.def("Input", {
+            let definition = {
                 let mut b = InstructionBuilder::new();
+
+                let invalid_input = self.num.i32_const(u32::MAX);
+
+                let byte_to_i32 = |byte| {
+                    number::make_i32([
+                        byte,
+                        number::null_byte(),
+                        number::null_byte(),
+                        number::null_byte(),
+                    ])
+                };
+
                 b.push([select(
                     optional::is_some(var("inp")),
                     invalid_input,
-                    // TODO convert input to i32
-                    optional::unwrap(var("inp")),
+                    byte_to_i32(optional::unwrap(var("inp"))),
                 )]);
+
                 b.ret();
                 b.build_input("inp")
-            });
+            };
+
+            self.def("Input", definition);
         }
 
         var("Input")

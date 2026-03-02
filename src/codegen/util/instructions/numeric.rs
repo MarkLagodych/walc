@@ -325,4 +325,25 @@ impl UtilGenerator {
 
         var("Sub")
     }
+
+    pub fn i32_wrap_i64(&mut self) -> Instruction {
+        if !self.has("I64toI32") {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a"]);
+
+                // Cut the number in half
+                let template = self.num.i64_const(1 << 31);
+                let parts = self.num_separate(var("a"), template);
+                // Get the least significant part and convert it back to a little-endian number
+                let result = number::reverse_bits(list::get_head(parts));
+
+                b.push([result]);
+                b.build()
+            };
+            self.def("I64toI32", definition);
+        }
+
+        var("I64toI32")
+    }
 }

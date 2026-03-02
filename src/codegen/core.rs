@@ -156,7 +156,7 @@ impl LetExprBuilder {
     /// therefore can call itself.
     ///
     /// To call the function, use [`rec`].
-    pub fn det_rec(&mut self, name: impl ToString, value: Expr) {
+    pub fn def_rec(&mut self, name: impl ToString, value: Expr) {
         self.defs.push((name.to_string(), abs([name], value)));
     }
 

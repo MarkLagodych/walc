@@ -104,33 +104,30 @@ pub fn generate_defs(b: &mut LetExprBuilder) {
     );
 
     // Reverses the bits of "x" and places them on top of "tail"
-    b.def(
-        "RevEx",
-        abs(["rev", "x", "tail"], {
+    b.def_rec(
+        "JoinRev",
+        abs(["tail", "x"], {
             select(
                 list::is_not_empty(var("x")),
                 var("tail"),
                 apply(
-                    rec(var("rev")),
+                    rec(var("JoinRev")),
                     [
-                        list::get_tail(var("x")),
                         list::node(list::get_head(var("x")), var("tail")),
+                        list::get_tail(var("x")),
                     ],
                 ),
             )
         }),
     );
 
-    b.def(
-        "Rev",
-        abs(["x"], apply(rec(var("RevEx")), [var("x"), list::empty()])),
-    );
+    b.def("Rev", apply(rec(var("JoinRev")), [list::empty()]));
 
     for (name, byte_count) in [("Id", 2), ("Int", 4), ("Long", 8)] {
         b.def(
             name,
             abs(
-                (0..byte_count).rev().map(|i| format!("b{i}")),
+                (0..byte_count).map(|i| format!("b{i}")),
                 join_bytes((0..byte_count).rev().map(|i| var(format!("b{i}")))),
             ),
         );
@@ -143,7 +140,7 @@ pub fn generate_defs(b: &mut LetExprBuilder) {
 fn join_bytes(be_bytes: impl IntoIterator<Item = Expr>) -> Expr {
     let mut expr = list::empty();
     for byte in be_bytes.into_iter() {
-        expr = apply(rec(var("RevEx")), [byte, expr]);
+        expr = apply(rec(var("JoinRev")), [expr, byte]);
     }
 
     expr
@@ -162,7 +159,7 @@ fn byte_expr(byte: u8) -> Byte {
 fn id_expr(id: u16) -> Id {
     apply(
         var("Id"),
-        id.to_be_bytes().iter().map(|&b| var(format!("{b:X}b"))),
+        id.to_le_bytes().iter().map(|&b| var(format!("{b:X}b"))),
     )
 }
 
@@ -172,7 +169,7 @@ pub fn make_i32(le_bytes: impl IntoIterator<Item = Expr>) -> I32 {
 }
 
 fn i32_expr(n: u32) -> I32 {
-    make_i32(n.to_be_bytes().iter().map(|&b| var(format!("{b:X}b"))))
+    make_i32(n.to_le_bytes().iter().map(|&b| var(format!("{b:X}b"))))
 }
 
 /// Makes an I64 from little-endian sequence of 8 bytes.
@@ -181,7 +178,7 @@ pub fn make_i64(le_bytes: impl IntoIterator<Item = Expr>) -> I64 {
 }
 
 fn i64_expr(n: u64) -> I64 {
-    make_i64(n.to_be_bytes().iter().map(|&b| var(format!("{b:X}b"))))
+    make_i64(n.to_le_bytes().iter().map(|&b| var(format!("{b:X}b"))))
 }
 
 pub fn null_byte() -> Byte {

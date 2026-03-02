@@ -463,4 +463,88 @@ impl UtilGenerator {
         let b_negated = self.num_negate(b);
         self.num_add(a, b_negated)
     }
+
+    /// Separates the number into parts as per the template and returns a big-endian list of the
+    /// parts.
+    ///
+    /// The template is a number where a 1-bit indicates an end of a part.
+    /// This means that there will be as many parts as there are bits in the number.
+    /// It must not be shorter than the number being cut, but can be longer.
+    ///
+    /// The bits of the returned parts are reversed, so if the the input number is in little endian,
+    /// then the returned parts are in big endian. This is useful e.g. for dividing a number into
+    /// bytes.
+    ///
+    /// Example:
+    /// ```text
+    /// a = ABCDEFGH (LE)
+    /// template = 00100101 (LE)
+    /// result = [HG (BE), FED (BE), CBA (BE)] (BE)
+    ///
+    /// a = ABCDEFGH (LE)
+    /// template = 00100000 (LE)
+    /// result = [CBA (BE)] (BE)
+    /// ```
+    pub fn num_separate(&mut self, a: number::Number, template: number::Number) -> list::List {
+        if !self.has("SEP") {
+            let a_head = list::get_head(var("a"));
+            let a_tail = list::get_tail(var("a"));
+
+            let template_head = list::get_head(var("template"));
+            let template_tail = list::get_tail(var("template"));
+
+            let new_part = list::node(a_head, var("part"));
+
+            let body = abs(
+                ["parts", "part", "a", "template"],
+                select(
+                    list::is_not_empty(var("a")),
+                    var("parts"),
+                    select(
+                        template_head,
+                        apply(
+                            rec(var("_SEP")),
+                            [
+                                var("parts"),
+                                new_part.clone(),
+                                a_tail.clone(),
+                                template_tail.clone(),
+                            ],
+                        ),
+                        apply(
+                            rec(var("_SEP")),
+                            [
+                                list::node(new_part.clone(), var("parts")),
+                                list::empty(),
+                                a_tail,
+                                template_tail,
+                            ],
+                        ),
+                    ),
+                ),
+            );
+
+            self.def_rec("_SEP", body);
+
+            self.def(
+                "SEP",
+                apply(rec(var("_SEP")), [list::empty(), list::empty()]),
+            );
+        }
+
+        apply(var("SEP"), [a, template])
+    }
+
+    /// Separates the number into a big-endian list of bytes.
+    pub fn num_to_bytes(&mut self, a: number::Number) -> list::List {
+        // 0000001 (LE) repeated for each byte
+        let byte_template = self.num.i64_const(0x80_80_80_80_80_80_80_80);
+        self.num_separate(a, byte_template)
+    }
+
+    pub fn i32_to_byte(&mut self, a: number::I32) -> number::Number {
+        let byte_template = self.num.i32_const(0x00_00_00_80);
+        let parts = self.num_separate(a, byte_template);
+        list::get_head(parts)
+    }
 }
