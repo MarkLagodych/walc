@@ -327,7 +327,7 @@ impl UtilGenerator {
     }
 
     pub fn i32_wrap_i64(&mut self) -> Instruction {
-        if !self.has("I64toI32") {
+        if !self.has("I32WrapI64") {
             let definition = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a"]);
@@ -341,9 +341,34 @@ impl UtilGenerator {
                 b.push([result]);
                 b.build()
             };
-            self.def("I64toI32", definition);
+            self.def("I32WrapI64", definition);
         }
 
-        var("I64toI32")
+        var("I32WrapI64")
+    }
+
+    pub fn i64_extend_i32(&mut self, signed: bool) -> Instruction {
+        let sign = if signed { "S" } else { "U" };
+
+        let name = format!("I64ExtendI32{sign}");
+
+        if !self.has(&name) {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a"]);
+
+                let mut result = self.i32_to_i64(var("a"));
+
+                if signed {
+                    result = self.num_sign_extend(result, 64, 32);
+                }
+
+                b.push([result]);
+                b.build()
+            };
+            self.def(&name, definition);
+        }
+
+        var(name)
     }
 }

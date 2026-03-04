@@ -48,8 +48,29 @@ impl UtilGenerator {
             // Memory instructions //////////////////////////////////////////
             MemorySize { .. } => self.memory_size(),
             MemoryGrow { .. } => self.memory_grow(),
-            I32Load { memarg, .. } => self.i32_load(memarg.offset as u32),
-            I64Load { memarg, .. } => self.i64_load(memarg.offset as u32),
+
+            I32Load { memarg, .. } => self.i_load(memarg.offset as u32, 32, 32, false),
+            I64Load { memarg, .. } => self.i_load(memarg.offset as u32, 64, 64, false),
+
+            I32Load8U { memarg, .. } => self.i_load(memarg.offset as u32, 32, 8, false),
+            I32Load8S { memarg, .. } => self.i_load(memarg.offset as u32, 32, 8, true),
+            I32Load16U { memarg, .. } => self.i_load(memarg.offset as u32, 32, 16, false),
+            I32Load16S { memarg, .. } => self.i_load(memarg.offset as u32, 32, 16, true),
+            I64Load8U { memarg, .. } => self.i_load(memarg.offset as u32, 64, 8, false),
+            I64Load8S { memarg, .. } => self.i_load(memarg.offset as u32, 64, 8, true),
+            I64Load16U { memarg, .. } => self.i_load(memarg.offset as u32, 64, 16, false),
+            I64Load16S { memarg, .. } => self.i_load(memarg.offset as u32, 64, 16, true),
+            I64Load32U { memarg, .. } => self.i_load(memarg.offset as u32, 64, 32, false),
+            I64Load32S { memarg, .. } => self.i_load(memarg.offset as u32, 64, 32, true),
+
+            I32Store { memarg, .. } => self.i_store(memarg.offset as u32, 32, 32, false),
+            I64Store { memarg, .. } => self.i_store(memarg.offset as u32, 64, 64, false),
+
+            I32Store8 { memarg, .. } => self.i_store(memarg.offset as u32, 32, 8, false),
+            I32Store16 { memarg, .. } => self.i_store(memarg.offset as u32, 32, 16, false),
+            I64Store8 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 8, false),
+            I64Store16 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 16, false),
+            I64Store32 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 32, false),
 
             // Numeric instructions //////////////////////////////////////////
             I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
@@ -57,6 +78,8 @@ impl UtilGenerator {
             }
 
             I32WrapI64 => self.i32_wrap_i64(),
+            I64ExtendI32U => self.i64_extend_i32(false),
+            I64ExtendI32S => self.i64_extend_i32(true),
 
             I32Eqz | I64Eqz => self.eqz(),
             I32Eq | I64Eq => self.eq(),

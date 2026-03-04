@@ -74,6 +74,8 @@ impl NumberGenerator {
     }
 
     pub fn with_init_value(&mut self, init_value: &Operator) -> Number {
+        // TODO Should floats be handled the same way as integers?
+        // They can be represented in a different way, e.g. as a triple of (sign, exp, mantissa)
         match init_value {
             Operator::I32Const { value } => self.i32_const(*value as u32),
             Operator::I64Const { value } => self.i64_const(*value as u64),

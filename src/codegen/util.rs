@@ -1,7 +1,7 @@
 mod instructions;
 mod math;
 
-use crate::codegen::core::*;
+use super::*;
 
 /// Generates all runtime utilities (instructions & maths) needed for the program.
 ///

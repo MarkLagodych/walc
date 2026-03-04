@@ -479,11 +479,11 @@ impl UtilGenerator {
     /// ```text
     /// a = ABCDEFGH (LE)
     /// template = 00100101 (LE)
-    /// result = [HG (BE), FED (BE), CBA (BE)] (BE)
+    /// result = [HG, FED, CBA] (list is BE, items are BE)
     ///
     /// a = ABCDEFGH (LE)
     /// template = 00100000 (LE)
-    /// result = [CBA (BE)] (BE)
+    /// result = [CBA]
     /// ```
     pub fn num_separate(&mut self, a: number::Number, template: number::Number) -> list::List {
         if !self.has("SEP") {
@@ -535,16 +535,148 @@ impl UtilGenerator {
         apply(var("SEP"), [a, template])
     }
 
-    /// Separates the number into a big-endian list of bytes.
-    pub fn num_to_bytes(&mut self, a: number::Number) -> list::List {
-        // 0000001 (LE) repeated for each byte
-        let byte_template = self.num.i64_const(0x80_80_80_80_80_80_80_80);
+    /// Takes a number `a` with `source_bits`, takes `target_bits` lowest bits and converts the
+    /// result to a big-endian list of bytes.
+    pub fn num_to_be_bytes(
+        &mut self,
+        a: number::Number,
+        source_bits: u8,
+        target_bits: u8,
+    ) -> list::List {
+        let byte_template = match (source_bits, target_bits) {
+            (32, 8) => self.num.i32_const(0x00_00_00_80),
+            (32, 16) => self.num.i32_const(0x00_00_80_80),
+            (32, 32) => self.num.i32_const(0x80_80_80_80),
+            (64, 8) => self.num.i64_const(0x00_00_00_00_00_00_00_80),
+            (64, 16) => self.num.i64_const(0x00_00_00_00_00_00_80_80),
+            (64, 32) => self.num.i64_const(0x00_00_00_00_80_80_80_80),
+            (64, 64) => self.num.i64_const(0x80_80_80_80_80_80_80_80),
+            _ => unreachable!(),
+        };
+
         self.num_separate(a, byte_template)
     }
 
-    pub fn i32_to_byte(&mut self, a: number::I32) -> number::Number {
-        let byte_template = self.num.i32_const(0x00_00_00_80);
-        let parts = self.num_separate(a, byte_template);
-        list::get_head(parts)
+    /// Widens a number by copying the missing bits from the template.
+    /// The template must not be shorter than the number being widened.
+    /// It is intended that the template is filled with zeroes.
+    ///
+    /// Example:
+    /// ```text
+    /// a        = 1010 (LE)
+    /// template = 00000000 (LE)
+    /// result   = 10100000 (LE)
+    ///                ^^^^
+    ///    these bits are copied from the template
+    /// ```
+    fn widen(&mut self, a: number::Number, template: number::Number) -> number::Number {
+        if !self.has("WIDEN") {
+            let a_head = list::get_head(var("a"));
+            let a_tail = list::get_tail(var("a"));
+
+            let template_tail = list::get_tail(var("template"));
+
+            let body = select(
+                list::is_not_empty(var("a")),
+                list::node(a_head, apply(rec(var("_WIDEN")), [a_tail, template_tail])),
+                var("template"),
+            );
+
+            self.def_rec("_WIDEN", abs(["a", "template"], body));
+
+            self.def(
+                "WIDEN",
+                apply(rec(var("_WIDEN")), [var("a"), var("template")]),
+            );
+        }
+
+        apply(var("WIDEN"), [a, template])
+    }
+
+    pub fn i32_to_i64(&mut self, a: number::I32) -> number::I64 {
+        let template = self.num.i64_const(0);
+        self.widen(a, template)
+    }
+
+    /// Copies a single bit of `a` into the bits masked by `extension_mask`.
+    /// The mask must not be shorter than the number being sign-extended.
+    ///
+    /// Example 1:
+    /// ```text
+    ///              sign bit...
+    ///                 v
+    /// a      = 01010101_00000000 (LE)
+    /// mask   = 00000000_11111111 (LE)
+    /// result = 01010101_11111111 (LE)
+    ///                   ^^^^^^^^
+    ///             ...gets copied here
+    /// ```
+    ///
+    /// Example 2:
+    ///
+    /// ```text
+    ///              sign bit...
+    ///                 v
+    /// a      = 01010100_00000000 (LE)
+    /// mask   = 00000000_11111111 (LE)
+    /// result = 01010100_00000000 (LE)
+    ///                   ^^^^^^^^
+    ///             ...gets copied here
+    /// ```
+    fn sign_extend(&mut self, a: number::Number, extension_mask: number::Number) -> number::Number {
+        if !self.has("SGNEXT") {
+            let definition = {
+                abs(["bit", "a", "mask"], {
+                    let a_head = list::get_head(var("a"));
+                    let a_tail = list::get_tail(var("a"));
+
+                    let mask_head = list::get_head(var("mask"));
+                    let mask_tail = list::get_tail(var("mask"));
+
+                    select(
+                        list::is_not_empty(var("a")),
+                        list::empty(),
+                        select(
+                            mask_head,
+                            list::node(
+                                a_head.clone(),
+                                apply(
+                                    rec(var("_SGNEXT")),
+                                    [a_head, a_tail.clone(), mask_tail.clone()],
+                                ),
+                            ),
+                            list::node(
+                                var("bit"),
+                                apply(rec(var("_SGNEXT")), [var("bit"), a_tail, mask_tail]),
+                            ),
+                        ),
+                    )
+                })
+            };
+
+            self.def_rec("_SGNEXT", definition);
+
+            self.def("SGNEXT", apply(rec(var("_SGNEXT")), [bit(false)]));
+        }
+
+        apply(var("SGNEXT"), [a, extension_mask])
+    }
+
+    pub fn num_sign_extend(
+        &mut self,
+        a: number::Number,
+        target_bits: u8,
+        source_bits: u8,
+    ) -> number::Number {
+        let extension_mask = match (target_bits, source_bits) {
+            (32, 8) => self.num.i32_const(0xff_ff_ff_00),
+            (32, 16) => self.num.i32_const(0xff_ff_00_00),
+            (64, 8) => self.num.i64_const(0xff_ff_ff_ff_ff_ff_ff_00),
+            (64, 16) => self.num.i64_const(0xff_ff_ff_ff_ff_ff_00_00),
+            (64, 32) => self.num.i64_const(0xff_ff_ff_ff_00_00_00_00),
+            _ => unreachable!(),
+        };
+
+        self.sign_extend(a, extension_mask)
     }
 }

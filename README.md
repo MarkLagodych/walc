@@ -26,16 +26,14 @@ The only things left are arithmetic instructions.
 
 - [X] all control flow instructions
 - [X] all variable instructions
+- [X] all memory instructions
 - [X] all integer comparison instructions
 - [X] `and`, `or`, `xor`
 - [X] `add`, `sub`
-- [ ] integer conversions (between 8/16/32/64 bits, including sign extensions)
-- [ ] `load` with byte conversions and `store`
-- [ ] data segment initialization
 - [ ] `mul`
-- [ ] `div`, `mod`
 - [ ] bit shifts and rotations
 - [ ] `ctz`, `clz`, `popcnt`
+- [ ] `div`, `mod`
 - [ ] floating-point numbers and arithmetic
 - [ ] extensive testing
 

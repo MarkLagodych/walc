@@ -242,7 +242,7 @@ pub fn entrypoint(util: &mut UtilGenerator, info: &EntrypointInfo) -> io_command
     let mut code = code::CodeBuilder::new();
 
     for (data_id, target_offset) in info.data_memory_offsets.iter().enumerate() {
-        // TODO init data segments
+        code.push(util.memory_init_with_data(var(format!("Data{data_id:x}")), *target_offset));
     }
 
     if let Some(start_id) = info.start_id {
