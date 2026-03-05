@@ -7,6 +7,7 @@ use super::*;
 ///
 /// The definitions are internally created on demand, with no name sorting,
 /// but obeying the depdendency order.
+/// The on-demand definition creation helps reduce code size without requiring a complex optimizer.
 #[derive(Default)]
 pub struct UtilGenerator {
     pub num: number::NumberGenerator,

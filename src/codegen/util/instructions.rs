@@ -18,11 +18,13 @@ impl UtilGenerator {
         use Operator::*;
 
         match op {
-            // Parametric instructions ///////////////////////////////////////
+            // ==================================================================================
+            // Parametric instructions
             Drop => self.drop(),
             Select => self.select(),
 
-            // Constrol flow instructions /////////////////////////////////////
+            // ==================================================================================
+            // Constrol flow instructions
             Nop => instruction::nop(),
             Unreachable => self.exit(),
 
@@ -38,14 +40,16 @@ impl UtilGenerator {
             BrTable { targets } => self.br_table(blocks, targets),
             Return => self.ret(blocks),
 
-            // Variable instructions ///////////////////////////////////////////
+            // ==================================================================================
+            // Variable instructions
             LocalGet { local_index } => self.local_get(*local_index),
             LocalSet { local_index } => self.local_set(*local_index),
             LocalTee { local_index } => self.local_tee(*local_index),
             GlobalGet { global_index } => self.global_get(*global_index),
             GlobalSet { global_index } => self.global_set(*global_index),
 
-            // Memory instructions //////////////////////////////////////////
+            // ==================================================================================
+            // Memory instructions
             MemorySize { .. } => self.memory_size(),
             MemoryGrow { .. } => self.memory_grow(),
 
@@ -72,10 +76,9 @@ impl UtilGenerator {
             I64Store16 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 16),
             I64Store32 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 32),
 
-            // Numeric instructions //////////////////////////////////////////
-            I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {
-                self.const_push(op)
-            }
+            // ==================================================================================
+            // Numeric instructions
+            I32Const { .. } | I64Const { .. } => self.i_const(op),
 
             I32WrapI64 => self.i32_wrap_i64(),
 
@@ -88,26 +91,26 @@ impl UtilGenerator {
             I64Extend16S => self.i_extend_s(64, 16),
             I64Extend32S => self.i_extend_s(64, 32),
 
-            I32Eqz | I64Eqz => self.eqz(),
-            I32Eq | I64Eq => self.eq(),
-            I32Ne | I64Ne => self.ne(),
+            I32Eqz | I64Eqz => self.i_eqz(),
+            I32Eq | I64Eq => self.i_eq(),
+            I32Ne | I64Ne => self.i_ne(),
 
-            I32And | I64And => self.and(),
-            I32Or | I64Or => self.or(),
-            I32Xor | I64Xor => self.xor(),
+            I32And | I64And => self.i_and(),
+            I32Or | I64Or => self.i_or(),
+            I32Xor | I64Xor => self.i_xor(),
 
-            I32LtU | I64LtU => self.lt_u(),
-            I32LeU | I64LeU => self.le_u(),
-            I32GtU | I64GtU => self.gt_u(),
-            I32GeU | I64GeU => self.ge_u(),
+            I32LtU | I64LtU => self.i_lt_u(),
+            I32LeU | I64LeU => self.i_le_u(),
+            I32GtU | I64GtU => self.i_gt_u(),
+            I32GeU | I64GeU => self.i_ge_u(),
 
-            I32LtS | I64LtS => self.lt_s(),
-            I32LeS | I64LeS => self.le_s(),
-            I32GtS | I64GtS => self.gt_s(),
-            I32GeS | I64GeS => self.ge_s(),
+            I32LtS | I64LtS => self.i_lt_s(),
+            I32LeS | I64LeS => self.i_le_s(),
+            I32GtS | I64GtS => self.i_gt_s(),
+            I32GeS | I64GeS => self.i_ge_s(),
 
-            I32Add | I64Add => self.add(),
-            I32Sub | I64Sub => self.sub(),
+            I32Add | I64Add => self.i_add(),
+            I32Sub | I64Sub => self.i_sub(),
 
             // TODO
             _ => todo!(),
@@ -152,9 +155,13 @@ impl UtilGenerator {
             let definition = {
                 let mut b = InstructionBuilder::new();
 
-                b.pop(["a", "b", "c"]);
+                b.pop(["val_if_not_zero", "val_if_zero", "x"]);
 
-                b.push([select(self.num_is_zero(var("c")), var("a"), var("b"))]);
+                b.push([select(
+                    self.num_is_zero(var("x")),
+                    var("val_if_not_zero"),
+                    var("val_if_zero"),
+                )]);
 
                 b.build()
             };

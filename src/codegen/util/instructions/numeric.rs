@@ -1,7 +1,7 @@
 use super::*;
 
 impl UtilGenerator {
-    pub fn const_push(&mut self, op: &Operator) -> Instruction {
+    pub fn i_const(&mut self, op: &Operator) -> Instruction {
         if !self.has("Push") {
             self.def("Push", {
                 abs(["item"], {
@@ -16,7 +16,7 @@ impl UtilGenerator {
         apply(var("Push"), [item])
     }
 
-    pub fn eqz(&mut self) -> Instruction {
+    pub fn i_eqz(&mut self) -> Instruction {
         if !self.has("Eqz") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -38,7 +38,7 @@ impl UtilGenerator {
         var("Eqz")
     }
 
-    pub fn eq(&mut self) -> Instruction {
+    pub fn i_eq(&mut self) -> Instruction {
         if !self.has("Eq") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -60,7 +60,7 @@ impl UtilGenerator {
         var("Eq")
     }
 
-    pub fn ne(&mut self) -> Instruction {
+    pub fn i_ne(&mut self) -> Instruction {
         if !self.has("Ne") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -82,7 +82,7 @@ impl UtilGenerator {
         var("Ne")
     }
 
-    pub fn and(&mut self) -> Instruction {
+    pub fn i_and(&mut self) -> Instruction {
         if !self.has("And") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -96,7 +96,7 @@ impl UtilGenerator {
         var("And")
     }
 
-    pub fn or(&mut self) -> Instruction {
+    pub fn i_or(&mut self) -> Instruction {
         if !self.has("Or") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -110,7 +110,7 @@ impl UtilGenerator {
         var("Or")
     }
 
-    pub fn xor(&mut self) -> Instruction {
+    pub fn i_xor(&mut self) -> Instruction {
         if !self.has("Xor") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -124,7 +124,7 @@ impl UtilGenerator {
         var("Xor")
     }
 
-    pub fn lt_u(&mut self) -> Instruction {
+    pub fn i_lt_u(&mut self) -> Instruction {
         if !self.has("Lt") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -147,7 +147,7 @@ impl UtilGenerator {
         var("Lt")
     }
 
-    pub fn le_u(&mut self) -> Instruction {
+    pub fn i_le_u(&mut self) -> Instruction {
         if !self.has("Le") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -169,7 +169,7 @@ impl UtilGenerator {
         var("Le")
     }
 
-    pub fn gt_u(&mut self) -> Instruction {
+    pub fn i_gt_u(&mut self) -> Instruction {
         if !self.has("Gt") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -191,7 +191,7 @@ impl UtilGenerator {
         var("Gt")
     }
 
-    pub fn ge_u(&mut self) -> Instruction {
+    pub fn i_ge_u(&mut self) -> Instruction {
         if !self.has("Ge") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -213,7 +213,7 @@ impl UtilGenerator {
         var("Ge")
     }
 
-    pub fn lt_s(&mut self) -> Instruction {
+    pub fn i_lt_s(&mut self) -> Instruction {
         if !self.has("LtS") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -235,7 +235,7 @@ impl UtilGenerator {
         var("LtS")
     }
 
-    pub fn le_s(&mut self) -> Instruction {
+    pub fn i_le_s(&mut self) -> Instruction {
         if !self.has("LeS") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -256,7 +256,7 @@ impl UtilGenerator {
         var("LeS")
     }
 
-    pub fn gt_s(&mut self) -> Instruction {
+    pub fn i_gt_s(&mut self) -> Instruction {
         if !self.has("GtS") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -277,7 +277,7 @@ impl UtilGenerator {
         var("GtS")
     }
 
-    pub fn ge_s(&mut self) -> Instruction {
+    pub fn i_ge_s(&mut self) -> Instruction {
         if !self.has("GeS") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -298,7 +298,7 @@ impl UtilGenerator {
         var("GeS")
     }
 
-    pub fn add(&mut self) -> Instruction {
+    pub fn i_add(&mut self) -> Instruction {
         if !self.has("Add") {
             let definition = {
                 let mut b = InstructionBuilder::new();
@@ -312,7 +312,7 @@ impl UtilGenerator {
         var("Add")
     }
 
-    pub fn sub(&mut self) -> Instruction {
+    pub fn i_sub(&mut self) -> Instruction {
         if !self.has("Sub") {
             let definition = {
                 let mut b = InstructionBuilder::new();
