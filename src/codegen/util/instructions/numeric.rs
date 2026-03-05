@@ -332,11 +332,7 @@ impl UtilGenerator {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a"]);
 
-                // Cut the number in half
-                let template = self.num.i64_const(1 << 31);
-                let parts = self.num_separate(var("a"), template);
-                // Get the least significant part and convert it back to a little-endian number
-                let result = number::reverse_bits(list::get_head(parts));
+                let result = self.i64_to_i32(var("a"));
 
                 b.push([result]);
                 b.build()

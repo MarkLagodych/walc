@@ -404,14 +404,14 @@ impl UtilGenerator {
         if !self.has("INC") {
             // Adding 1 is equivalent to flipping leading ones and the first zero bit. For example:
             //
-            // INC(000000_LE) = 100000_LE
-            //     *            *
+            // INC(000000) = 100000   (numbers are in LE)
+            //     *         *
             //
-            // INC(111000_LE) = 000100_LE
-            //     ^^^*         ^^^*
+            // INC(111000) = 000100   (numbers are in LE)
+            //     ^^^*      ^^^*
             //
-            // INC(111111_LE) = 000000_LE
-            //     ^^^^^^       ^^^^^^
+            // INC(111111) = 000000   (numbers are in LE)
+            //     ^^^^^^    ^^^^^^
 
             let a_head = list::get_head(var("a"));
             let a_tail = list::get_tail(var("a"));
@@ -464,28 +464,32 @@ impl UtilGenerator {
         self.num_add(a, b_negated)
     }
 
-    /// Separates the number into parts as per the template and returns a big-endian list of the
+    /// Chops the number into parts using the template and returns a big-endian list of the
     /// parts.
     ///
     /// The template is a number where a 1-bit indicates an end of a part.
     /// This means that there will be as many parts as there are bits in the number.
-    /// It must not be shorter than the number being cut, but can be longer.
+    /// It must not be shorter than the number being chopped, but can be longer.
     ///
     /// The bits of the returned parts are reversed, so if the the input number is in little endian,
     /// then the returned parts are in big endian. This is useful e.g. for dividing a number into
-    /// bytes.
+    /// bytes or converting a number into an `Id`.
     ///
     /// Example:
     /// ```text
     /// a = ABCDEFGH (LE)
-    /// template = 00100101 (LE)
-    /// result = [HG, FED, CBA] (list is BE, items are BE)
+    /// template = 00100000 (LE)
+    /// result = [CBA] (the item is BE)
     ///
     /// a = ABCDEFGH (LE)
-    /// template = 00100000 (LE)
-    /// result = [CBA]
+    /// template = 00100100 (LE)
+    /// result = [FED, CBA] (list is BE, items are BE)
+    ///
+    /// a = ABCDEFGH (LE)
+    /// template = 00100101 (LE)
+    /// result = [HG, FED, CBA] (list is BE, items are BE)
     /// ```
-    pub fn num_separate(&mut self, a: number::Number, template: number::Number) -> list::List {
+    pub fn num_chop(&mut self, a: number::Number, template: number::Number) -> list::List {
         if !self.has("SEP") {
             let a_head = list::get_head(var("a"));
             let a_tail = list::get_tail(var("a"));
@@ -537,7 +541,7 @@ impl UtilGenerator {
 
     /// Takes a number `a` with `source_bits`, takes `target_bits` lowest bits and converts the
     /// result to a big-endian list of bytes.
-    pub fn num_to_be_bytes(
+    pub fn num_split_lowest_bits_to_be_bytes(
         &mut self,
         a: number::Number,
         source_bits: u8,
@@ -554,7 +558,22 @@ impl UtilGenerator {
             _ => unreachable!(),
         };
 
-        self.num_separate(a, byte_template)
+        self.num_chop(a, byte_template)
+    }
+
+    pub fn i64_to_i32(&mut self, a: number::I64) -> number::I32 {
+        // Cut the number in half (only the lower part is kept)
+        let template = self.num.i64_const(1 << 31);
+        let parts = self.num_chop(a, template);
+        // Convert it back to a little-endian number
+        number::reverse_bits(list::get_head(parts))
+    }
+
+    pub fn i32_to_id(&mut self, a: number::I32) -> number::Id {
+        // Cut the number in half (only the lower part is kept)
+        let template = self.num.i32_const(1 << 15);
+        let parts = self.num_chop(a, template);
+        list::get_head(parts)
     }
 
     /// Widens a number by copying the missing bits from the template.

@@ -8,7 +8,7 @@ impl UtilGenerator {
                 b.pop(["a"]);
 
                 // Get the lowest byte of the value
-                let bytes = self.num_to_be_bytes(var("a"), 32, 8);
+                let bytes = self.num_split_lowest_bits_to_be_bytes(var("a"), 32, 8);
                 let byte = list::get_head(bytes);
 
                 b.ret();
@@ -30,10 +30,10 @@ impl UtilGenerator {
 
                 let byte_to_i32 = |byte| {
                     number::make_i32([
+                        number::null_byte(),
+                        number::null_byte(),
+                        number::null_byte(),
                         byte,
-                        number::null_byte(),
-                        number::null_byte(),
-                        number::null_byte(),
                     ])
                 };
 

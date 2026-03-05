@@ -31,14 +31,25 @@ pub mod tree {
         pair::select(tree, selector)
     }
 
+    /// Index the tree with a little-endian number (e.g. `I32`).
     /// The index bitness must match the tree bitness.
-    pub fn index(tree: Tree, index: number::Number) -> Expr {
-        apply(var("Idx"), [tree, index])
+    pub fn index_num(tree: Tree, index: number::Number) -> Expr {
+        apply(var("IdxLE"), [tree, index])
+    }
+
+    /// Index the tree with an ID.
+    /// The index bitness must match the tree bitness.
+    pub fn index_id(tree: Tree, index: number::Id) -> Expr {
+        apply(var("IdxBE"), [tree, index])
     }
 
     /// The index bitness must match the tree bitness.
-    pub fn insert(tree: Tree, index: number::Number, value: Expr) -> Tree {
-        apply(var("Ins"), [tree, index, value])
+    pub fn insert_num(tree: Tree, index: number::Number, value: Expr) -> Tree {
+        apply(var("InsLE"), [tree, index, value])
+    }
+
+    pub fn insert_id(tree: Tree, index: number::Id, value: Expr) -> Tree {
+        apply(var("InsBE"), [tree, index, value])
     }
 
     /// The index bitness must match the tree bitness.
@@ -79,30 +90,32 @@ pub mod tree {
         }
 
         b.def_rec(
-            "Idx_",
+            "IdxBE_",
             abs(["tree", "index"], {
                 select(list::is_not_empty(var("index")), var("tree"), {
                     let index_bit = list::get_head(var("index"));
                     let index_tail = list::get_tail(var("index"));
                     let subtree = tree::select_subtree(var("tree"), index_bit);
-                    apply(rec(var("Idx_")), [subtree, index_tail])
+                    apply(rec(var("IdxBE_")), [subtree, index_tail])
                 })
             }),
         );
 
+        b.def("IdxBE", rec(var("IdxBE_")));
+
         b.def(
-            "Idx",
+            "IdxLE",
             abs(
                 ["tree", "index"],
                 apply(
-                    rec(var("Idx_")),
+                    rec(var("IdxBE_")),
                     [var("tree"), number::reverse_bits(var("index"))],
                 ),
             ),
         );
 
         b.def_rec(
-            "Ins_",
+            "InsBE_",
             abs(["tree", "index", "value"], {
                 let left = tree::get_left(var("tree"));
                 let right = tree::get_right(var("tree"));
@@ -112,7 +125,7 @@ pub mod tree {
 
                 let insert = |subtree| {
                     apply(
-                        rec(var("Ins_")),
+                        rec(var("InsBE_")),
                         [subtree, index_tail.clone(), var("value")],
                     )
                 };
@@ -129,12 +142,14 @@ pub mod tree {
             }),
         );
 
+        b.def("InsBE", rec(var("InsBE_")));
+
         b.def(
-            "Ins",
+            "InsLE",
             abs(
                 ["tree", "index", "value"],
                 apply(
-                    rec(var("Ins_")),
+                    rec(var("InsBE_")),
                     [
                         var("tree"),
                         number::reverse_bits(var("index")),
@@ -157,11 +172,11 @@ pub mod memory {
     }
 
     pub fn index(memory: Memory, address: number::I32) -> Expr {
-        tree::index(memory, address)
+        tree::index_num(memory, address)
     }
 
     pub fn insert(memory: Memory, address: number::I32, value: Expr) -> Memory {
-        tree::insert(memory, address, value)
+        tree::insert_num(memory, address, value)
     }
 }
 
@@ -178,11 +193,11 @@ pub mod table {
     }
 
     pub fn index(table: Table, address: number::Id) -> Expr {
-        tree::index(table, address)
+        tree::index_id(table, address)
     }
 
     pub fn insert(table: Table, address: number::Id, value: Expr) -> Table {
-        tree::insert(table, address, value)
+        tree::insert_id(table, address, value)
     }
 }
 

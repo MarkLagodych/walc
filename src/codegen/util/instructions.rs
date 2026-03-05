@@ -63,14 +63,14 @@ impl UtilGenerator {
             I64Load32U { memarg, .. } => self.i_load(memarg.offset as u32, 64, 32, false),
             I64Load32S { memarg, .. } => self.i_load(memarg.offset as u32, 64, 32, true),
 
-            I32Store { memarg, .. } => self.i_store(memarg.offset as u32, 32, 32, false),
-            I64Store { memarg, .. } => self.i_store(memarg.offset as u32, 64, 64, false),
+            I32Store { memarg, .. } => self.i_store(memarg.offset as u32, 32, 32),
+            I64Store { memarg, .. } => self.i_store(memarg.offset as u32, 64, 64),
 
-            I32Store8 { memarg, .. } => self.i_store(memarg.offset as u32, 32, 8, false),
-            I32Store16 { memarg, .. } => self.i_store(memarg.offset as u32, 32, 16, false),
-            I64Store8 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 8, false),
-            I64Store16 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 16, false),
-            I64Store32 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 32, false),
+            I32Store8 { memarg, .. } => self.i_store(memarg.offset as u32, 32, 8),
+            I32Store16 { memarg, .. } => self.i_store(memarg.offset as u32, 32, 16),
+            I64Store8 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 8),
+            I64Store16 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 16),
+            I64Store32 { memarg, .. } => self.i_store(memarg.offset as u32, 64, 32),
 
             // Numeric instructions //////////////////////////////////////////
             I32Const { .. } | I64Const { .. } | F32Const { .. } | F64Const { .. } => {

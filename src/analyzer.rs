@@ -49,7 +49,36 @@ impl Analyzer {
     const MAX_ID: u32 = u16::MAX as u32;
     const MAX_COUNT: u32 = Self::MAX_ID + 1;
 
-    const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1.union(WasmFeatures::MULTI_VALUE);
+    /// This compiler supports `WASM 1.0` (the WWW standard released in 2019) with some extensions
+    /// from the `LIME1` superset, namely:
+    /// * `multi-value`: support for multiple return values in blocks and functions.
+    ///   This was really easy to implement because WASM VM is a just stack machine.
+    ///   Not supporting this extension would rather be an unreasonable limitation.
+    /// * `sign-extension-ops`: support for `iNN.extendMM_s` sign-extension instructions.
+    ///   These operations were implemented in the WASM VM anyway because they are used by the
+    ///   `iNN.loadMM_s` instructions, which are in the core spec.
+    ///   This extension is simply handy and also allows for better testing.
+    /// * `bulk-memory-opt`: a subset of `bulk-memory-operations` that just defines the
+    ///   `memory.init` and `memory.fill` instructions.
+    ///   These instructions are extremely interesting for benchmarking as they are basically the
+    ///   fastest way to initialize/copy memory chunks.
+    /// * `call-indirect-overlong`:
+    ///   This just enables the wasmparser's support for a slightly different encoding of the
+    ///   `call_indirect` instruction that was introduced in WASM 2.0.
+    ///
+    /// Note that other `LIME1` extensions are *not supported*:
+    /// * `extended-const`: the proposal [says](https://github.com/WebAssembly/extended-const/blob/main/proposals/extended-const/Overview.md)
+    ///   that the extension is primarily motivated by efforts to implement dynamic linking, which
+    ///   is not possible in WALC (there is nothing to link to).
+    ///
+    /// **TODO** `nontrapping-float-to-int-conversions`?
+    ///
+    /// **TODO** move this comment to docs
+    const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1
+        .union(WasmFeatures::MULTI_VALUE)
+        .union(WasmFeatures::SIGN_EXTENSION)
+        .union(WasmFeatures::BULK_MEMORY_OPT)
+        .union(WasmFeatures::CALL_INDIRECT_OVERLONG);
 
     pub fn new() -> Self {
         Self {

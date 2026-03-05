@@ -22,12 +22,17 @@ impl UtilGenerator {
 
     pub fn call_indirect(&mut self) -> Instruction {
         if !self.has("CallIndirect") {
-            self.def("CallIndirect", {
+            let body = {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a"]);
+
+                b.def("a", self.i32_to_id(var("a")));
                 b.call_indirect(var("a"));
+
                 b.build()
-            });
+            };
+
+            self.def("CallIndirect", body);
         }
 
         var("CallIndirect")

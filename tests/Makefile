@@ -10,7 +10,8 @@ bin/function.wasm \
 bin/function-locals.wasm \
 bin/if.wasm \
 bin/br.wasm \
-bin/loop.wasm
+bin/loop.wasm \
+bin/memory.wasm
 
 bin:
 	mkdir -p bin
