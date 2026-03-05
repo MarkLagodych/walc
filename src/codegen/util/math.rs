@@ -576,6 +576,12 @@ impl UtilGenerator {
         list::get_head(parts)
     }
 
+    pub fn i32_to_byte(&mut self, a: number::I32) -> number::Byte {
+        // Get the lowest byte of the value
+        let bytes = self.num_split_lowest_bits_to_be_bytes(a, 32, 8);
+        list::get_head(bytes)
+    }
+
     /// Widens a number by copying the missing bits from the template.
     /// The template must not be shorter than the number being widened.
     /// It is intended that the template is filled with zeroes.

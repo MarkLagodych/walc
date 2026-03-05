@@ -75,6 +75,96 @@ impl UtilGenerator {
         apply(var("MemInit"), [data_segment, memory_offset])
     }
 
+    pub fn memory_fill(&mut self) -> Instruction {
+        if !self.has("MemFill") {
+            let body = abs(["mem", "addr", "byte", "max"], {
+                select(
+                    self.num_equal(var("addr"), var("max")),
+                    apply(
+                        rec(var("_MemFill")),
+                        [
+                            memory::insert(var("mem"), var("addr"), var("byte")),
+                            self.num_increment(var("addr")),
+                            var("byte"),
+                            var("max"),
+                        ],
+                    ),
+                    var("mem"),
+                )
+            });
+
+            self.def("_MemFill", body);
+
+            let body = {
+                let mut b = InstructionBuilder::new();
+
+                b.pop(["addr", "val", "len"]);
+
+                // The maximum address at which to stop
+                let max = self.num_add(var("addr"), var("len"));
+
+                let byte = self.i32_to_byte(var("val"));
+
+                b.set_memory(apply(
+                    rec(var("_MemFill")),
+                    [b.memory(), var("addr"), byte, max],
+                ));
+
+                b.build()
+            };
+
+            self.def("MemFill", body);
+        }
+
+        var("MemFill")
+    }
+
+    pub fn memory_copy(&mut self) -> Instruction {
+        if !self.has("MemCopy") {
+            let body = abs(["mem", "dst", "src", "maxsrc"], {
+                select(
+                    self.num_equal(var("src"), var("maxsrc")),
+                    apply(
+                        rec(var("_MemCopy")),
+                        [
+                            memory::insert(
+                                var("mem"),
+                                var("dst"),
+                                memory::index(var("mem"), var("src")),
+                            ),
+                            self.num_increment(var("dst")),
+                            self.num_increment(var("src")),
+                            var("maxsrc"),
+                        ],
+                    ),
+                    var("mem"),
+                )
+            });
+
+            self.def("_MemCopy", body);
+
+            let body = {
+                let mut b = InstructionBuilder::new();
+
+                b.pop(["dst", "src", "len"]);
+
+                // Maximum source index
+                let maxsrc = self.num_add(var("src"), var("len"));
+
+                b.set_memory(apply(
+                    rec(var("_MemCopy")),
+                    [b.memory(), var("dst"), var("src"), maxsrc],
+                ));
+
+                b.build()
+            };
+
+            self.def("MemCopy", body);
+        }
+
+        var("MemCopy")
+    }
+
     /// Generates all `load` instructions: `i(32|64).load[(8|16|32)_(u|s)]`, e.g.
     /// `i32.load`, `i64.load32_s`.
     ///

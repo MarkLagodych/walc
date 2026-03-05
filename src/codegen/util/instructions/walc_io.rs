@@ -7,9 +7,7 @@ impl UtilGenerator {
                 let mut b = InstructionBuilder::new();
                 b.pop(["a"]);
 
-                // Get the lowest byte of the value
-                let bytes = self.num_split_lowest_bits_to_be_bytes(var("a"), 32, 8);
-                let byte = list::get_head(bytes);
+                let byte = self.i32_to_byte(var("a"));
 
                 b.ret();
                 b.build_output(byte)

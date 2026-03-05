@@ -53,6 +53,9 @@ impl UtilGenerator {
             MemorySize { .. } => self.memory_size(),
             MemoryGrow { .. } => self.memory_grow(),
 
+            MemoryFill { .. } => self.memory_fill(),
+            MemoryCopy { .. } => self.memory_copy(),
+
             I32Load { memarg, .. } => self.i_load(memarg.offset as u32, 32, 32, false),
             I64Load { memarg, .. } => self.i_load(memarg.offset as u32, 64, 64, false),
 
