@@ -38,7 +38,7 @@ impl UtilGenerator {
     pub fn memory_init_with_data(
         &mut self,
         data_segment: list::List,
-        memory_offset: u32,
+        memory_offset: number::I32,
     ) -> Instruction {
         if !self.has("MemInit") {
             let body = abs(["dat", "offset", "mem"], {
@@ -72,8 +72,7 @@ impl UtilGenerator {
             self.def("MemInit", body);
         }
 
-        let offset = self.num.i32_const(memory_offset);
-        apply(var("MemInit"), [data_segment, offset])
+        apply(var("MemInit"), [data_segment, memory_offset])
     }
 
     /// Generates all `load` instructions: `i(32|64).load[(8|16|32)_(u|s)]`, e.g.

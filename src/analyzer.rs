@@ -218,20 +218,17 @@ impl Analyzer {
         for data_segment in section.into_iter() {
             let data_segment = data_segment?;
 
-            let target_memory_offset = match data_segment.kind {
+            let target_memory_offset_expr = match data_segment.kind {
                 DataKind::Active { offset_expr, .. } => {
-                    match offset_expr.get_operators_reader().read()? {
-                        Operator::I32Const { value } => value as u32,
-                        // Validator must ensure that offset_expr is I32
-                        _ => unreachable!(),
-                    }
+                    // WASM 1.0 only supports constant expressions consisting of single operators
+                    offset_expr.get_operators_reader().read()?
                 }
                 // Passive data segments are not supported in WASM 1.0
                 _ => unreachable!(),
             };
 
             self.program
-                .handle_data(data_segment.data, target_memory_offset);
+                .handle_data(data_segment.data, &target_memory_offset_expr);
         }
 
         Ok(())

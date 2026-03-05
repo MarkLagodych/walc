@@ -232,24 +232,23 @@ pub fn exit_function(util: &mut UtilGenerator) -> code::Code {
     code::single(util.exit())
 }
 
-pub struct EntrypointInfo<'a> {
-    pub main_id: FuncId,
-    pub start_id: Option<FuncId>,
-    pub data_memory_offsets: &'a [u32],
-}
-
-pub fn entrypoint(util: &mut UtilGenerator, info: &EntrypointInfo) -> io_command::IoCommand {
+pub fn entrypoint(
+    util: &mut UtilGenerator,
+    main_id: FuncId,
+    start_id: Option<FuncId>,
+    data_memory_offsets: impl Iterator<Item = number::I32>,
+) -> io_command::IoCommand {
     let mut code = code::CodeBuilder::new();
 
-    for (data_id, target_offset) in info.data_memory_offsets.iter().enumerate() {
-        code.push(util.memory_init_with_data(var(format!("Data{data_id:x}")), *target_offset));
+    for (data_id, target_offset) in data_memory_offsets.enumerate() {
+        code.push(util.memory_init_with_data(var(format!("Data{data_id:x}")), target_offset));
     }
 
-    if let Some(start_id) = info.start_id {
+    if let Some(start_id) = start_id {
         code.push(util.call(start_id));
     }
 
-    code.push(util.call(info.main_id));
+    code.push(util.call(main_id));
 
     code.push(util.exit());
 

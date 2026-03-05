@@ -18,7 +18,7 @@ pub struct ProgramBuilder {
     globals: Vec<number::Number>,
 
     data_segments: Vec<list::List>,
-    data_memory_offsets: Vec<u32>,
+    data_memory_offsets: Vec<number::I32>,
 
     main_id: Option<FuncId>,
     start_id: Option<FuncId>,
@@ -34,11 +34,9 @@ impl ProgramBuilder {
     pub fn build(mut self) -> Expr {
         let start_function = function::entrypoint(
             &mut self.util,
-            &function::EntrypointInfo {
-                main_id: self.main_id.unwrap(), // The analyzer must ensure that `main` exists
-                start_id: self.start_id,
-                data_memory_offsets: &self.data_memory_offsets,
-            },
+            self.main_id.unwrap(), // The analyzer must ensure that `main` exists
+            self.start_id,
+            self.data_memory_offsets.into_iter(),
         );
 
         let start = instruction::start(
@@ -93,11 +91,21 @@ impl ProgramBuilder {
         self.start_id = Some(id);
     }
 
-    pub fn handle_data(&mut self, data: &[u8], target_memory_offset: u32) {
-        let list = list::from(data.iter().map(|b| self.util.num.byte_const(*b)));
+    pub fn handle_data(&mut self, data: &[u8], target_memory_offset_expr: &Operator) {
+        let data = list::from(data.iter().map(|b| self.util.num.byte_const(*b)));
 
-        self.data_segments.push(list);
-        self.data_memory_offsets.push(target_memory_offset);
+        self.data_segments.push(data);
+
+        let offset = match target_memory_offset_expr {
+            Operator::I32Const { value } => self.util.num.i32_const(*value as u32),
+            Operator::GlobalGet { global_index } => {
+                let global_index = self.util.num.i32_const(*global_index);
+                table::index(var("Globals"), global_index)
+            }
+            _ => unreachable!(),
+        };
+
+        self.data_memory_offsets.push(offset);
     }
 
     pub fn handle_import(&mut self, name: &str) {
