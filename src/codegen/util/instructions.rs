@@ -78,8 +78,15 @@ impl UtilGenerator {
             }
 
             I32WrapI64 => self.i32_wrap_i64(),
+
             I64ExtendI32U => self.i64_extend_i32(false),
             I64ExtendI32S => self.i64_extend_i32(true),
+
+            I32Extend8S => self.i_extend_s(32, 8),
+            I32Extend16S => self.i_extend_s(32, 16),
+            I64Extend8S => self.i_extend_s(64, 8),
+            I64Extend16S => self.i_extend_s(64, 16),
+            I64Extend32S => self.i_extend_s(64, 32),
 
             I32Eqz | I64Eqz => self.eqz(),
             I32Eq | I64Eq => self.eq(),

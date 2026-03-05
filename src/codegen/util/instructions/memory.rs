@@ -94,7 +94,7 @@ impl UtilGenerator {
         let target_bytes = target_bits / 8;
         let pad_bytes = target_bytes - source_bytes;
 
-        let name = format!("I{target_bits}Load{source_bits}_{sign}");
+        let name = format!("I{target_bits}Load{source_bits}{sign}");
 
         if !self.has(&name) {
             let body = abs(["offset"], {

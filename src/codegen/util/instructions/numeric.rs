@@ -367,4 +367,26 @@ impl UtilGenerator {
 
         var(name)
     }
+
+    /// Args:
+    /// * `target_bits`: 32 or 64
+    /// * `source_bits`: 8, 16, 32, or 64. Must be <= `target_bits`.
+    pub fn i_extend_s(&mut self, target_bits: u8, source_bits: u8) -> Instruction {
+        let name = format!("I{target_bits}Extend{source_bits}S");
+
+        if !self.has(&name) {
+            let definition = {
+                let mut b = InstructionBuilder::new();
+                b.pop(["a"]);
+
+                let result = self.num_sign_extend(var("a"), target_bits, source_bits);
+
+                b.push([result]);
+                b.build()
+            };
+            self.def(&name, definition);
+        }
+
+        var(name)
+    }
 }
