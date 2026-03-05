@@ -180,7 +180,12 @@ impl UtilGenerator {
                 // Reversed because the byte list is BE but numbers are stored in LE
                 for i in (0..target_bytes).rev() {
                     b.def("b", list::get_head(var("bytes")));
-                    b.def("bytes", list::get_tail(var("bytes")));
+
+                    // Do not get the tail of the last byte, it will be empty anyway
+                    if i != 0 {
+                        b.def("bytes", list::get_tail(var("bytes")));
+                    }
+
                     b.store(var(format!("addr{i}")), var("b"));
                 }
 
