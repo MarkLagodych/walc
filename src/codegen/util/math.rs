@@ -97,85 +97,48 @@ impl UtilGenerator {
         self.bit_not(a_is_equal_to_b)
     }
 
-    pub fn num_and(&mut self, a: number::Number, b: number::Number) -> number::Number {
-        if !self.has("AND") {
+    fn num_bitop(&mut self, a: number::Number, b: number::Number, op: &str) -> number::Number {
+        if !self.has(op) {
             let a_head = list::get_head(var("a"));
             let a_tail = list::get_tail(var("a"));
 
             let b_head = list::get_head(var("b"));
             let b_tail = list::get_tail(var("b"));
 
-            let heads_and = self.bit_and(a_head, b_head);
+            let head = match op {
+                "AND" => self.bit_and(a_head, b_head),
+                "OR" => self.bit_or(a_head, b_head),
+                "XOR" => self.bit_xor(a_head, b_head),
+                _ => unreachable!(),
+            };
 
             self.def_rec(
-                "_AND",
+                format!("_{op}"),
                 abs(["a", "b"], {
                     select(
                         list::is_not_empty(var("a")),
                         list::empty(),
-                        list::node(heads_and, apply(rec(var("_AND")), [a_tail, b_tail])),
+                        list::node(head, apply(rec(var(format!("_{op}"))), [a_tail, b_tail])),
                     )
                 }),
             );
 
-            self.def("AND", rec(var("_AND")));
+            self.def(op, rec(var(op)));
         }
 
-        apply(var("AND"), [a, b])
+        apply(var(op), [a, b])
+    }
+
+    pub fn num_and(&mut self, a: number::Number, b: number::Number) -> number::Number {
+        self.num_bitop(a, b, "AND")
     }
 
     pub fn num_or(&mut self, a: number::Number, b: number::Number) -> number::Number {
-        if !self.has("OR") {
-            let a_head = list::get_head(var("a"));
-            let a_tail = list::get_tail(var("a"));
-
-            let b_head = list::get_head(var("b"));
-            let b_tail = list::get_tail(var("b"));
-
-            let heads_or = self.bit_or(a_head, b_head);
-
-            self.def_rec(
-                "_OR",
-                abs(["a", "b"], {
-                    select(
-                        list::is_not_empty(var("a")),
-                        list::empty(),
-                        list::node(heads_or, apply(rec(var("_OR")), [a_tail, b_tail])),
-                    )
-                }),
-            );
-
-            self.def("OR", rec(var("_OR")));
-        }
-
-        apply(var("OR"), [a, b])
+        self.num_bitop(a, b, "OR")
     }
 
     pub fn num_xor(&mut self, a: number::Number, b: number::Number) -> number::Number {
-        if !self.has("XOR") {
-            let a_head = list::get_head(var("a"));
-            let a_tail = list::get_tail(var("a"));
-
-            let b_head = list::get_head(var("b"));
-            let b_tail = list::get_tail(var("b"));
-
-            let heads_xor = self.bit_xor(a_head, b_head);
-
-            self.def_rec(
-                "_XOR",
-                abs(["a", "b"], {
-                    select(
-                        list::is_not_empty(var("a")),
-                        list::empty(),
-                        list::node(heads_xor, apply(rec(var("_XOR")), [a_tail, b_tail])),
-                    )
-                }),
-            );
-
-            self.def("XOR", rec(var("_XOR")));
-        }
-
-        apply(var("XOR"), [a, b])
+        self.num_bitop(a, b, "XOR")
     }
 
     /// Compares two BE numbers
