@@ -1,4 +1,7 @@
-use crate::codegen::{core::*, util::UtilGenerator};
+use crate::codegen::{
+    core::*,
+    runtime::{self, RuntimeGenerator},
+};
 
 use crate::analyzer::{BlockType, Func, FuncId, FuncType, GlobalTypeInfo, Operator};
 
@@ -85,7 +88,7 @@ impl BlockStack {
 
 struct FunctionBuilder<'a> {
     func: &'a Func<'a>,
-    util: &'a mut UtilGenerator,
+    rt: &'a mut RuntimeGenerator,
     types: &'a GlobalTypeInfo,
     code: code::CodeBuilder,
 
@@ -97,9 +100,9 @@ struct FunctionBuilder<'a> {
 }
 
 impl<'a> FunctionBuilder<'a> {
-    fn new(func: &'a Func, util: &'a mut UtilGenerator, types: &'a GlobalTypeInfo) -> Self {
+    fn new(func: &'a Func, rt: &'a mut RuntimeGenerator, types: &'a GlobalTypeInfo) -> Self {
         Self {
-            util,
+            rt,
             func,
             types,
             code: code::CodeBuilder::new(),
@@ -122,7 +125,7 @@ impl<'a> FunctionBuilder<'a> {
             labels: BlockLabels::Func { end_label },
         });
 
-        let instr = self.util.func_prologue(self.func);
+        let instr = runtime::instructions::func_prologue(self.rt, self.func);
         self.code.push(instr);
     }
 
@@ -130,7 +133,7 @@ impl<'a> FunctionBuilder<'a> {
         for op in self.func.operators {
             self.before_instruction(op);
 
-            let instr = self.util.instruction(op, &self.blocks);
+            let instr = runtime::instructions::instruction(self.rt, op, &self.blocks);
             self.code.push(instr);
 
             self.after_instruction(op);
@@ -215,25 +218,25 @@ impl<'a> FunctionBuilder<'a> {
     }
 }
 
-pub fn function(util: &mut UtilGenerator, func: &Func, types: &GlobalTypeInfo) -> code::Code {
-    let b = FunctionBuilder::new(func, util, types);
+pub fn function(rt: &mut RuntimeGenerator, func: &Func, types: &GlobalTypeInfo) -> code::Code {
+    let b = FunctionBuilder::new(func, rt, types);
     b.build()
 }
 
-pub fn input_function(util: &mut UtilGenerator) -> code::Code {
-    code::single(util.input_and_return())
+pub fn input_function(rt: &mut RuntimeGenerator) -> code::Code {
+    code::single(runtime::instructions::walc_io::input_and_return(rt))
 }
 
-pub fn output_function(util: &mut UtilGenerator) -> code::Code {
-    code::single(util.output_and_return())
+pub fn output_function(rt: &mut RuntimeGenerator) -> code::Code {
+    code::single(runtime::instructions::walc_io::output_and_return(rt))
 }
 
-pub fn exit_function(util: &mut UtilGenerator) -> code::Code {
-    code::single(util.exit())
+pub fn exit_function(rt: &mut RuntimeGenerator) -> code::Code {
+    code::single(runtime::instructions::walc_io::exit(rt))
 }
 
 pub fn entrypoint(
-    util: &mut UtilGenerator,
+    rt: &mut RuntimeGenerator,
     main_id: FuncId,
     start_id: Option<FuncId>,
     data_memory_offsets: impl Iterator<Item = number::I32>,
@@ -241,16 +244,20 @@ pub fn entrypoint(
     let mut code = code::CodeBuilder::new();
 
     for (data_id, target_offset) in data_memory_offsets.enumerate() {
-        code.push(util.memory_init_with_data(var(format!("Data{data_id:x}")), target_offset));
+        code.push(runtime::instructions::memory::memory_init_with_data(
+            rt,
+            var(format!("Data{data_id:x}")),
+            target_offset,
+        ));
     }
 
     if let Some(start_id) = start_id {
-        code.push(util.call(start_id));
+        code.push(runtime::instructions::control_flow::call(rt, start_id));
     }
 
-    code.push(util.call(main_id));
+    code.push(runtime::instructions::control_flow::call(rt, main_id));
 
-    code.push(util.exit());
+    code.push(runtime::instructions::walc_io::exit(rt));
 
     code.build()
 }

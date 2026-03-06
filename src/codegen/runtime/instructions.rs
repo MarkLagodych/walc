@@ -1,0 +1,138 @@
+pub mod control_flow;
+pub mod memory;
+pub mod numeric;
+pub mod parametric;
+pub mod variable;
+pub mod walc_io;
+
+use super::*;
+
+use crate::codegen::{
+    function::BlockStack,
+    instruction::{Instruction, InstructionBuilder},
+};
+
+use crate::analyzer::{Func, Operator};
+
+pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack) -> Instruction {
+    use Operator::*;
+
+    match op {
+        // ==================================================================================
+        // Parametric instructions
+        Drop => parametric::drop(rt),
+        Select => parametric::select(rt),
+
+        // ==================================================================================
+        // Constrol flow instructions
+        Nop => instruction::nop(),
+        Unreachable => walc_io::exit(rt),
+
+        Call { function_index } => control_flow::call(rt, *function_index),
+        CallIndirect { .. } => control_flow::call_indirect(rt),
+
+        Loop { .. } | If { .. } | Block { .. } => control_flow::begin_block(rt, blocks),
+        Else => control_flow::block_else(rt, blocks),
+        End => control_flow::end_block(rt, blocks),
+
+        Br { relative_depth } => control_flow::br(rt, blocks, *relative_depth),
+        BrIf { relative_depth } => control_flow::br_if(rt, blocks, *relative_depth),
+        BrTable { targets } => control_flow::br_table(rt, blocks, targets),
+        Return => control_flow::ret(rt, blocks),
+
+        // ==================================================================================
+        // Variable instructions
+        LocalGet { local_index } => variable::local_get(rt, *local_index),
+        LocalSet { local_index } => variable::local_set(rt, *local_index),
+        LocalTee { local_index } => variable::local_tee(rt, *local_index),
+        GlobalGet { global_index } => variable::global_get(rt, *global_index),
+        GlobalSet { global_index } => variable::global_set(rt, *global_index),
+
+        // ==================================================================================
+        // Memory instructions
+        MemorySize { .. } => memory::memory_size(rt),
+        MemoryGrow { .. } => memory::memory_grow(rt),
+
+        MemoryFill { .. } => memory::memory_fill(rt),
+        MemoryCopy { .. } => memory::memory_copy(rt),
+
+        I32Load { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 32, false),
+        I64Load { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 64, false),
+
+        I32Load8U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 8, false),
+        I32Load8S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 8, true),
+        I32Load16U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 16, false),
+        I32Load16S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 16, true),
+        I64Load8U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 8, false),
+        I64Load8S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 8, true),
+        I64Load16U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 16, false),
+        I64Load16S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 16, true),
+        I64Load32U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 32, false),
+        I64Load32S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 32, true),
+
+        I32Store { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 32, 32),
+        I64Store { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 64, 64),
+
+        I32Store8 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 32, 8),
+        I32Store16 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 32, 16),
+        I64Store8 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 64, 8),
+        I64Store16 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 64, 16),
+        I64Store32 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 64, 32),
+
+        // ==================================================================================
+        // Numeric instructions
+        I32Const { .. } | I64Const { .. } => numeric::i_const(rt, op),
+
+        I32WrapI64 => numeric::i32_wrap_i64(rt),
+
+        I64ExtendI32U => numeric::i64_extend_i32(rt, false),
+        I64ExtendI32S => numeric::i64_extend_i32(rt, true),
+
+        I32Extend8S => numeric::i_extend_s(rt, 32, 8),
+        I32Extend16S => numeric::i_extend_s(rt, 32, 16),
+        I64Extend8S => numeric::i_extend_s(rt, 64, 8),
+        I64Extend16S => numeric::i_extend_s(rt, 64, 16),
+        I64Extend32S => numeric::i_extend_s(rt, 64, 32),
+
+        I32Eqz | I64Eqz => numeric::i_eqz(rt),
+        I32Eq | I64Eq => numeric::i_eq(rt),
+        I32Ne | I64Ne => numeric::i_ne(rt),
+
+        I32And | I64And => numeric::i_and(rt),
+        I32Or | I64Or => numeric::i_or(rt),
+        I32Xor | I64Xor => numeric::i_xor(rt),
+
+        I32LtU | I64LtU => numeric::i_lt_u(rt),
+        I32LeU | I64LeU => numeric::i_le_u(rt),
+        I32GtU | I64GtU => numeric::i_gt_u(rt),
+        I32GeU | I64GeU => numeric::i_ge_u(rt),
+
+        I32LtS | I64LtS => numeric::i_lt_s(rt),
+        I32LeS | I64LeS => numeric::i_le_s(rt),
+        I32GtS | I64GtS => numeric::i_gt_s(rt),
+        I32GeS | I64GeS => numeric::i_ge_s(rt),
+
+        I32Add | I64Add => numeric::i_add(rt),
+        I32Sub | I64Sub => numeric::i_sub(rt),
+
+        // TODO
+        _ => todo!(),
+    }
+}
+
+pub fn func_prologue(rt: &mut RuntimeGenerator, func: &Func) -> Instruction {
+    let mut b = InstructionBuilder::new();
+
+    let param_count = func.func_type.params().len();
+
+    b.pop((0..param_count).map(|i| format!("p{i:x}")));
+
+    let mut locals = Vec::new();
+    locals.extend((0..param_count).map(|i| var(format!("p{i:x}"))));
+    locals.extend(func.local_types.iter().map(|ty| rt.num.default_const(*ty)));
+
+    b.push_locals_frame(table::from(locals));
+    b.push_stack_frame();
+
+    b.build()
+}

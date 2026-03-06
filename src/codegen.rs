@@ -5,13 +5,13 @@ pub use core::*;
 
 mod function;
 
-mod util;
+mod runtime;
 
 use crate::analyzer::*;
 
 #[derive(Default)]
 pub struct ProgramBuilder {
-    util: util::UtilGenerator,
+    runtime: runtime::RuntimeGenerator,
 
     functions: Vec<code::Code>,
 
@@ -33,7 +33,7 @@ impl ProgramBuilder {
 
     pub fn build(mut self) -> Expr {
         let start_function = function::entrypoint(
-            &mut self.util,
+            &mut self.runtime,
             self.main_id.unwrap(), // The analyzer must ensure that `main` exists
             self.start_id,
             self.data_memory_offsets.into_iter(),
@@ -52,7 +52,7 @@ impl ProgramBuilder {
 
         generate_core_definitions(&mut defs);
 
-        self.util.generate(&mut defs);
+        self.runtime.generate(&mut defs);
 
         for (id, data) in self.data_segments.into_iter().enumerate() {
             defs.def(format!("Data{id:x}"), data);
@@ -92,14 +92,14 @@ impl ProgramBuilder {
     }
 
     pub fn handle_data(&mut self, data: &[u8], target_memory_offset_expr: &Operator) {
-        let data = list::from(data.iter().map(|b| self.util.num.byte_const(*b)));
+        let data = list::from(data.iter().map(|b| self.runtime.num.byte_const(*b)));
 
         self.data_segments.push(data);
 
         let offset = match target_memory_offset_expr {
-            Operator::I32Const { value } => self.util.num.i32_const(*value as u32),
+            Operator::I32Const { value } => self.runtime.num.i32_const(*value as u32),
             Operator::GlobalGet { global_index } => {
-                let global_index = self.util.num.i32_const(*global_index);
+                let global_index = self.runtime.num.i32_const(*global_index);
                 table::index(var("Globals"), global_index)
             }
             _ => unreachable!(),
@@ -110,9 +110,9 @@ impl ProgramBuilder {
 
     pub fn handle_import(&mut self, name: &str) {
         let func = match name {
-            "input" => function::input_function(&mut self.util),
-            "output" => function::output_function(&mut self.util),
-            "exit" => function::exit_function(&mut self.util),
+            "input" => function::input_function(&mut self.runtime),
+            "output" => function::output_function(&mut self.runtime),
+            "exit" => function::exit_function(&mut self.runtime),
             _ => unreachable!(),
         };
 
@@ -121,11 +121,11 @@ impl ProgramBuilder {
 
     pub fn handle_function(&mut self, func: &Func, types: &GlobalTypeInfo) {
         self.functions
-            .push(function::function(&mut self.util, func, types));
+            .push(function::function(&mut self.runtime, func, types));
     }
 
     pub fn handle_global(&mut self, init: Operator) {
-        self.globals.push(self.util.num.with_init_value(&init));
+        self.globals.push(self.runtime.num.with_init_value(&init));
     }
 
     pub fn handle_table(&mut self, size: u32) {
