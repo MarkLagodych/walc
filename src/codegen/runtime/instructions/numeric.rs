@@ -15,7 +15,7 @@ pub fn i_const(rt: &mut RuntimeGenerator, op: &Operator) -> Instruction {
     apply(var("Push"), [item])
 }
 
-pub fn i_eqz(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn eqz(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Eqz") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -37,7 +37,7 @@ pub fn i_eqz(rt: &mut RuntimeGenerator) -> Instruction {
     var("Eqz")
 }
 
-pub fn i_eq(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn eq(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Eq") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -59,7 +59,7 @@ pub fn i_eq(rt: &mut RuntimeGenerator) -> Instruction {
     var("Eq")
 }
 
-pub fn i_ne(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn ne(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Ne") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -81,7 +81,7 @@ pub fn i_ne(rt: &mut RuntimeGenerator) -> Instruction {
     var("Ne")
 }
 
-pub fn i_and(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn and(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("And") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -95,7 +95,7 @@ pub fn i_and(rt: &mut RuntimeGenerator) -> Instruction {
     var("And")
 }
 
-pub fn i_or(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn or(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Or") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -109,7 +109,7 @@ pub fn i_or(rt: &mut RuntimeGenerator) -> Instruction {
     var("Or")
 }
 
-pub fn i_xor(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn xor(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Xor") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -123,7 +123,7 @@ pub fn i_xor(rt: &mut RuntimeGenerator) -> Instruction {
     var("Xor")
 }
 
-pub fn i_lt_u(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn lt_u(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Lt") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -146,7 +146,7 @@ pub fn i_lt_u(rt: &mut RuntimeGenerator) -> Instruction {
     var("Lt")
 }
 
-pub fn i_le_u(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn le_u(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Le") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -168,7 +168,7 @@ pub fn i_le_u(rt: &mut RuntimeGenerator) -> Instruction {
     var("Le")
 }
 
-pub fn i_gt_u(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn gt_u(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Gt") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -190,7 +190,7 @@ pub fn i_gt_u(rt: &mut RuntimeGenerator) -> Instruction {
     var("Gt")
 }
 
-pub fn i_ge_u(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn ge_u(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Ge") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -212,7 +212,7 @@ pub fn i_ge_u(rt: &mut RuntimeGenerator) -> Instruction {
     var("Ge")
 }
 
-pub fn i_lt_s(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn lt_s(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("LtS") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -234,7 +234,7 @@ pub fn i_lt_s(rt: &mut RuntimeGenerator) -> Instruction {
     var("LtS")
 }
 
-pub fn i_le_s(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn le_s(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("LeS") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -255,7 +255,7 @@ pub fn i_le_s(rt: &mut RuntimeGenerator) -> Instruction {
     var("LeS")
 }
 
-pub fn i_gt_s(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn gt_s(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("GtS") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -276,7 +276,7 @@ pub fn i_gt_s(rt: &mut RuntimeGenerator) -> Instruction {
     var("GtS")
 }
 
-pub fn i_ge_s(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn ge_s(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("GeS") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -297,7 +297,7 @@ pub fn i_ge_s(rt: &mut RuntimeGenerator) -> Instruction {
     var("GeS")
 }
 
-pub fn i_add(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn add(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Add") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -311,7 +311,7 @@ pub fn i_add(rt: &mut RuntimeGenerator) -> Instruction {
     var("Add")
 }
 
-pub fn i_sub(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn sub(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Sub") {
         let definition = {
             let mut b = InstructionBuilder::new();
@@ -370,7 +370,7 @@ pub fn i64_extend_i32(rt: &mut RuntimeGenerator, signed: bool) -> Instruction {
 /// Args:
 /// * `target_bits`: 32 or 64
 /// * `source_bits`: 8, 16, 32, or 64. Must be <= `target_bits`.
-pub fn i_extend_s(rt: &mut RuntimeGenerator, target_bits: u8, source_bits: u8) -> Instruction {
+pub fn extend_s(rt: &mut RuntimeGenerator, target_bits: u8, source_bits: u8) -> Instruction {
     let name = format!("I{target_bits}Extend{source_bits}S");
 
     if !rt.has(&name) {

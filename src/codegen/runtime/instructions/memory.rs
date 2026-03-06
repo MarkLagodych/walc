@@ -7,7 +7,7 @@ use crate::codegen::memory;
 /// so there are 2^16 pages.
 const MEMORY_SIZE_IN_PAGES: u32 = 1 << 16;
 
-pub fn memory_size(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn size(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("MemSize") {
         let memory_size = rt.num.i32_const(MEMORY_SIZE_IN_PAGES);
         rt.def("MemSize", {
@@ -20,7 +20,7 @@ pub fn memory_size(rt: &mut RuntimeGenerator) -> Instruction {
     var("MemSize")
 }
 
-pub fn memory_grow(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn grow(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("MemGrow") {
         let memory_size = rt.num.i32_const(MEMORY_SIZE_IN_PAGES);
         rt.def("MemGrow", {
@@ -34,7 +34,7 @@ pub fn memory_grow(rt: &mut RuntimeGenerator) -> Instruction {
     var("MemGrow")
 }
 
-pub fn memory_init_with_data(
+pub fn init_with_data(
     rt: &mut RuntimeGenerator,
     data_segment: list::List,
     memory_offset: number::I32,
@@ -74,7 +74,7 @@ pub fn memory_init_with_data(
     apply(var("MemInit"), [data_segment, memory_offset])
 }
 
-pub fn memory_fill(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn fill(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("MemFill") {
         let body = abs(["mem", "addr", "byte", "max"], {
             select(
@@ -118,7 +118,7 @@ pub fn memory_fill(rt: &mut RuntimeGenerator) -> Instruction {
     var("MemFill")
 }
 
-pub fn memory_copy(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn copy(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("MemCopy") {
         let body = abs(["mem", "dst", "src", "maxsrc"], {
             select(
@@ -170,7 +170,7 @@ pub fn memory_copy(rt: &mut RuntimeGenerator) -> Instruction {
 /// Args:
 /// * `target_bits`: 32 or 64
 /// * `source_bits`: 8, 16, 32, or 64. Must be <= `target_bits`.
-pub fn i_load(
+pub fn load(
     rt: &mut RuntimeGenerator,
     memory_offset: u32,
     target_bits: u8,
@@ -240,7 +240,7 @@ pub fn i_load(
 /// Args:
 /// * `source_bits`: 32 or 64
 /// * `target_bits`: 8, 16, 32, or 64. Must be <= `source_bits`.
-pub fn i_store(
+pub fn store(
     rt: &mut RuntimeGenerator,
     memory_offset: u32,
     source_bits: u8,

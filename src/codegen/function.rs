@@ -224,15 +224,15 @@ pub fn function(rt: &mut RuntimeGenerator, func: &Func, types: &GlobalTypeInfo) 
 }
 
 pub fn input_function(rt: &mut RuntimeGenerator) -> code::Code {
-    code::single(runtime::instructions::walc_io::input_and_return(rt))
+    code::single(runtime::instructions::io::input_and_return(rt))
 }
 
 pub fn output_function(rt: &mut RuntimeGenerator) -> code::Code {
-    code::single(runtime::instructions::walc_io::output_and_return(rt))
+    code::single(runtime::instructions::io::output_and_return(rt))
 }
 
 pub fn exit_function(rt: &mut RuntimeGenerator) -> code::Code {
-    code::single(runtime::instructions::walc_io::exit(rt))
+    code::single(runtime::instructions::io::exit(rt))
 }
 
 pub fn entrypoint(
@@ -244,7 +244,7 @@ pub fn entrypoint(
     let mut code = code::CodeBuilder::new();
 
     for (data_id, target_offset) in data_memory_offsets.enumerate() {
-        code.push(runtime::instructions::memory::memory_init_with_data(
+        code.push(runtime::instructions::memory::init_with_data(
             rt,
             var(format!("Data{data_id:x}")),
             target_offset,
@@ -257,7 +257,7 @@ pub fn entrypoint(
 
     code.push(runtime::instructions::control_flow::call(rt, main_id));
 
-    code.push(runtime::instructions::walc_io::exit(rt));
+    code.push(runtime::instructions::io::exit(rt));
 
     code.build()
 }

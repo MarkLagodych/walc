@@ -1,9 +1,9 @@
 pub mod control_flow;
+pub mod io;
 pub mod memory;
 pub mod numeric;
 pub mod parametric;
 pub mod variable;
-pub mod walc_io;
 
 use super::*;
 
@@ -26,7 +26,7 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         // ==================================================================================
         // Constrol flow instructions
         Nop => instruction::nop(),
-        Unreachable => walc_io::exit(rt),
+        Unreachable => io::exit(rt),
 
         Call { function_index } => control_flow::call(rt, *function_index),
         CallIndirect { .. } => control_flow::call_indirect(rt),
@@ -50,34 +50,34 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
 
         // ==================================================================================
         // Memory instructions
-        MemorySize { .. } => memory::memory_size(rt),
-        MemoryGrow { .. } => memory::memory_grow(rt),
+        MemorySize { .. } => memory::size(rt),
+        MemoryGrow { .. } => memory::grow(rt),
 
-        MemoryFill { .. } => memory::memory_fill(rt),
-        MemoryCopy { .. } => memory::memory_copy(rt),
+        MemoryFill { .. } => memory::fill(rt),
+        MemoryCopy { .. } => memory::copy(rt),
 
-        I32Load { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 32, false),
-        I64Load { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 64, false),
+        I32Load { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 32, false),
+        I64Load { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 64, false),
 
-        I32Load8U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 8, false),
-        I32Load8S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 8, true),
-        I32Load16U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 16, false),
-        I32Load16S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 32, 16, true),
-        I64Load8U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 8, false),
-        I64Load8S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 8, true),
-        I64Load16U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 16, false),
-        I64Load16S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 16, true),
-        I64Load32U { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 32, false),
-        I64Load32S { memarg, .. } => memory::i_load(rt, memarg.offset as u32, 64, 32, true),
+        I32Load8U { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 8, false),
+        I32Load8S { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 8, true),
+        I32Load16U { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 16, false),
+        I32Load16S { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 16, true),
+        I64Load8U { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 8, false),
+        I64Load8S { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 8, true),
+        I64Load16U { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 16, false),
+        I64Load16S { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 16, true),
+        I64Load32U { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 32, false),
+        I64Load32S { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 32, true),
 
-        I32Store { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 32, 32),
-        I64Store { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 64, 64),
+        I32Store { memarg, .. } => memory::store(rt, memarg.offset as u32, 32, 32),
+        I64Store { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 64),
 
-        I32Store8 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 32, 8),
-        I32Store16 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 32, 16),
-        I64Store8 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 64, 8),
-        I64Store16 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 64, 16),
-        I64Store32 { memarg, .. } => memory::i_store(rt, memarg.offset as u32, 64, 32),
+        I32Store8 { memarg, .. } => memory::store(rt, memarg.offset as u32, 32, 8),
+        I32Store16 { memarg, .. } => memory::store(rt, memarg.offset as u32, 32, 16),
+        I64Store8 { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 8),
+        I64Store16 { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 16),
+        I64Store32 { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 32),
 
         // ==================================================================================
         // Numeric instructions
@@ -88,32 +88,32 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         I64ExtendI32U => numeric::i64_extend_i32(rt, false),
         I64ExtendI32S => numeric::i64_extend_i32(rt, true),
 
-        I32Extend8S => numeric::i_extend_s(rt, 32, 8),
-        I32Extend16S => numeric::i_extend_s(rt, 32, 16),
-        I64Extend8S => numeric::i_extend_s(rt, 64, 8),
-        I64Extend16S => numeric::i_extend_s(rt, 64, 16),
-        I64Extend32S => numeric::i_extend_s(rt, 64, 32),
+        I32Extend8S => numeric::extend_s(rt, 32, 8),
+        I32Extend16S => numeric::extend_s(rt, 32, 16),
+        I64Extend8S => numeric::extend_s(rt, 64, 8),
+        I64Extend16S => numeric::extend_s(rt, 64, 16),
+        I64Extend32S => numeric::extend_s(rt, 64, 32),
 
-        I32Eqz | I64Eqz => numeric::i_eqz(rt),
-        I32Eq | I64Eq => numeric::i_eq(rt),
-        I32Ne | I64Ne => numeric::i_ne(rt),
+        I32Eqz | I64Eqz => numeric::eqz(rt),
+        I32Eq | I64Eq => numeric::eq(rt),
+        I32Ne | I64Ne => numeric::ne(rt),
 
-        I32And | I64And => numeric::i_and(rt),
-        I32Or | I64Or => numeric::i_or(rt),
-        I32Xor | I64Xor => numeric::i_xor(rt),
+        I32And | I64And => numeric::and(rt),
+        I32Or | I64Or => numeric::or(rt),
+        I32Xor | I64Xor => numeric::xor(rt),
 
-        I32LtU | I64LtU => numeric::i_lt_u(rt),
-        I32LeU | I64LeU => numeric::i_le_u(rt),
-        I32GtU | I64GtU => numeric::i_gt_u(rt),
-        I32GeU | I64GeU => numeric::i_ge_u(rt),
+        I32LtU | I64LtU => numeric::lt_u(rt),
+        I32LeU | I64LeU => numeric::le_u(rt),
+        I32GtU | I64GtU => numeric::gt_u(rt),
+        I32GeU | I64GeU => numeric::ge_u(rt),
 
-        I32LtS | I64LtS => numeric::i_lt_s(rt),
-        I32LeS | I64LeS => numeric::i_le_s(rt),
-        I32GtS | I64GtS => numeric::i_gt_s(rt),
-        I32GeS | I64GeS => numeric::i_ge_s(rt),
+        I32LtS | I64LtS => numeric::lt_s(rt),
+        I32LeS | I64LeS => numeric::le_s(rt),
+        I32GtS | I64GtS => numeric::gt_s(rt),
+        I32GeS | I64GeS => numeric::ge_s(rt),
 
-        I32Add | I64Add => numeric::i_add(rt),
-        I32Sub | I64Sub => numeric::i_sub(rt),
+        I32Add | I64Add => numeric::add(rt),
+        I32Sub | I64Sub => numeric::sub(rt),
 
         // TODO
         _ => todo!(),
