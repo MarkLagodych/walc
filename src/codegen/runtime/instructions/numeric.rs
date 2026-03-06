@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn i_const(rt: &mut RuntimeGenerator, op: &Operator) -> Instruction {
+pub fn push_const(rt: &mut RuntimeGenerator, op: &Operator) -> Instruction {
     if !rt.has("Push") {
         rt.def("Push", {
             abs(["item"], {
