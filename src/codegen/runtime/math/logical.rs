@@ -49,3 +49,187 @@ pub fn or(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> nu
 pub fn xor(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> number::Number {
     apply_bitop(rt, a, b, "XOR")
 }
+
+/// Adds 2^n zeroes to the little end of the number.
+///
+/// Example:
+/// ```text
+/// a      = 10101010     (LE binary)
+/// n      = 2            (decimal)
+/// result = 000010101010 (LE binary)
+///          ^^^^
+///    2^n zeroes are added
+/// ```
+fn add_trailing_zeroes(rt: &mut RuntimeGenerator, a: number::Number, n_log2: u8) -> number::Number {
+    let name = format!("_ATZ{n_log2}");
+    if !rt.has(&name) {
+        let body = match n_log2 {
+            0..=3 => {
+                let mut result = var("a");
+
+                for _ in 0..(1 << n_log2) {
+                    result = list::node(bit(false), result);
+                }
+
+                result
+            }
+            4..=5 => {
+                let mut result = var("a");
+                result = add_trailing_zeroes(rt, result, n_log2 - 1);
+                result = add_trailing_zeroes(rt, result, n_log2 - 1);
+                result
+            }
+            _ => unreachable!(),
+        };
+
+        rt.def(&name, abs(["a"], body));
+    }
+
+    apply(var(&name), [a])
+}
+
+/// Drops 2^n bits from the little end of the number.
+///
+/// Example:
+/// ```text
+///     2^n bits are dropped
+///          vvvv
+/// a      = 11110101  (LE binary)
+/// n      = 2         (decimal)
+/// result = 0101      (LE binary)
+/// ```
+fn drop_trailing_bits(rt: &mut RuntimeGenerator, a: number::Number, n_log2: u8) -> number::Number {
+    let name = format!("_DTB{n_log2}");
+    if !rt.has(&name) {
+        let body = match n_log2 {
+            0..=3 => {
+                let mut result = var("a");
+
+                for _ in 0..(1 << n_log2) {
+                    result = list::get_tail(result);
+                }
+
+                result
+            }
+            4..=5 => {
+                let mut result = var("a");
+                result = drop_trailing_bits(rt, result, n_log2 - 1);
+                result = drop_trailing_bits(rt, result, n_log2 - 1);
+                result
+            }
+            _ => unreachable!(),
+        };
+
+        rt.def(&name, abs(["a"], body));
+    }
+
+    apply(var(&name), [a])
+}
+
+/// `op` must be one of: "SHL", "SHR_U", "SHR_S"
+/// `bits` must be one of: 32, 64.
+fn apply_shift(
+    rt: &mut RuntimeGenerator,
+    a: number::Number,
+    shift: number::Number,
+    op: &str,
+    bits: u8,
+) -> number::Number {
+    let name = format!("{op}{bits}");
+
+    let shift_significant_bits = bits.trailing_zeros() as u8;
+
+    if !rt.has(&name) {
+        let body = {
+            let mut b = LetExprBuilder::new();
+
+            for i in 0..shift_significant_bits {
+                let shift_bit = list::get_head(var("shift"));
+
+                let shifted = match op {
+                    "SHL" => add_trailing_zeroes(rt, var("a"), i),
+                    _ => drop_trailing_bits(rt, var("a"), i),
+                };
+
+                b.def("a", select(shift_bit, var("a"), shifted));
+
+                if i != shift_significant_bits - 1 {
+                    b.def("shift", list::get_tail(var("shift")));
+                }
+            }
+
+            let result = match op {
+                "SHL" => match bits {
+                    32 => super::conversions::wrap_i32(rt, var("a")),
+                    64 => super::conversions::wrap_i64(rt, var("a")),
+                    _ => unreachable!(),
+                },
+                "SHR_U" => match bits {
+                    32 => super::conversions::widen_i32(rt, var("a")),
+                    64 => super::conversions::widen_i64(rt, var("a")),
+                    _ => unreachable!(),
+                },
+                "SHR_S" => match bits {
+                    32 => super::conversions::widen_and_sign_extend_i32(rt, var("a")),
+                    64 => super::conversions::widen_and_sign_extend_i64(rt, var("a")),
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            };
+
+            b.build_in(result)
+        };
+
+        rt.def(&name, abs(["a", "shift"], body));
+    }
+
+    apply(var(&name), [a, shift])
+}
+
+pub fn i32_shift_left(
+    rt: &mut RuntimeGenerator,
+    a: number::I32,
+    shift: number::Number,
+) -> number::I32 {
+    apply_shift(rt, a, shift, "SHL", 32)
+}
+
+pub fn i32_shift_right_unsigned(
+    rt: &mut RuntimeGenerator,
+    a: number::I32,
+    shift: number::Number,
+) -> number::I32 {
+    apply_shift(rt, a, shift, "SHR_U", 32)
+}
+
+pub fn i32_shift_right_signed(
+    rt: &mut RuntimeGenerator,
+    a: number::I32,
+    shift: number::Number,
+) -> number::I32 {
+    apply_shift(rt, a, shift, "SHR_S", 32)
+}
+
+pub fn i64_shift_left(
+    rt: &mut RuntimeGenerator,
+    a: number::I64,
+    shift: number::Number,
+) -> number::I64 {
+    apply_shift(rt, a, shift, "SHL", 64)
+}
+
+pub fn i64_shift_right_unsigned(
+    rt: &mut RuntimeGenerator,
+    a: number::I64,
+    shift: number::Number,
+) -> number::I64 {
+    apply_shift(rt, a, shift, "SHR_U", 64)
+}
+
+pub fn i64_shift_right_signed(
+    rt: &mut RuntimeGenerator,
+    a: number::I64,
+    shift: number::Number,
+) -> number::I64 {
+    apply_shift(rt, a, shift, "SHR_S", 64)
+}

@@ -107,6 +107,14 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         I32Or | I64Or => numeric::or(rt),
         I32Xor | I64Xor => numeric::xor(rt),
 
+        I32Shl => numeric::i32_shl(rt),
+        I32ShrU => numeric::i32_shr_u(rt),
+        I32ShrS => numeric::i32_shr_s(rt),
+
+        I64Shl => numeric::i64_shl(rt),
+        I64ShrU => numeric::i64_shr_u(rt),
+        I64ShrS => numeric::i64_shr_s(rt),
+
         I32LtU | I64LtU => numeric::lt_u(rt),
         I32LtS | I64LtS => numeric::lt_s(rt),
 

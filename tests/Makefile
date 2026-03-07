@@ -11,7 +11,8 @@ bin/function-locals.wasm \
 bin/if.wasm \
 bin/br.wasm \
 bin/loop.wasm \
-bin/memory.wasm
+bin/memory.wasm \
+bin/shift.wasm
 
 bin:
 	mkdir -p bin

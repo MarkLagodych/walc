@@ -48,6 +48,14 @@ fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
                 "And" => math::and(rt, var("a"), var("b")),
                 "Or" => math::or(rt, var("a"), var("b")),
                 "Xor" => math::xor(rt, var("a"), var("b")),
+
+                "Shl32" => math::i32_shift_left(rt, var("a"), var("b")),
+                "ShrU32" => math::i32_shift_right_unsigned(rt, var("a"), var("b")),
+                "ShrS32" => math::i32_shift_right_signed(rt, var("a"), var("b")),
+                "Shl64" => math::i64_shift_left(rt, var("a"), var("b")),
+                "ShrU64" => math::i64_shift_right_unsigned(rt, var("a"), var("b")),
+                "ShrS64" => math::i64_shift_right_signed(rt, var("a"), var("b")),
+
                 "Add" => math::add(rt, var("a"), var("b")),
                 "Sub" => math::sub(rt, var("a"), var("b")),
                 // TODO
@@ -86,6 +94,30 @@ pub fn add(rt: &mut RuntimeGenerator) -> Instruction {
 
 pub fn sub(rt: &mut RuntimeGenerator) -> Instruction {
     binop(rt, "Sub")
+}
+
+pub fn i32_shl(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "Shl32")
+}
+
+pub fn i32_shr_u(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "ShrU32")
+}
+
+pub fn i32_shr_s(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "ShrS32")
+}
+
+pub fn i64_shl(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "Shl64")
+}
+
+pub fn i64_shr_u(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "ShrU64")
+}
+
+pub fn i64_shr_s(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "ShrS64")
 }
 
 /// `op` is "Eq", "Ne", "LtU", "LeU", "GtU", "GeU", "LtS", "LeS", "GtS", or "GeS".
@@ -168,7 +200,7 @@ pub fn i32_wrap_i64(rt: &mut RuntimeGenerator) -> Instruction {
             let mut b = InstructionBuilder::new();
             b.pop(["a"]);
 
-            let result = math::i64_to_i32(rt, var("a"));
+            let result = math::wrap_i32(rt, var("a"));
 
             b.push([result]);
             b.build()
@@ -189,7 +221,7 @@ pub fn i64_extend_i32(rt: &mut RuntimeGenerator, signed: bool) -> Instruction {
             let mut b = InstructionBuilder::new();
             b.pop(["a"]);
 
-            let mut result = math::i32_to_i64(rt, var("a"));
+            let mut result = math::widen_i64(rt, var("a"));
 
             if signed {
                 result = math::sign_extend(rt, result, 64, 32);

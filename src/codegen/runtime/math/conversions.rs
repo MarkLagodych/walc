@@ -3,9 +3,9 @@ use super::*;
 /// Chops the number into parts using the template and returns a big-endian list of the
 /// parts.
 ///
-/// The template is a number where a 1-bit indicates an end of a part.
-/// This means that there will be as many parts as there are bits in the number.
-/// It must not be shorter than the number being chopped, but can be longer.
+/// `template` is a number where a 1-bit indicates an end of a part.
+/// This means that there will be as many parts as there are 1-bits in the template.
+/// It *can be longer* than the number being chopped, but no shorter.
 ///
 /// The bits of the returned parts are reversed, so if the the input number is in little endian,
 /// then the returned parts are in big endian. This is useful e.g. for dividing a number into
@@ -25,7 +25,7 @@ use super::*;
 /// template = 00100101 (LE)
 /// result = [HG, FED, CBA] (list is BE, items are BE)
 /// ```
-pub fn chop(rt: &mut RuntimeGenerator, a: number::Number, template: number::Number) -> list::List {
+fn chop(rt: &mut RuntimeGenerator, a: number::Number, template: number::Number) -> list::List {
     if !rt.has("CHOP") {
         let a_head = list::get_head(var("a"));
         let a_tail = list::get_tail(var("a"));
@@ -38,7 +38,7 @@ pub fn chop(rt: &mut RuntimeGenerator, a: number::Number, template: number::Numb
         let body = abs(
             ["parts", "part", "a", "template"],
             select(
-                list::is_not_empty(var("a")),
+                list::is_not_empty(var("template")),
                 var("parts"),
                 select(
                     template_head,
@@ -97,9 +97,17 @@ pub fn split_lowest_bits_to_be_bytes(
     chop(rt, a, byte_template)
 }
 
-pub fn i64_to_i32(rt: &mut RuntimeGenerator, a: number::I64) -> number::I32 {
-    // Cut the number in half (only the lower part is kept)
+/// Wraps the bits at a limit of 32 bits.
+pub fn wrap_i32(rt: &mut RuntimeGenerator, a: number::Number) -> number::I32 {
     let template = rt.num.i64_const(1 << 31);
+    let parts = chop(rt, a, template);
+    // Convert it back to a little-endian number
+    number::reverse_bits(list::get_head(parts))
+}
+
+/// Wraps the bits at a limit of 64 bits.
+pub fn wrap_i64(rt: &mut RuntimeGenerator, a: number::Number) -> number::I64 {
+    let template = rt.num.i64_const(1 << 63);
     let parts = chop(rt, a, template);
     // Convert it back to a little-endian number
     number::reverse_bits(list::get_head(parts))
@@ -120,7 +128,7 @@ pub fn i32_to_byte(rt: &mut RuntimeGenerator, a: number::I32) -> number::Byte {
 
 /// Widens a number by copying the missing bits from the template.
 /// The template must not be shorter than the number being widened.
-/// It is intended that the template is filled with zeroes.
+/// The template should be filled with zeroes.
 ///
 /// Example:
 /// ```text
@@ -139,22 +147,26 @@ fn widen(rt: &mut RuntimeGenerator, a: number::Number, template: number::Number)
 
         let body = select(
             list::is_not_empty(var("a")),
-            list::node(a_head, apply(rec(var("_WIDEN")), [a_tail, template_tail])),
             var("template"),
+            list::node(a_head, apply(rec(var("_WIDEN")), [a_tail, template_tail])),
         );
 
         rt.def_rec("_WIDEN", abs(["a", "template"], body));
 
-        rt.def(
-            "WIDEN",
-            apply(rec(var("_WIDEN")), [var("a"), var("template")]),
-        );
+        rt.def("WIDEN", rec(var("_WIDEN")));
     }
 
     apply(var("WIDEN"), [a, template])
 }
 
-pub fn i32_to_i64(rt: &mut RuntimeGenerator, a: number::I32) -> number::I64 {
+/// Widens a given list of bits to a I32
+pub fn widen_i32(rt: &mut RuntimeGenerator, a: list::List) -> number::I32 {
+    let template = rt.num.i32_const(0);
+    widen(rt, a, template)
+}
+
+/// Widens a given list of bits to a I64
+pub fn widen_i64(rt: &mut RuntimeGenerator, a: list::List) -> number::I64 {
     let template = rt.num.i64_const(0);
     widen(rt, a, template)
 }
@@ -243,4 +255,73 @@ pub fn sign_extend(
     };
 
     sign_extend_with_mask(rt, a, extension_mask)
+}
+
+/// Widen a number to match the width of the template by copying the sign bit.
+///
+/// The template must not be shorter than the number given.
+/// Its bits are ignored.
+///
+/// Example:
+/// ```text
+///         the sign bit....
+///               v
+/// a        = 0101     (LE)
+/// template = 00000000 (LE)
+/// result   = 01011111 (LE)
+///                ^^^^
+///       ...gets copied here
+/// ```
+fn widen_and_sign_extend_with_template(
+    rt: &mut RuntimeGenerator,
+    a: list::List,
+    template: number::Number,
+) -> number::Number {
+    if !rt.has("WSGNEXT") {
+        let definition = {
+            abs(["bit", "a", "template"], {
+                let a_not_empty = list::is_not_empty(var("a"));
+                let a_head = list::get_head(var("a"));
+                let a_tail = list::get_tail(var("a"));
+
+                let template_not_empty = list::is_not_empty(var("template"));
+                let template_tail = list::get_tail(var("template"));
+
+                select(
+                    template_not_empty,
+                    var("a"),
+                    select(
+                        a_not_empty,
+                        list::node(
+                            var("bit"),
+                            apply(
+                                rec(var("_WSGNEXT")),
+                                [var("bit"), list::empty(), template_tail.clone()],
+                            ),
+                        ),
+                        list::node(
+                            a_head.clone(),
+                            apply(rec(var("_WSGNEXT")), [a_head, a_tail, template_tail]),
+                        ),
+                    ),
+                )
+            })
+        };
+
+        rt.def_rec("_WSGNEXT", definition);
+
+        rt.def("WSGNEXT", apply(rec(var("_WSGNEXT")), [bit(false)]));
+    }
+
+    apply(var("WSGNEXT"), [a, template])
+}
+
+pub fn widen_and_sign_extend_i32(rt: &mut RuntimeGenerator, a: list::List) -> number::I32 {
+    let template = rt.num.i32_const(0);
+    widen_and_sign_extend_with_template(rt, a, template)
+}
+
+pub fn widen_and_sign_extend_i64(rt: &mut RuntimeGenerator, a: list::List) -> number::I64 {
+    let template = rt.num.i64_const(0);
+    widen_and_sign_extend_with_template(rt, a, template)
 }

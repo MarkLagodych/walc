@@ -30,7 +30,8 @@ instructions.
 - [X] all integer comparison instructions
 - [X] `and`, `or`, `xor`
 - [X] `add`, `sub`
-- [ ] bit shifts and rotations
+- [X] bit shifts
+- [ ] bit rotations
 - [ ] `ctz`, `clz`, `popcnt`
 - [ ] `mul`
 - [ ] `div`, `mod`
