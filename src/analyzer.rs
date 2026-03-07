@@ -34,8 +34,8 @@ pub struct Func<'a> {
     pub operators: &'a [Operator<'a>],
 }
 
-struct Analyzer {
-    program: codegen::ProgramBuilder,
+struct Analyzer<'a> {
+    program: codegen::ProgramBuilder<'a>,
     types: GlobalTypeInfo,
     next_function_id: u32,
 }
@@ -44,41 +44,13 @@ pub fn compile(source: &[u8]) -> Result<codegen::Expr> {
     Analyzer::new().compile(source)
 }
 
-impl Analyzer {
+impl<'a> Analyzer<'a> {
     /// Maximum ID for functions, globals, and locals
     const MAX_ID: u32 = u16::MAX as u32;
     const MAX_COUNT: u32 = Self::MAX_ID + 1;
 
-    /// This compiler supports `WASM 1.0` (the WWW standard released in 2019) with some extensions
-    /// from the `LIME1` superset, namely:
-    /// * `multi-value`: support for multiple return values in blocks and functions.
-    ///   This was really easy to implement because WASM VM is a just stack machine.
-    ///   Not supporting this extension would rather be an unreasonable limitation.
-    /// * `sign-extension-ops`: support for `iNN.extendMM_s` sign-extension instructions.
-    ///   These operations were implemented in the WASM VM anyway because they are used by the
-    ///   `iNN.loadMM_s` instructions, which are in the core spec.
-    ///   This extension is simply handy and also allows for better testing.
-    /// * `bulk-memory-opt`: a subset of `bulk-memory-operations` that just defines the
-    ///   `memory.init` and `memory.fill` instructions.
-    ///   These instructions are extremely interesting for benchmarking as they are basically the
-    ///   fastest way to initialize/copy memory chunks.
-    /// * `call-indirect-overlong`:
-    ///   This just enables the wasmparser's support for a slightly different encoding of the
-    ///   `call_indirect` instruction that was introduced in WASM 2.0.
-    ///
-    /// Note that other `LIME1` extensions are *not supported*:
-    /// * `extended-const`: the proposal [says](https://github.com/WebAssembly/extended-const/blob/main/proposals/extended-const/Overview.md)
-    ///   that the extension is primarily motivated by efforts to implement dynamic linking, which
-    ///   is not possible in WALC (there is nothing to link to).
-    ///
-    /// **TODO** `nontrapping-float-to-int-conversions`?
-    ///
-    /// **TODO** move this comment to docs
-    const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::WASM1
-        .union(WasmFeatures::MULTI_VALUE)
-        .union(WasmFeatures::SIGN_EXTENSION)
-        .union(WasmFeatures::BULK_MEMORY_OPT)
-        .union(WasmFeatures::CALL_INDIRECT_OVERLONG);
+    /// WASM 1.0 + Linear Memory 1.0 extensions
+    const SUPPORTED_FEATURES: WasmFeatures = WasmFeatures::LIME1;
 
     pub fn new() -> Self {
         Self {
@@ -88,7 +60,7 @@ impl Analyzer {
         }
     }
 
-    pub fn compile(mut self, source: &[u8]) -> Result<codegen::Expr> {
+    pub fn compile(mut self, source: &'a [u8]) -> Result<codegen::Expr> {
         Validator::new_with_features(Self::SUPPORTED_FEATURES)
             .validate_all(source)
             .map_err(|e| anyhow!("WASM validation failed: {e}"))?;
@@ -102,7 +74,7 @@ impl Analyzer {
         Ok(self.program.build())
     }
 
-    fn handle_payload(&mut self, payload: Payload<'_>) -> Result<()> {
+    fn handle_payload(&mut self, payload: Payload<'a>) -> Result<()> {
         match payload {
             Payload::TypeSection(section) => self.handle_types(section)?,
             Payload::ImportSection(section) => self.handle_imports(section)?,
@@ -219,10 +191,10 @@ impl Analyzer {
             let data_segment = data_segment?;
 
             let target_memory_offset_expr = match data_segment.kind {
-                DataKind::Active { offset_expr, .. } => {
-                    // WASM 1.0 only supports constant expressions consisting of single operators
-                    offset_expr.get_operators_reader().read()?
-                }
+                DataKind::Active { offset_expr, .. } => offset_expr
+                    .get_operators_reader()
+                    .into_iter()
+                    .collect::<Result<Vec<Operator>, _>>()?,
                 // Passive data segments are not supported in WASM 1.0
                 _ => unreachable!(),
             };
@@ -311,7 +283,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn handle_globals(&mut self, section: GlobalSectionReader) -> Result<()> {
+    fn handle_globals(&mut self, section: GlobalSectionReader<'a>) -> Result<()> {
         if section.count() > Self::MAX_COUNT {
             Err(anyhow!(
                 "Too many globals: {} (max is {})",
@@ -323,10 +295,13 @@ impl Analyzer {
         for global in section.into_iter() {
             let global = global?;
 
-            // WASM 1.0 initializer expressions can only contain a single const instruction
-            let init = global.init_expr.get_operators_reader().read()?;
+            let init = global
+                .init_expr
+                .get_operators_reader()
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()?;
 
-            self.program.handle_global(init);
+            self.program.handle_global(&init);
         }
 
         Ok(())

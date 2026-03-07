@@ -3,19 +3,21 @@
 mod core;
 pub use core::*;
 
+mod const_expr;
 mod function;
-
 mod runtime;
 
 use crate::analyzer::*;
 
 #[derive(Default)]
-pub struct ProgramBuilder {
+pub struct ProgramBuilder<'a> {
     runtime: runtime::RuntimeGenerator,
 
     functions: Vec<code::Code>,
 
-    globals: Vec<number::Number>,
+    /// Initializers are stored as explicit instructions and not as generated constants because
+    /// they may be used to compute data segment offsets
+    globals: Vec<Operator<'a>>,
 
     data_segments: Vec<list::List>,
     data_memory_offsets: Vec<number::I32>,
@@ -26,7 +28,7 @@ pub struct ProgramBuilder {
     custom_func_table: Vec<Option<FuncId>>,
 }
 
-impl ProgramBuilder {
+impl<'a> ProgramBuilder<'a> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -46,7 +48,22 @@ impl ProgramBuilder {
             var("Globals"),
         );
 
-        let func_count = self.functions.len();
+        let function_table =
+            table::from((0..self.functions.len()).map(|id| var(format!("Func{id:x}"))));
+
+        let custom_table = table::from(self.custom_func_table.into_iter().map(|opt_id| {
+            if let Some(id) = opt_id {
+                var(format!("Func{id:x}"))
+            } else {
+                unreachable()
+            }
+        }));
+
+        let globals = table::from(
+            self.globals
+                .iter()
+                .map(|global| self.runtime.num.with_init_value(global)),
+        );
 
         let mut defs = LetExprBuilder::new();
 
@@ -62,23 +79,9 @@ impl ProgramBuilder {
             defs.def(format!("Func{id:x}"), func);
         }
 
-        defs.def(
-            "FunctionTable",
-            table::from((0..func_count).map(|id| var(format!("Func{id:x}")))),
-        );
-
-        defs.def(
-            "CustomTable",
-            table::from(self.custom_func_table.into_iter().map(|opt_id| {
-                if let Some(id) = opt_id {
-                    var(format!("Func{id:x}"))
-                } else {
-                    unreachable()
-                }
-            })),
-        );
-
-        defs.def("Globals", table::from(self.globals));
+        defs.def("FunctionTable", function_table);
+        defs.def("CustomTable", custom_table);
+        defs.def("Globals", globals);
 
         defs.build_in(start)
     }
@@ -91,20 +94,16 @@ impl ProgramBuilder {
         self.start_id = Some(id);
     }
 
-    pub fn handle_data(&mut self, data: &[u8], target_memory_offset_expr: &Operator) {
-        let data = list::from(data.iter().map(|b| self.runtime.num.byte_const(*b)));
+    pub fn handle_global(&mut self, init_expr: &[Operator<'a>]) {
+        self.globals.push(const_expr::eval(init_expr, &[]));
+    }
 
+    pub fn handle_data(&mut self, data: &[u8], target_memory_offset_expr: &[Operator]) {
+        let data = list::from(data.iter().map(|b| self.runtime.num.byte_const(*b)));
         self.data_segments.push(data);
 
-        let offset = match target_memory_offset_expr {
-            Operator::I32Const { value } => self.runtime.num.i32_const(*value as u32),
-            Operator::GlobalGet { global_index } => {
-                let global_index = self.runtime.num.i32_const(*global_index);
-                table::index(var("Globals"), global_index)
-            }
-            _ => unreachable!(),
-        };
-
+        let offset = const_expr::eval(target_memory_offset_expr, &self.globals);
+        let offset = self.runtime.num.with_init_value(&offset);
         self.data_memory_offsets.push(offset);
     }
 
@@ -122,10 +121,6 @@ impl ProgramBuilder {
     pub fn handle_function(&mut self, func: &Func, types: &GlobalTypeInfo) {
         self.functions
             .push(function::function(&mut self.runtime, func, types));
-    }
-
-    pub fn handle_global(&mut self, init: Operator) {
-        self.globals.push(self.runtime.num.with_init_value(&init));
     }
 
     pub fn handle_table(&mut self, size: u32) {
