@@ -37,292 +37,129 @@ pub fn eqz(rt: &mut RuntimeGenerator) -> Instruction {
     var("Eqz")
 }
 
-pub fn eq(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Eq") {
+/// `op` is "And", "Or", or "Xor", "Add", "Sub", "Mul", "DivU", "DivS", "RemU", or "RemS".
+fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
+    if !rt.has(op) {
         let definition = {
             let mut b = InstructionBuilder::new();
             b.pop(["a", "b"]);
 
-            let result = select(
-                math::equal(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
+            let result = match op {
+                "And" => math::and(rt, var("a"), var("b")),
+                "Or" => math::or(rt, var("a"), var("b")),
+                "Xor" => math::xor(rt, var("a"), var("b")),
+                "Add" => math::add(rt, var("a"), var("b")),
+                "Sub" => math::sub(rt, var("a"), var("b")),
+                // TODO
+                // "Mul" => math::mul(rt, var("a"), var("b")),
+                // "DivU" => math::div_unsigned(rt, var("a"), var("b")),
+                // "DivS" => math::div_signed(rt, var("a"), var("b")),
+                // "RemU" => math::rem_unsigned(rt, var("a"), var("b")),
+                // "RemS" => math::rem_signed(rt, var("a"), var("b")),
+                _ => unreachable!(),
+            };
 
             b.push([result]);
-
             b.build()
         };
-        rt.def("Eq", definition);
+        rt.def(op, definition);
     }
 
-    var("Eq")
-}
-
-pub fn ne(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Ne") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::not_equal(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-
-            b.build()
-        };
-        rt.def("Ne", definition);
-    }
-
-    var("Ne")
+    var(op)
 }
 
 pub fn and(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("And") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-            b.push([math::and(rt, var("a"), var("b"))]);
-            b.build()
-        };
-        rt.def("And", definition);
-    }
-
-    var("And")
+    binop(rt, "And")
 }
 
 pub fn or(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Or") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-            b.push([math::or(rt, var("a"), var("b"))]);
-            b.build()
-        };
-        rt.def("Or", definition);
-    }
-
-    var("Or")
+    binop(rt, "Or")
 }
 
 pub fn xor(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Xor") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-            b.push([math::xor(rt, var("a"), var("b"))]);
-            b.build()
-        };
-        rt.def("Xor", definition);
-    }
-
-    var("Xor")
-}
-
-pub fn lt_u(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Lt") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::less_unsigned(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-
-            b.build()
-        };
-        rt.def("Lt", definition);
-    }
-
-    var("Lt")
-}
-
-pub fn le_u(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Le") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::less_equal_unsigned(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-
-            b.build()
-        };
-        rt.def("Le", definition);
-    }
-
-    var("Le")
-}
-
-pub fn gt_u(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Gt") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::greater_unsigned(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-
-            b.build()
-        };
-        rt.def("Gt", definition);
-    }
-
-    var("Gt")
-}
-
-pub fn ge_u(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Ge") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::greater_equal_unsigned(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-
-            b.build()
-        };
-        rt.def("Ge", definition);
-    }
-
-    var("Ge")
-}
-
-pub fn lt_s(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("LtS") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::less_signed(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-
-            b.build()
-        };
-        rt.def("LtS", definition);
-    }
-
-    var("LtS")
-}
-
-pub fn le_s(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("LeS") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::less_equal_signed(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-            b.build()
-        };
-        rt.def("LeS", definition);
-    }
-
-    var("LeS")
-}
-
-pub fn gt_s(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("GtS") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::greater_signed(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-            b.build()
-        };
-        rt.def("GtS", definition);
-    }
-
-    var("GtS")
-}
-
-pub fn ge_s(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("GeS") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-
-            let result = select(
-                math::greater_equal_signed(rt, var("a"), var("b")),
-                rt.num.i32_const(0),
-                rt.num.i32_const(1),
-            );
-
-            b.push([result]);
-            b.build()
-        };
-        rt.def("GeS", definition);
-    }
-
-    var("GeS")
+    binop(rt, "Xor")
 }
 
 pub fn add(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Add") {
-        let definition = {
-            let mut b = InstructionBuilder::new();
-            b.pop(["a", "b"]);
-            b.push([math::add(rt, var("a"), var("b"))]);
-            b.build()
-        };
-        rt.def("Add", definition);
-    }
-
-    var("Add")
+    binop(rt, "Add")
 }
 
 pub fn sub(rt: &mut RuntimeGenerator) -> Instruction {
-    if !rt.has("Sub") {
+    binop(rt, "Sub")
+}
+
+/// `op` is "Eq", "Ne", "LtU", "LeU", "GtU", "GeU", "LtS", "LeS", "GtS", or "GeS".
+/// The abbreviations mean "Equal", "Not equal", "Greater/Less equal/than (Unsigned/Signed)".
+fn cmp(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
+    if !rt.has(op) {
         let definition = {
             let mut b = InstructionBuilder::new();
             b.pop(["a", "b"]);
-            b.push([math::sub(rt, var("a"), var("b"))]);
+
+            let result_bit = match op {
+                "Eq" => math::equal(rt, var("a"), var("b")),
+                "Ne" => math::not_equal(rt, var("a"), var("b")),
+                "LtU" => math::less_unsigned(rt, var("a"), var("b")),
+                "LeU" => math::less_equal_unsigned(rt, var("a"), var("b")),
+                "GtU" => math::greater_unsigned(rt, var("a"), var("b")),
+                "GeU" => math::greater_equal_unsigned(rt, var("a"), var("b")),
+                "LtS" => math::less_signed(rt, var("a"), var("b")),
+                "LeS" => math::less_equal_signed(rt, var("a"), var("b")),
+                "GtS" => math::greater_signed(rt, var("a"), var("b")),
+                "GeS" => math::greater_equal_signed(rt, var("a"), var("b")),
+                _ => unreachable!(),
+            };
+
+            let result = select(result_bit, rt.num.i32_const(0), rt.num.i32_const(1));
+
+            b.push([result]);
+
             b.build()
         };
-        rt.def("Sub", definition);
+        rt.def(op, definition);
     }
 
-    var("Sub")
+    var(op)
+}
+
+pub fn eq(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "Eq")
+}
+
+pub fn ne(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "Ne")
+}
+
+pub fn lt_u(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "LtU")
+}
+
+pub fn le_u(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "LeU")
+}
+
+pub fn gt_u(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "GtU")
+}
+
+pub fn ge_u(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "GeU")
+}
+
+pub fn lt_s(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "LtS")
+}
+
+pub fn le_s(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "LeS")
+}
+
+pub fn gt_s(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "GtS")
+}
+
+pub fn ge_s(rt: &mut RuntimeGenerator) -> Instruction {
+    cmp(rt, "GeS")
 }
 
 pub fn i32_wrap_i64(rt: &mut RuntimeGenerator) -> Instruction {
@@ -378,7 +215,7 @@ pub fn extend_s(rt: &mut RuntimeGenerator, target_bits: u8, source_bits: u8) -> 
             let mut b = InstructionBuilder::new();
             b.pop(["a"]);
 
-            let result = math::sign_extend(rt, var("a"), 64, 32);
+            let result = math::sign_extend(rt, var("a"), target_bits, source_bits);
 
             b.push([result]);
             b.build()
