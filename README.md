@@ -3,9 +3,9 @@
 WALC /wɑlts/ compiles stand-alone modules in [WebAssembly 1.0](https://w3.org/TR/wasm-core-1/)
 ([pdf](https://webassembly.github.io/spec/versions/core/WebAssembly-1.0.pdf))
 into [untyped lambda expressions](https://en.wikipedia.org/wiki/Lambda_calculus).
+It also supports [LIME1](https://github.com/WebAssembly/tool-conventions/blob/main/Lime.md)
+WebAssembly extensions.
 
-The compiler naturally supports the [`multi-value`](https://webassembly.github.io/multi-value/core/_download/WebAssembly.pdf)
-WebAssembly extension.
 The input modules are only allowed to use custom [WALC functions](./docs/wasm.md)
 for standard I/O, see [example programs](./examples/rust) written in Rust.
 
@@ -19,8 +19,8 @@ with an [example interpreter](./examples/interpreter/).
 
 ## Project state
 
-Most of the compiler's modules are already finished and will not change much.
-The only things left are arithmetic instructions.
+The compiler is almost done, the only things left are some arithmetic
+instructions.
 
 ### TODO
 
@@ -30,11 +30,11 @@ The only things left are arithmetic instructions.
 - [X] all integer comparison instructions
 - [X] `and`, `or`, `xor`
 - [X] `add`, `sub`
-- [ ] `mul`
 - [ ] bit shifts and rotations
 - [ ] `ctz`, `clz`, `popcnt`
+- [ ] `mul`
 - [ ] `div`, `mod`
-- [ ] floating-point numbers and arithmetic
+- [ ] floating-point arithmetic
 - [ ] extensive testing
 
 Also, a faster interpreter in Rust is planned, as well as more examples
