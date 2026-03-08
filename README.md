@@ -44,7 +44,8 @@ instructions.
 - [X] `add`, `sub`
 - [X] bit shifts
 - [X] bit rotations
-- [ ] `ctz`, `clz`, `popcnt`
+- [X] `ctz`, `clz`
+- [ ] `popcnt`
 - [ ] `mul`
 - [ ] `div`, `mod`
 - [ ] floating-point arithmetic

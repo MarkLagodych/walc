@@ -329,3 +329,63 @@ pub fn i64_rotate_left(
 ) -> number::I64 {
     rotate(rt, a, shift, "ROTL", 64)
 }
+
+fn count_trailing_zeroes(rt: &mut RuntimeGenerator, a: number::Number, bits: u8) -> number::Number {
+    let name = format!("CTZ{bits}");
+    if !rt.has(&name) {
+        let helper_name = format!("_CTZ{bits}");
+
+        let body = {
+            select(
+                list::is_not_empty(var("a")),
+                var("count"),
+                select(
+                    list::get_head(var("a")),
+                    apply(
+                        rec(var(&helper_name)),
+                        [super::increment(rt, var("count")), list::get_tail(var("a"))],
+                    ),
+                    var("count"),
+                ),
+            )
+        };
+
+        rt.def_rec(&helper_name, abs(["count", "a"], body));
+
+        let zero = match bits {
+            32 => rt.num.i32_const(0),
+            64 => rt.num.i64_const(0),
+            _ => unreachable!(),
+        };
+
+        rt.def(&name, apply(rec(var(helper_name)), [zero]));
+    }
+
+    apply(var(name), [a])
+}
+
+pub fn i32_count_trailing_zeroes(rt: &mut RuntimeGenerator, a: number::I32) -> number::I32 {
+    count_trailing_zeroes(rt, a, 32)
+}
+
+pub fn i64_count_trailing_zeroes(rt: &mut RuntimeGenerator, a: number::I64) -> number::I64 {
+    count_trailing_zeroes(rt, a, 64)
+}
+
+fn count_leading_zeroes(rt: &mut RuntimeGenerator, a: number::Number, bits: u8) -> number::Number {
+    let name = format!("CLZ{bits}");
+    if !rt.has(&name) {
+        let body = count_trailing_zeroes(rt, number::reverse_bits(var("a")), bits);
+        rt.def(&name, abs(["a"], body));
+    }
+
+    apply(var(name), [a])
+}
+
+pub fn i32_count_leading_zeroes(rt: &mut RuntimeGenerator, a: number::I32) -> number::I32 {
+    count_leading_zeroes(rt, a, 32)
+}
+
+pub fn i64_count_leading_zeroes(rt: &mut RuntimeGenerator, a: number::I64) -> number::I64 {
+    count_leading_zeroes(rt, a, 64)
+}

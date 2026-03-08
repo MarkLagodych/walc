@@ -37,6 +37,50 @@ pub fn eqz(rt: &mut RuntimeGenerator) -> Instruction {
     var("Eqz")
 }
 
+/// `op` is "Clz32", "Ctz32", "PopCnt32", "Clz64", "Ctz64", "PopCnt64".
+fn unop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
+    if !rt.has(op) {
+        let definition = {
+            let mut b = InstructionBuilder::new();
+            b.pop(["a"]);
+
+            let result = match op {
+                "Clz32" => math::i32_count_leading_zeroes(rt, var("a")),
+                "Clz64" => math::i64_count_leading_zeroes(rt, var("a")),
+
+                "Ctz32" => math::i32_count_trailing_zeroes(rt, var("a")),
+                "Ctz64" => math::i64_count_trailing_zeroes(rt, var("a")),
+
+                // "PopCnt32" => math::i32_popcount(rt, var("a")),
+                // "PopCnt64" => math::i64_popcount(rt, var("a")),
+                _ => unreachable!(),
+            };
+
+            b.push([result]);
+            b.build()
+        };
+        rt.def(op, definition);
+    }
+
+    var(op)
+}
+
+pub fn clz32(rt: &mut RuntimeGenerator) -> Instruction {
+    unop(rt, "Clz32")
+}
+
+pub fn ctz32(rt: &mut RuntimeGenerator) -> Instruction {
+    unop(rt, "Ctz32")
+}
+
+pub fn clz64(rt: &mut RuntimeGenerator) -> Instruction {
+    unop(rt, "Clz64")
+}
+
+pub fn ctz64(rt: &mut RuntimeGenerator) -> Instruction {
+    unop(rt, "Ctz64")
+}
+
 /// `op` is "And", "Or", or "Xor", "Add", "Sub", "Mul", "DivU", "DivS", "RemU", or "RemS".
 fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
     if !rt.has(op) {
