@@ -99,7 +99,7 @@ pub fn split_lowest_bits_to_be_bytes(
 
 /// Wraps the bits at a limit of 32 bits.
 pub fn wrap_i32(rt: &mut RuntimeGenerator, a: number::Number) -> number::I32 {
-    let template = rt.num.i64_const(1 << 31);
+    let template = rt.num.i32_const(1 << 31);
     let parts = chop(rt, a, template);
     // Convert it back to a little-endian number
     number::reverse_bits(list::get_head(parts))

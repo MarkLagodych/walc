@@ -74,28 +74,8 @@ pub fn increment(rt: &mut RuntimeGenerator, a: number::Number) -> number::Number
     apply(var("INC"), [a])
 }
 
-/// Applies bit NOT to every bit
-fn invert(rt: &mut RuntimeGenerator, a: number::Number) -> number::Number {
-    if !rt.has("INV") {
-        let a_head = list::get_head(var("a"));
-        let a_tail = list::get_tail(var("a"));
-
-        let body = select(
-            list::is_not_empty(var("a")),
-            list::empty(),
-            list::node(bit_not(a_head), apply(rec(var("_INV")), [a_tail])),
-        );
-
-        rt.def_rec("_INV", abs(["a"], body));
-
-        rt.def("INV", rec(var("_INV")));
-    }
-
-    apply(var("INV"), [a])
-}
-
-fn negate(rt: &mut RuntimeGenerator, a: number::Number) -> number::Number {
-    let a_inverted = invert(rt, a);
+pub fn negate(rt: &mut RuntimeGenerator, a: number::Number) -> number::Number {
+    let a_inverted = super::logical::invert(rt, a);
     increment(rt, a_inverted)
 }
 

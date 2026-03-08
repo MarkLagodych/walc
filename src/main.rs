@@ -1,5 +1,3 @@
-#![allow(clippy::redundant_closure)]
-
 mod analyzer;
 mod codegen;
 

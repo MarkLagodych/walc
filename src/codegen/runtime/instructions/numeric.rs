@@ -56,6 +56,11 @@ fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
                 "ShrU64" => math::i64_shift_right_unsigned(rt, var("a"), var("b")),
                 "ShrS64" => math::i64_shift_right_signed(rt, var("a"), var("b")),
 
+                "Rotl32" => math::i32_rotate_left(rt, var("a"), var("b")),
+                "Rotr32" => math::i32_rotate_right(rt, var("a"), var("b")),
+                "Rotl64" => math::i64_rotate_left(rt, var("a"), var("b")),
+                "Rotr64" => math::i64_rotate_right(rt, var("a"), var("b")),
+
                 "Add" => math::add(rt, var("a"), var("b")),
                 "Sub" => math::sub(rt, var("a"), var("b")),
                 // TODO
@@ -118,6 +123,22 @@ pub fn i64_shr_u(rt: &mut RuntimeGenerator) -> Instruction {
 
 pub fn i64_shr_s(rt: &mut RuntimeGenerator) -> Instruction {
     binop(rt, "ShrS64")
+}
+
+pub fn i32_rotate_left(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "Rotl32")
+}
+
+pub fn i32_rotate_right(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "Rotr32")
+}
+
+pub fn i64_rotate_left(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "Rotl64")
+}
+
+pub fn i64_rotate_right(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "Rotr64")
 }
 
 /// `op` is "Eq", "Ne", "LtU", "LeU", "GtU", "GeU", "LtS", "LeS", "GtS", or "GeS".

@@ -12,7 +12,10 @@ bin/if.wasm \
 bin/br.wasm \
 bin/loop.wasm \
 bin/memory.wasm \
-bin/shift.wasm
+bin/add-sub.wasm \
+bin/bitwise.wasm \
+bin/shift.wasm \
+bin/rotations.wasm
 
 bin:
 	mkdir -p bin

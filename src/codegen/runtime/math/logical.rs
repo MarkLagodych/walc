@@ -1,5 +1,25 @@
 use super::*;
 
+/// Applies bit NOT to every bit
+pub fn invert(rt: &mut RuntimeGenerator, a: number::Number) -> number::Number {
+    if !rt.has("INV") {
+        let a_head = list::get_head(var("a"));
+        let a_tail = list::get_tail(var("a"));
+
+        let body = select(
+            list::is_not_empty(var("a")),
+            list::empty(),
+            list::node(bit_not(a_head), apply(rec(var("_INV")), [a_tail])),
+        );
+
+        rt.def_rec("_INV", abs(["a"], body));
+
+        rt.def("INV", rec(var("_INV")));
+    }
+
+    apply(var("INV"), [a])
+}
+
 /// Applies a bitwise operation.
 fn apply_bitop(
     rt: &mut RuntimeGenerator,
@@ -51,6 +71,7 @@ pub fn xor(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> n
 }
 
 /// Adds 2^n zeroes to the little end of the number.
+/// This is equivalent to a single step of shifting to the right (in BE terms).
 ///
 /// Example:
 /// ```text
@@ -89,6 +110,7 @@ fn add_trailing_zeroes(rt: &mut RuntimeGenerator, a: number::Number, n_log2: u8)
 }
 
 /// Drops 2^n bits from the little end of the number.
+/// This is equivalent to a single step of shifting to the left (in BE terms).
 ///
 /// Example:
 /// ```text
@@ -137,11 +159,11 @@ fn apply_shift(
 ) -> number::Number {
     let name = format!("{op}{bits}");
 
-    let shift_significant_bits = bits.trailing_zeros() as u8;
-
     if !rt.has(&name) {
         let body = {
             let mut b = LetExprBuilder::new();
+
+            let shift_significant_bits = bits.trailing_zeros() as u8;
 
             for i in 0..shift_significant_bits {
                 let shift_bit = list::get_head(var("shift"));
@@ -232,4 +254,74 @@ pub fn i64_shift_right_signed(
     shift: number::Number,
 ) -> number::I64 {
     apply_shift(rt, a, shift, "SHR_S", 64)
+}
+
+/// `op` must be one of: "ROTR", "ROTL".
+/// `bits` must be one of: 32, 64.
+fn rotate(
+    rt: &mut RuntimeGenerator,
+    a: number::Number,
+    shift: number::Number,
+    op: &str,
+    bits: u8,
+) -> number::Number {
+    if !rt.has(op) {
+        let body = {
+            let shifted_part = match (op, bits) {
+                ("ROTR", 32) => i32_shift_right_unsigned(rt, var("a"), var("shift")),
+                ("ROTR", 64) => i64_shift_right_unsigned(rt, var("a"), var("shift")),
+                ("ROTL", 32) => i32_shift_left(rt, var("a"), var("shift")),
+                ("ROTL", 64) => i64_shift_left(rt, var("a"), var("shift")),
+                _ => unreachable!(),
+            };
+
+            let minus_shift = super::arithmetic::negate(rt, var("shift"));
+
+            let rotated_part = match (op, bits) {
+                ("ROTR", 32) => i32_shift_left(rt, var("a"), minus_shift),
+                ("ROTR", 64) => i64_shift_left(rt, var("a"), minus_shift),
+                ("ROTL", 32) => i32_shift_right_unsigned(rt, var("a"), minus_shift),
+                ("ROTL", 64) => i64_shift_right_unsigned(rt, var("a"), minus_shift),
+                _ => unreachable!(),
+            };
+
+            or(rt, shifted_part, rotated_part)
+        };
+
+        rt.def(op, abs(["a", "shift"], body));
+    }
+
+    apply(var(op), [a, shift])
+}
+
+pub fn i32_rotate_right(
+    rt: &mut RuntimeGenerator,
+    a: number::I32,
+    shift: number::Number,
+) -> number::I32 {
+    rotate(rt, a, shift, "ROTR", 32)
+}
+
+pub fn i32_rotate_left(
+    rt: &mut RuntimeGenerator,
+    a: number::I32,
+    shift: number::Number,
+) -> number::I32 {
+    rotate(rt, a, shift, "ROTL", 32)
+}
+
+pub fn i64_rotate_right(
+    rt: &mut RuntimeGenerator,
+    a: number::I64,
+    shift: number::Number,
+) -> number::I64 {
+    rotate(rt, a, shift, "ROTR", 64)
+}
+
+pub fn i64_rotate_left(
+    rt: &mut RuntimeGenerator,
+    a: number::I64,
+    shift: number::Number,
+) -> number::I64 {
+    rotate(rt, a, shift, "ROTL", 64)
 }
