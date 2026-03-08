@@ -22,6 +22,27 @@
 
         i32.const -1
         call $compare32
+
+        i64.const 5
+        i64.const -10
+        i64.add
+
+        i64.const -5
+        call $compare64
+
+        i64.const 0
+        i64.const 10
+        i64.sub
+
+        i64.const -10
+        call $compare64
+
+        i64.const 5
+        i64.const -10
+        i64.sub
+
+        i64.const 15
+        call $compare64
     )
     (func $compare32 (param i32 i32)
         local.get 0

@@ -71,7 +71,7 @@ pub fn xor(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> n
 }
 
 /// Adds 2^n zeroes to the little end of the number.
-/// This is equivalent to a single step of shifting to the right (in BE terms).
+/// This is equivalent to a single step of shifting to the left (in BE terms).
 ///
 /// Example:
 /// ```text
@@ -94,23 +94,22 @@ fn add_trailing_zeroes(rt: &mut RuntimeGenerator, a: number::Number, n_log2: u8)
 
                 result
             }
-            4..=5 => {
+            _ => {
                 let mut result = var("a");
                 result = add_trailing_zeroes(rt, result, n_log2 - 1);
                 result = add_trailing_zeroes(rt, result, n_log2 - 1);
                 result
             }
-            _ => unreachable!(),
         };
 
         rt.def(&name, abs(["a"], body));
     }
 
-    apply(var(&name), [a])
+    apply(var(name), [a])
 }
 
 /// Drops 2^n bits from the little end of the number.
-/// This is equivalent to a single step of shifting to the left (in BE terms).
+/// This is equivalent to a single step of shifting to the right (in BE terms).
 ///
 /// Example:
 /// ```text
@@ -133,19 +132,18 @@ fn drop_trailing_bits(rt: &mut RuntimeGenerator, a: number::Number, n_log2: u8) 
 
                 result
             }
-            4..=5 => {
+            _ => {
                 let mut result = var("a");
                 result = drop_trailing_bits(rt, result, n_log2 - 1);
                 result = drop_trailing_bits(rt, result, n_log2 - 1);
                 result
             }
-            _ => unreachable!(),
         };
 
         rt.def(&name, abs(["a"], body));
     }
 
-    apply(var(&name), [a])
+    apply(var(name), [a])
 }
 
 /// `op` must be one of: "SHL", "SHR_U", "SHR_S"
@@ -163,6 +161,9 @@ fn apply_shift(
         let body = {
             let mut b = LetExprBuilder::new();
 
+            // This computes log2(bits).
+            // A number with `bits` bits can be shifted by `log2(bits)` shift,
+            // i.e. a 32-bit number is shifted with a 5-bit number, and for 64 it's 6-bit number.
             let shift_significant_bits = bits.trailing_zeros() as u8;
 
             for i in 0..shift_significant_bits {
@@ -205,7 +206,7 @@ fn apply_shift(
         rt.def(&name, abs(["a", "shift"], body));
     }
 
-    apply(var(&name), [a, shift])
+    apply(var(name), [a, shift])
 }
 
 pub fn i32_shift_left(
@@ -265,7 +266,8 @@ fn rotate(
     op: &str,
     bits: u8,
 ) -> number::Number {
-    if !rt.has(op) {
+    let name = format!("{op}{bits}");
+    if !rt.has(&name) {
         let body = {
             let shifted_part = match (op, bits) {
                 ("ROTR", 32) => i32_shift_right_unsigned(rt, var("a"), var("shift")),
@@ -275,6 +277,8 @@ fn rotate(
                 _ => unreachable!(),
             };
 
+            // This is equivalent to `32|64 - shift` because 32|64 is a power of 2 and
+            // only a few lower bits matter.
             let minus_shift = super::arithmetic::negate(rt, var("shift"));
 
             let rotated_part = match (op, bits) {
@@ -288,10 +292,10 @@ fn rotate(
             or(rt, shifted_part, rotated_part)
         };
 
-        rt.def(op, abs(["a", "shift"], body));
+        rt.def(&name, abs(["a", "shift"], body));
     }
 
-    apply(var(op), [a, shift])
+    apply(var(name), [a, shift])
 }
 
 pub fn i32_rotate_right(

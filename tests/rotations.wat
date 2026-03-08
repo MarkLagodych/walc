@@ -27,7 +27,7 @@
         i64.const 1
         i64.rotr
 
-        i64.const 0xE0000000_00000000
+        i64.const 0xC0000000_00000000
         call $compare64
 
         i64.const 0x80000000_00000000
@@ -35,7 +35,6 @@
         i64.rotr
 
         i64.const 0x40000000_00000000
-        ;; FIXME this fails here!!!
         call $compare64
 
         i32.const 0xDEADBEEF
