@@ -22,21 +22,37 @@ with an [example interpreter](./examples/interpreter/).
 The compiler is almost done, the only things left are some arithmetic
 instructions.
 
-### TODO
+**Basic instructions:**
 
 - [X] all control flow instructions
 - [X] all variable instructions
 - [X] all memory instructions
+
+**LIME1 extensions:**
+
+- [X] `multi-value`
+- [X] `bulk-memory-opt`
+- [X] `sign-extension-ops`
+- [X] `extended-const`
+- [X] `call-indirect-overlong`
+- [ ] `nontrapping-float-to-int-conversions`
+
+**Arithmetic:**
+
 - [X] all integer comparison instructions
 - [X] `and`, `or`, `xor`
 - [X] `add`, `sub`
 - [X] bit shifts
-- [ ] bit rotations
+- [X] bit rotations
 - [ ] `ctz`, `clz`, `popcnt`
 - [ ] `mul`
 - [ ] `div`, `mod`
 - [ ] floating-point arithmetic
-- [ ] extensive testing
 
-Also, a faster interpreter in Rust is planned, as well as more examples
-once more WASM features become supported.
+**Other:**
+
+- [ ] extensive testing
+- [ ] faster interpreter in Rust
+- [ ] more WASM examples
+- [ ] compile Doom to lambda calculus?
+
