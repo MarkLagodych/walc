@@ -121,11 +121,13 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         I64Rotl => numeric::i64_rotate_left(rt),
         I64Rotr => numeric::i64_rotate_right(rt),
 
-        I32Clz => numeric::clz32(rt),
-        I32Ctz => numeric::ctz32(rt),
+        I32Clz => numeric::i32_clz(rt),
+        I32Ctz => numeric::i32_ctz(rt),
+        I32Popcnt => numeric::i32_popcnt(rt),
 
-        I64Clz => numeric::clz64(rt),
-        I64Ctz => numeric::ctz64(rt),
+        I64Clz => numeric::i64_clz(rt),
+        I64Ctz => numeric::i64_ctz(rt),
+        I64Popcnt => numeric::i64_popcnt(rt),
 
         I32LtU | I64LtU => numeric::lt_u(rt),
         I32LtS | I64LtS => numeric::lt_s(rt),

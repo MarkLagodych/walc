@@ -51,8 +51,8 @@ fn unop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
                 "Ctz32" => math::i32_count_trailing_zeroes(rt, var("a")),
                 "Ctz64" => math::i64_count_trailing_zeroes(rt, var("a")),
 
-                // "PopCnt32" => math::i32_popcount(rt, var("a")),
-                // "PopCnt64" => math::i64_popcount(rt, var("a")),
+                "PopCnt32" => math::i32_count_ones(rt, var("a")),
+                "PopCnt64" => math::i64_count_ones(rt, var("a")),
                 _ => unreachable!(),
             };
 
@@ -65,20 +65,28 @@ fn unop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
     var(op)
 }
 
-pub fn clz32(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn i32_clz(rt: &mut RuntimeGenerator) -> Instruction {
     unop(rt, "Clz32")
 }
 
-pub fn ctz32(rt: &mut RuntimeGenerator) -> Instruction {
-    unop(rt, "Ctz32")
-}
-
-pub fn clz64(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn i64_clz(rt: &mut RuntimeGenerator) -> Instruction {
     unop(rt, "Clz64")
 }
 
-pub fn ctz64(rt: &mut RuntimeGenerator) -> Instruction {
+pub fn i32_ctz(rt: &mut RuntimeGenerator) -> Instruction {
+    unop(rt, "Ctz32")
+}
+
+pub fn i64_ctz(rt: &mut RuntimeGenerator) -> Instruction {
     unop(rt, "Ctz64")
+}
+
+pub fn i32_popcnt(rt: &mut RuntimeGenerator) -> Instruction {
+    unop(rt, "PopCnt32")
+}
+
+pub fn i64_popcnt(rt: &mut RuntimeGenerator) -> Instruction {
+    unop(rt, "PopCnt64")
 }
 
 /// `op` is "And", "Or", or "Xor", "Add", "Sub", "Mul", "DivU", "DivS", "RemU", or "RemS".

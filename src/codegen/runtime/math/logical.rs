@@ -389,3 +389,48 @@ pub fn i32_count_leading_zeroes(rt: &mut RuntimeGenerator, a: number::I32) -> nu
 pub fn i64_count_leading_zeroes(rt: &mut RuntimeGenerator, a: number::I64) -> number::I64 {
     count_leading_zeroes(rt, a, 64)
 }
+
+fn count_ones(rt: &mut RuntimeGenerator, a: number::Number, bits: u8) -> number::Number {
+    let name = format!("POPCNT{bits}");
+    if !rt.has(&name) {
+        let helper_name = format!("_POPCNT{bits}");
+
+        let body = {
+            select(
+                list::is_not_empty(var("a")),
+                var("count"),
+                select(
+                    list::get_head(var("a")),
+                    apply(
+                        rec(var(&helper_name)),
+                        [var("count"), list::get_tail(var("a"))],
+                    ),
+                    apply(
+                        rec(var(&helper_name)),
+                        [super::increment(rt, var("count")), list::get_tail(var("a"))],
+                    ),
+                ),
+            )
+        };
+
+        rt.def_rec(&helper_name, abs(["count", "a"], body));
+
+        let zero = match bits {
+            32 => rt.num.i32_const(0),
+            64 => rt.num.i64_const(0),
+            _ => unreachable!(),
+        };
+
+        rt.def(&name, apply(rec(var(helper_name)), [zero]));
+    }
+
+    apply(var(name), [a])
+}
+
+pub fn i32_count_ones(rt: &mut RuntimeGenerator, a: number::I32) -> number::I32 {
+    count_ones(rt, a, 32)
+}
+
+pub fn i64_count_ones(rt: &mut RuntimeGenerator, a: number::I64) -> number::I64 {
+    count_ones(rt, a, 64)
+}

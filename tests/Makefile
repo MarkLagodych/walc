@@ -16,7 +16,8 @@ bin/add-sub.wasm \
 bin/bitwise.wasm \
 bin/shift.wasm \
 bin/rotations.wasm \
-bin/count-zeroes.wasm
+bin/count-zeroes.wasm \
+bin/count-ones.wasm
 
 bin:
 	mkdir -p bin

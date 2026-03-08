@@ -39,16 +39,12 @@ instructions.
 
 **Arithmetic:**
 
-- [X] all integer comparison instructions
-- [X] `and`, `or`, `xor`
+- [X] all bit operations
+- [X] all comparison instructions
 - [X] `add`, `sub`
-- [X] bit shifts
-- [X] bit rotations
-- [X] `ctz`, `clz`
-- [ ] `popcnt`
 - [ ] `mul`
 - [ ] `div`, `mod`
-- [ ] floating-point arithmetic
+- [ ] floating-point arithmetic?
 
 **Other:**
 
