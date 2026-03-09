@@ -1,5 +1,6 @@
 use super::*;
 
+/// The result will be as wide as `a` is.
 pub fn add(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> number::Number {
     if !rt.has("ADD") {
         // Full adder for two bits and a carry-in:
@@ -82,4 +83,51 @@ pub fn negate(rt: &mut RuntimeGenerator, a: number::Number) -> number::Number {
 pub fn sub(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> number::Number {
     let b_negated = negate(rt, b);
     add(rt, a, b_negated)
+}
+
+/// Multiplies two numbers.
+/// `a` and `b` must be of the same bit width. The result is of the same width.
+pub fn mul(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> number::Number {
+    if !rt.has("MUL") {
+        // Numbers are in LE binary here.
+        // `*` is a multiplication (bit-and) with a single bit.
+        // [x, y, z, ...] denotes a list.
+        //
+        // Aaaaaaaa x Bbbbbbbb
+        // = A * Bbbbbbbb + 0aaaaaaa x Bbbbbbbb
+        // = [A * B, A * bbbbbbb + aaaaaaa x Bbbbbbbb]
+        // = if A then [B, bbbbbbb + aaaaaaa x Bbbbbbbb] else [0, aaaaaaa x Bbbbbbbb]
+        //
+        // So, the algorithm is:
+        // tail0 = aaaaaaa x Bbbbbbbb (note that this can be empty when aaaaaaa is empty)
+        // tail1 = tail0 + bbbbbbb    (order is important here, the result must be of tail0 width)
+        // if A then [B, tail1] else [0, tail0]
+
+        let a = var("a");
+        let a_head = list::get_head(a.clone());
+        let a_tail = list::get_tail(a.clone());
+
+        let b = var("b");
+        let b_head = list::get_head(b.clone());
+        let b_tail = list::get_tail(b.clone());
+
+        let tail0 = apply(rec(var("_MUL")), [a_tail, b]);
+        let tail1 = add(rt, tail0.clone(), b_tail);
+
+        let body = select(
+            list::is_not_empty(var("a")),
+            list::empty(),
+            select(
+                a_head,
+                list::node(bit(false), tail0),
+                list::node(b_head, tail1),
+            ),
+        );
+
+        rt.def_rec("_MUL", abs(["a", "b"], body));
+
+        rt.def("MUL", rec(var("_MUL")));
+    }
+
+    apply(var("MUL"), [a, b])
 }

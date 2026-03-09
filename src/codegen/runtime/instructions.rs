@@ -143,6 +143,7 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
 
         I32Add | I64Add => numeric::add(rt),
         I32Sub | I64Sub => numeric::sub(rt),
+        I32Mul | I64Mul => numeric::mul(rt),
 
         // TODO
         _ => todo!(),

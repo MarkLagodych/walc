@@ -42,8 +42,8 @@ instructions.
 - [X] all bit operations
 - [X] all comparison instructions
 - [X] `add`, `sub`
-- [ ] `mul`
-- [ ] `div`, `mod`
+- [X] `mul`
+- [ ] `div`, `rem`
 - [ ] floating-point arithmetic?
 
 **Other:**

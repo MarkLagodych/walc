@@ -13,6 +13,7 @@ bin/br.wasm \
 bin/loop.wasm \
 bin/memory.wasm \
 bin/add-sub.wasm \
+bin/mul.wasm \
 bin/bitwise.wasm \
 bin/shift.wasm \
 bin/rotations.wasm \

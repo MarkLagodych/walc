@@ -115,8 +115,8 @@ fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
 
                 "Add" => math::add(rt, var("a"), var("b")),
                 "Sub" => math::sub(rt, var("a"), var("b")),
+                "Mul" => math::mul(rt, var("a"), var("b")),
                 // TODO
-                // "Mul" => math::mul(rt, var("a"), var("b")),
                 // "DivU" => math::div_unsigned(rt, var("a"), var("b")),
                 // "DivS" => math::div_signed(rt, var("a"), var("b")),
                 // "RemU" => math::rem_unsigned(rt, var("a"), var("b")),
@@ -151,6 +151,10 @@ pub fn add(rt: &mut RuntimeGenerator) -> Instruction {
 
 pub fn sub(rt: &mut RuntimeGenerator) -> Instruction {
     binop(rt, "Sub")
+}
+
+pub fn mul(rt: &mut RuntimeGenerator) -> Instruction {
+    binop(rt, "Mul")
 }
 
 pub fn i32_shl(rt: &mut RuntimeGenerator) -> Instruction {
