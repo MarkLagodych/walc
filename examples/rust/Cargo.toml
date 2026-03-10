@@ -20,3 +20,7 @@ path = "hello.rs"
 [[bin]]
 name = "echo"
 path = "echo.rs"
+
+[[bin]]
+name = "mandelbrot"
+path = "mandelbrot.rs"

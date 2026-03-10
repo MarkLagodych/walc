@@ -4,5 +4,5 @@ mod walc;
 use walc::*;
 
 pub fn main() {
-    println!("Hello world!");
+    print_string("Hello world!");
 }
