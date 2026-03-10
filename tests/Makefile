@@ -12,6 +12,7 @@ bin/if.wasm \
 bin/br.wasm \
 bin/loop.wasm \
 bin/memory.wasm \
+bin/comparisons.wasm \
 bin/add-sub.wasm \
 bin/mul.wasm \
 bin/bitwise.wasm \

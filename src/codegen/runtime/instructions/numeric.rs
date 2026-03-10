@@ -89,7 +89,6 @@ pub fn i64_popcnt(rt: &mut RuntimeGenerator) -> Instruction {
     unop(rt, "PopCnt64")
 }
 
-/// `op` is "And", "Or", or "Xor", "Add", "Sub", "Mul", "DivU", "DivS", "RemU", or "RemS".
 fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
     if !rt.has(op) {
         let definition = {

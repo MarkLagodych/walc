@@ -253,6 +253,7 @@ local function main()
             -- Output
             local output, next_program = decode_pair(data)
             io.write(string.char(decode_byte(output)))
+            io.flush()
             program = next_program
         end
     end

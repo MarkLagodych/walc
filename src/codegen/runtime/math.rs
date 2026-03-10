@@ -22,14 +22,6 @@ fn bit_or(a: Bit, b: Bit) -> Bit {
     select(a, b, bit(true))
 }
 
-fn bit_less(a: Bit, b: Bit) -> Bit {
-    select(a, b, bit(false))
-}
-
-fn bit_less_equal(a: Bit, b: Bit) -> Bit {
-    select(a, bit(true), b)
-}
-
 fn bit_xor(a: Bit, b: Bit) -> Bit {
     select(a, b.clone(), bit_not(b))
 }
