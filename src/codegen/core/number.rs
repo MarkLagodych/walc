@@ -94,7 +94,7 @@ impl NumberGenerator {
             b.def(format!("{:X}b", n), byte_expr(n));
         }
         for &n in &self.ids {
-            b.def(format!("{:X}d", n), id_expr(n));
+            b.def(format!("{:X}x", n), id_expr(n));
         }
         for &n in &self.i32s {
             b.def(format!("{:X}i", n), i32_expr(n));
@@ -119,7 +119,7 @@ impl NumberGenerator {
         self.bytes
             .extend(id.to_le_bytes().map(|byte| byte.reverse_bits()));
 
-        var(format!("{:X}d", id))
+        var(format!("{:X}x", id))
     }
 
     pub fn i32_const(&mut self, n: u32) -> I32 {

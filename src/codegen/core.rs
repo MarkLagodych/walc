@@ -107,7 +107,7 @@ pub fn unreachable() -> Expr {
 
         var(format!("UNREACHABLE_{}", next_id))
     } else {
-        abs(["_"], var("_"))
+        var("_")
     }
 }
 
