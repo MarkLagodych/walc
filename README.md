@@ -7,7 +7,8 @@ It also supports [LIME1](https://github.com/WebAssembly/tool-conventions/blob/ma
 WebAssembly extensions.
 
 The input modules are only allowed to use custom [WALC functions](./docs/wasm.md)
-for standard I/O, see [example programs](./examples/rust) written in Rust.
+for standard I/O, see [example programs](./examples/rust/README.md)
+written in Rust.
 
 The output lambda expressions are in [WALC format](./docs/format.md),
 which defines how the expressions should be interpreted in order to perform I/O.

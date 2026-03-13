@@ -6,14 +6,14 @@ use walc::*;
 const FRAC_BITS: i32 = 16;
 const ONE: i32 = 1 << FRAC_BITS;
 
-const WIDTH: i32 = 28;
-const HEIGHT: i32 = 8;
+const WIDTH: i32 = 80;
+const HEIGHT: i32 = 24;
 
 // This must be a power of 2 so that the division can be done with a shift
-const MAX_ITER: i32 = 32;
+const MAX_ITER: i32 = 16;
 
-// The length is a power of two so that the mapping can be done with a shift
-const PALETTE: &[u8] = b" .,:;!?rnx7XNMW@";
+// The length is a power of 2 so that the division can be done with a shift
+const PALETTE: &[u8] = b" .::!??@";
 
 // Mandelbrot region
 const XMIN: i32 = -2 * ONE;

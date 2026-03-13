@@ -68,28 +68,53 @@ function Env(parent, name, value, computed)
     return { parent = parent, name = name, value = value, computed = computed }
 end
 
-local function run(closure)
-    -- Based on the Krivine machine
-    -- Implements an optimization to avoid re-computing variable values
-    -- by updating the env when a variable is computed for the first time.
+-- recursion_depth avoids stack overflow with too much recursion.
+-- Pass nil when normally calling from other functions.
+local function run(closure, recursion_depth)
+    --[[ Based on the Krivine machine with a mixed computation strategy:
+    (1) Call by need (weak) is used by default, meaning that most expressions
+        are evaluated lazily and also,
+        when a variable value is computed for the first time, its value
+        is updated in its environment to avoid future re-computations.
+        This prevents the program from slowing down with time.
+    (2) Call by value (strict) is used when a function argument
+        is a variable, meaning that in such a case the right side of
+        an application is computed before the left side.
+        This avoids building long environment chains that are unavoidable
+        with weak strategies. Effectively, this prevents the program from using
+        more and more memory with time. ]]
 
     local stack = {}
 
+    -- (1)
     -- Stores envs whose values need to be computed and updated
     local uncomputed_envs = {}
     -- Positions in the stack of when those envs were scheduled
-    local compute_locations = {}
+    local stack_locations = {}
 
     while true do
-        if closure.expr.type == "application" then
-            table.insert(stack, Closure(closure.env, closure.expr.right))
-            closure = Closure(closure.env, closure.expr.left)
+        if closure.expr.type == "variable" then
+            -- Find the environment where the variable is defined
+            local env = closure.env
+            while env and env.name ~= closure.expr.name do
+                env = env.parent
+            end
+
+            assert(env, "Unbound variable: " .. closure.expr.name)
+
+            -- (1) Schedule the variable for an update
+            if not env.computed then
+                table.insert(uncomputed_envs, env)
+                table.insert(stack_locations, #stack)
+            end
+
+            closure = env.value
         elseif closure.expr.type == "abstraction" then
-            -- Optimization: assign the value to the corresponding variables
-            while compute_locations[#compute_locations] == #stack do
-                table.remove(compute_locations)
+            -- (1) Update variable values
+            while stack_locations[#stack_locations] == #stack do
+                table.remove(stack_locations)
                 local env = table.remove(uncomputed_envs)
-                env.value = closure -- Assign the computed (optimized) value
+                env.value = closure -- Assign the computed value
                 env.computed = true
             end
 
@@ -100,30 +125,25 @@ local function run(closure)
             local argument = table.remove(stack)
             local env = Env(closure.env, closure.expr.variable, argument)
             closure = Closure(env, closure.expr.body)
-        elseif closure.expr.type == "variable" then
-            -- Find the environment where the variable is defined
-            local env = closure.env
-            while env and env.name ~= closure.expr.name do
-                env = env.parent
+        elseif closure.expr.type == "application" then
+            local right = Closure(closure.env, closure.expr.right)
+
+            -- (2) Evaluate the argument before the function here
+            if right.expr.type == "variable" then
+                if not recursion_depth or recursion_depth < 10 then
+                    right = run(right, (recursion_depth or 0) + 1)
+                end
             end
 
-            assert(env, "Unbound variable: " .. closure.expr.name)
-
-            -- Optimization: assign a computed value to the environment later
-            if not env.computed then
-                table.insert(uncomputed_envs, env)
-                table.insert(compute_locations, #stack)
-            end
-
-            closure = env.value
+            table.insert(stack, right)
+            closure = Closure(closure.env, closure.expr.left)
         end
     end
 
     return closure
 end
 
--- The text ensures that the variable will be undefined and thus cause an error
-local unreachable = Var([[unreachable ¯\_(ツ)_/¯]])
+local unreachable = Abs("_", Var("_"))
 
 local bit0 = parse("[x0[x1 x0]]")
 local bit1 = parse("[x0[x1 x1]]")

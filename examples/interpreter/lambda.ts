@@ -57,29 +57,50 @@ class Env {
     ) {}
 }
 
-function run(closure: Closure): Closure {
-    // Based on the Krivine machine.
-    // Implements an optimization to avoid re-computing variable values
-    // by updating the env when a variable is computed for the first time.
+function run(closure: Closure, recursion_depth: number | null = null): Closure {
+    /* Based on the Krivine machine with a mixed computation strategy:
+    (1) Call by need (weak) is used by default, meaning that most expressions
+        are evaluated lazily and also,
+        when a variable value is computed for the first time, its value
+        is updated in its environment to avoid future re-computations.
+        This prevents the program from slowing down with time.
+    (2) Call by value (strict) is used when a function argument
+        is a variable, meaning that in such a case the right side of
+        an application is computed before the left side.
+        This avoids building long environment chains that are unavoidable
+        with weak strategies. Effectively, this prevents the program from using
+        more and more memory with time. */
 
     const stack: Closure[] = []
 
+    // (1)
     // Stores envs whose values need to be computed and updated
     const uncomputed_envs: Env[] = []
     // Positions in the stack of when those envs were scheduled
     const stack_locations: number[] = []
 
     while (true) {
-        if (closure.expr instanceof Apply) {
-            stack.push(new Closure(closure.env, closure.expr.right))
-            closure = new Closure(closure.env, closure.expr.left)
+        if (closure.expr instanceof Var) {
+            // Find the environment where the variable is defined
+            let env = closure.env
+            while (env && env.name != closure.expr.name) env = env.parent
+
+            if (!env) throw new Error(`Unbound variable: ${closure.expr.name}`)
+
+            // (1) Schedule the variable for an update
+            if (!env.computed) {
+                uncomputed_envs.push(env)
+                stack_locations.push(stack.length)
+            }
+
+            closure = env.value
         }
         else if (closure.expr instanceof Abs) {
-            // Optimization: update the values of the corresponding envs
+            // (1) Update variable values
             while (stack_locations.at(-1) === stack.length) {
                 stack_locations.pop()!
                 const env = uncomputed_envs.pop()!
-                env.value = closure // Assign the computed (optimized) value
+                env.value = closure // Assign the computed value
                 env.computed = true
             }
 
@@ -90,28 +111,25 @@ function run(closure: Closure): Closure {
             const env = new Env(closure.env, closure.expr.variable, argument)
             closure = new Closure(env, closure.expr.body)
         }
-        else if (closure.expr instanceof Var) {
-            // Find the environment where the variable is defined
-            let env = closure.env
-            while (env && env.name != closure.expr.name) env = env.parent
+        else if (closure.expr instanceof Apply) {
+            let right = new Closure(closure.env, closure.expr.right)
 
-            if (!env) throw new Error(`Unbound variable: ${closure.expr.name}`)
-
-            // Optimization: schedule the env for a value update
-            if (!env.computed) {
-                uncomputed_envs.push(env)
-                stack_locations.push(stack.length)
+            // (2) Evaluate the argument before the function here
+            if (right.expr instanceof Var) {
+                // Avoid stack overflow due to recursion
+                if (!recursion_depth || recursion_depth < 10)
+                    right = run(right, (recursion_depth || 0) + 1)
             }
 
-            closure = env.value
+            stack.push(right)
+            closure = new Closure(closure.env, closure.expr.left)
         }
     }
 
     return closure
 }
 
-// The text ensures that the variable will be undefined and thus cause an error
-const unreachable = new Var("unreachable ¯\\_(ツ)_/¯")
+const unreachable = new Abs("_", new Var("_"))
 
 const bit0 = parse("[x0[x1 x0]]")
 const bit1 = parse("[x0[x1 x1]]")
