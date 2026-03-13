@@ -59,19 +59,26 @@ class Env {
 
 function run(closure: Closure, recursion_depth: number = 0): Closure {
     /* Based on the Krivine machine with a mixed computation strategy:
+
     (1) Call by need (weak) is used by default, meaning that most expressions
         are evaluated lazily and also, when a variable value is computed for
         the first time, its value is updated in its environment to avoid future
         re-computations.
         This prevents the program from slowing down with time.
+
     (2) Call by value (strict) is used when a function argument is a variable,
         meaning that in such a case the right side of an application is computed
-        before the left side. The recursion depth is limited to avoid stack
-        overflow.
+        before the left side.
         This avoids building long environment chains with lots of unused
         variables, which are unavoidable with weak strategies.
         Effectively, this prevents the program from using more and more memory
-        with time. */
+        with time.
+
+        This approach involves recursion. To prevent stack overflows,
+        the recursion depth is limited, so computation just stops at some point.
+
+        This might not be the most efficient approach as it computes things
+        that might never be actually used, but it is surely the simplest one. */
 
     const stack: Closure[] = []
 
@@ -117,7 +124,7 @@ function run(closure: Closure, recursion_depth: number = 0): Closure {
             let right = new Closure(closure.env, closure.expr.right)
 
             // (2) Preemptively compute the right if it is a variable,
-            // but limit the recursion depth.
+            // but limit the recursion depth (10 worked well during tests).
             if (right.expr instanceof Var && recursion_depth < 10)
                 right = run(right, recursion_depth + 1)
 
@@ -129,7 +136,10 @@ function run(closure: Closure, recursion_depth: number = 0): Closure {
     return closure
 }
 
-const unreachable = new Abs("〜⁠(⁠꒪⁠꒳⁠꒪⁠)⁠〜", new Var("〜⁠(⁠꒪⁠꒳⁠꒪⁠)⁠〜"))
+// The text in the variable name ensures that it cannot be defined by the
+// program. It is wrapped in an abstraction to prevent it from being
+// preemptively computed by the interpreter.
+const unreachable = new Abs("〜⁠(⁠꒪⁠꒳⁠꒪⁠)⁠〜", new Var("unreachable (⊙＿⊙')"))
 
 const bit0 = parse("[x0[x1 x0]]")
 const bit1 = parse("[x0[x1 x1]]")

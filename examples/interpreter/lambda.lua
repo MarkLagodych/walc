@@ -72,19 +72,26 @@ end
 -- Pass nil when normally calling from other functions.
 local function run(closure, recursion_depth)
     --[[ Based on the Krivine machine with a mixed computation strategy:
+
     (1) Call by need (weak) is used by default, meaning that most expressions
         are evaluated lazily and also, when a variable value is computed for
         the first time, its value is updated in its environment to avoid future
         re-computations.
         This prevents the program from slowing down with time.
+
     (2) Call by value (strict) is used when a function argument is a variable,
         meaning that in such a case the right side of an application is computed
-        before the left side. The recursion depth is limited to avoid stack
-        overflow.
+        before the left side.
         This avoids building long environment chains with lots of unused
         variables, which are unavoidable with weak strategies.
         Effectively, this prevents the program from using more and more memory
-        with time. ]]
+        with time.
+
+        This approach involves recursion. To prevent stack overflows,
+        the recursion depth is limited, so computation just stops at some point.
+
+        This might not be the most efficient approach as it computes things
+        that might never be actually used, but it is surely the simplest one. ]]
 
     local stack = {}
 
@@ -133,7 +140,7 @@ local function run(closure, recursion_depth)
             local right = Closure(closure.env, closure.expr.right)
 
             -- (2) Preemptively compute the right if it is a variable,
-            -- but limit the recursion depth.
+            -- but limit the recursion depth (10 worked well during tests).
             if right.expr.type == "variable" and recursion_depth < 10 then
                 right = run(right, recursion_depth + 1)
             end
@@ -146,7 +153,10 @@ local function run(closure, recursion_depth)
     return closure
 end
 
-local unreachable = Abs([[¯\_(ツ)_/¯]], Var([[¯\_(ツ)_/¯]]))
+-- The text in the variable name ensures that it cannot be defined by the
+-- program. It is wrapped in a function to prevent it from being preemptively
+-- computed by the interpreter.
+local unreachable = Abs("〜⁠(⁠꒪⁠꒳⁠꒪⁠)⁠〜", Var("unreachable (⊙＿⊙')"))
 
 local bit0 = parse("[x0[x1 x0]]")
 local bit1 = parse("[x0[x1 x1]]")
