@@ -57,19 +57,21 @@ class Env {
     ) {}
 }
 
-function run(closure: Closure, recursion_depth: number | null = null): Closure {
+function run(closure: Closure, recursion_depth: number = 0): Closure {
     /* Based on the Krivine machine with a mixed computation strategy:
     (1) Call by need (weak) is used by default, meaning that most expressions
-        are evaluated lazily and also,
-        when a variable value is computed for the first time, its value
-        is updated in its environment to avoid future re-computations.
+        are evaluated lazily and also, when a variable value is computed for
+        the first time, its value is updated in its environment to avoid future
+        re-computations.
         This prevents the program from slowing down with time.
-    (2) Call by value (strict) is used when a function argument
-        is a variable, meaning that in such a case the right side of
-        an application is computed before the left side.
-        This avoids building long environment chains that are unavoidable
-        with weak strategies. Effectively, this prevents the program from using
-        more and more memory with time. */
+    (2) Call by value (strict) is used when a function argument is a variable,
+        meaning that in such a case the right side of an application is computed
+        before the left side. The recursion depth is limited to avoid stack
+        overflow.
+        This avoids building long environment chains with lots of unused
+        variables, which are unavoidable with weak strategies.
+        Effectively, this prevents the program from using more and more memory
+        with time. */
 
     const stack: Closure[] = []
 
@@ -114,12 +116,10 @@ function run(closure: Closure, recursion_depth: number | null = null): Closure {
         else if (closure.expr instanceof Apply) {
             let right = new Closure(closure.env, closure.expr.right)
 
-            // (2) Evaluate the argument before the function here
-            if (right.expr instanceof Var) {
-                // Avoid stack overflow due to recursion
-                if (!recursion_depth || recursion_depth < 10)
-                    right = run(right, (recursion_depth || 0) + 1)
-            }
+            // (2) Preemptively compute the right if it is a variable,
+            // but limit the recursion depth.
+            if (right.expr instanceof Var && recursion_depth < 10)
+                right = run(right, recursion_depth + 1)
 
             stack.push(right)
             closure = new Closure(closure.env, closure.expr.left)
@@ -129,7 +129,7 @@ function run(closure: Closure, recursion_depth: number | null = null): Closure {
     return closure
 }
 
-const unreachable = new Abs("_", new Var("_"))
+const unreachable = new Abs("〜⁠(⁠꒪⁠꒳⁠꒪⁠)⁠〜", new Var("〜⁠(⁠꒪⁠꒳⁠꒪⁠)⁠〜"))
 
 const bit0 = parse("[x0[x1 x0]]")
 const bit1 = parse("[x0[x1 x1]]")

@@ -105,7 +105,10 @@ pub fn unreachable() -> Expr {
             id
         };
 
-        var(format!("UNREACHABLE_{}", next_id))
+        // Just using an unbound variable will easily raise an error in the interpreter.
+        // Instead, we make an abstraction that contains an unbound variable, so it will never
+        // be evaluated unless there is a bug in the generated program (and thus in the compiler).
+        abs(["_"], var(format!("UNREACHABLE_{}", next_id)))
     } else {
         var("_")
     }

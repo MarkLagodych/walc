@@ -73,16 +73,18 @@ end
 local function run(closure, recursion_depth)
     --[[ Based on the Krivine machine with a mixed computation strategy:
     (1) Call by need (weak) is used by default, meaning that most expressions
-        are evaluated lazily and also,
-        when a variable value is computed for the first time, its value
-        is updated in its environment to avoid future re-computations.
+        are evaluated lazily and also, when a variable value is computed for
+        the first time, its value is updated in its environment to avoid future
+        re-computations.
         This prevents the program from slowing down with time.
-    (2) Call by value (strict) is used when a function argument
-        is a variable, meaning that in such a case the right side of
-        an application is computed before the left side.
-        This avoids building long environment chains that are unavoidable
-        with weak strategies. Effectively, this prevents the program from using
-        more and more memory with time. ]]
+    (2) Call by value (strict) is used when a function argument is a variable,
+        meaning that in such a case the right side of an application is computed
+        before the left side. The recursion depth is limited to avoid stack
+        overflow.
+        This avoids building long environment chains with lots of unused
+        variables, which are unavoidable with weak strategies.
+        Effectively, this prevents the program from using more and more memory
+        with time. ]]
 
     local stack = {}
 
@@ -91,6 +93,8 @@ local function run(closure, recursion_depth)
     local uncomputed_envs = {}
     -- Positions in the stack of when those envs were scheduled
     local stack_locations = {}
+
+    recursion_depth = recursion_depth or 0
 
     while true do
         if closure.expr.type == "variable" then
@@ -128,11 +132,10 @@ local function run(closure, recursion_depth)
         elseif closure.expr.type == "application" then
             local right = Closure(closure.env, closure.expr.right)
 
-            -- (2) Evaluate the argument before the function here
-            if right.expr.type == "variable" then
-                if not recursion_depth or recursion_depth < 10 then
-                    right = run(right, (recursion_depth or 0) + 1)
-                end
+            -- (2) Preemptively compute the right if it is a variable,
+            -- but limit the recursion depth.
+            if right.expr.type == "variable" and recursion_depth < 10 then
+                right = run(right, recursion_depth + 1)
             end
 
             table.insert(stack, right)
@@ -143,7 +146,7 @@ local function run(closure, recursion_depth)
     return closure
 end
 
-local unreachable = Abs("_", Var("_"))
+local unreachable = Abs([[¯\_(ツ)_/¯]], Var([[¯\_(ツ)_/¯]]))
 
 local bit0 = parse("[x0[x1 x0]]")
 local bit1 = parse("[x0[x1 x1]]")
