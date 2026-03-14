@@ -93,10 +93,15 @@
         i64.const -1231
         call $compare64
 
-        i32.const 1
-        i32.const 0
-        i32.div_u ;; Should trap
+        i32.const 0x80000000 ;; -2^31
+        i32.const -1
+        i32.div_s ;; Should trap because 2^31 is not representable as signed i32
         drop
+
+        ;; i32.const 1
+        ;; i32.const 0
+        ;; i32.div_u ;; Should trap
+        ;; drop
 
         i32.const 0x4E ;; 'N'
         call $output

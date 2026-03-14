@@ -397,6 +397,27 @@ fn div_signed(
     if !rt.has(&name) {
         let mut defs = LetExprBuilder::new();
 
+        let smallest_signed = match bits {
+            32 => rt.num.i32_const(i32::MIN as u32),
+            64 => rt.num.i64_const(i64::MIN as u64),
+            _ => unreachable!(),
+        };
+
+        let neg_one = match bits {
+            32 => rt.num.i32_const(-1i32 as u32),
+            64 => rt.num.i64_const(-1i64 as u64),
+            _ => unreachable!(),
+        };
+
+        // If a is -2^(bits-1) and b is -1, a/b will be out of range of representable signed numbers
+        defs.def(
+            "range_error",
+            bit_and(
+                super::comparisons::equal(rt, var("a"), smallest_signed),
+                super::comparisons::equal(rt, var("b"), neg_one),
+            ),
+        );
+
         defs.def("a_neg", list::get_head(number::reverse_bits(var("a"))));
         defs.def("b_neg", list::get_head(number::reverse_bits(var("b"))));
 
@@ -406,13 +427,17 @@ fn div_signed(
         defs.def("res", div(rt, var("a"), var("b"), bits));
 
         let body = select(
-            bit_xor(var("a_neg"), var("b_neg")),
-            var("res"),
+            var("range_error"),
             select(
-                optional::is_some(var("res")),
-                optional::none(),
-                optional::some(negate(rt, optional::unwrap(var("res")))),
+                bit_xor(var("a_neg"), var("b_neg")),
+                var("res"),
+                select(
+                    optional::is_some(var("res")),
+                    optional::none(),
+                    optional::some(negate(rt, optional::unwrap(var("res")))),
+                ),
             ),
+            optional::none(),
         );
 
         let definition = abs(["a", "b"], defs.build_in(body));
