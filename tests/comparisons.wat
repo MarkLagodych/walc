@@ -2,6 +2,20 @@
     (import "walc" "output" (func $output (param i32)))
     (export "main" (func $main))
     (func $main
+        i32.const 0
+        i32.const 0
+        i32.le_u
+
+        i32.const 1
+        call $compare32
+
+        i32.const 0x7FFFFFFF
+        i32.const 0xFFFFFFFF
+        i32.le_u
+
+        i32.const 1
+        call $compare32
+
         i32.const 3
         i32.const 4
         i32.gt_u

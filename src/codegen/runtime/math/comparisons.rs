@@ -65,7 +65,101 @@ pub fn not_equal(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number
     bit_not(a_is_equal_to_b)
 }
 
-/// Compares two BE numbers.
+/// Compares two unsigned numbers.
+/// `b` must not be shorter than `a`, but can be longer.
+///
+/// `op` must be one of: "LT", "LE"
+fn compare(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number, op: &str) -> Bit {
+    let name = op;
+    if !rt.has(name) {
+        let helper_name = format!("_{op}");
+
+        // Numbers are in LE here.
+        //
+        // A < B or A <= B ("cmp(A, B)" for short) is computed by:
+        //
+        // | A        | B        | cmp(result, A, B)             |
+        // | -------- | -------- | ----------------------------- |
+        // | 0aaaaaaa | 0bbbbbbb | cmp(aaaaaaa, bbbbbbb, result) |
+        // | 0aaaaaaa | 1bbbbbbb | cmp(aaaaaaa, bbbbbbb, true)   |
+        // | 1aaaaaaa | 0bbbbbbb | cmp(aaaaaaa, bbbbbbb, false)  |
+        // | 1aaaaaaa | 1bbbbbbb | cmp(aaaaaaa, bbbbbbb, result) |
+        // | empty    | whatever | result                        |
+        //
+        // To put it in normal language, when the bits are equal, do not change the intermediate
+        // result. When they differ, update the result.
+        //
+        // The initial intermediate result for "<=" is true because if numbers are equal, the
+        // overall result must be true.
+
+        let a_head = list::get_head(var("a"));
+        let a_tail = list::get_tail(var("a"));
+
+        let b_head = list::get_head(var("b"));
+        let b_tail = list::get_tail(var("b"));
+
+        let compare_tails = |result| {
+            apply(
+                rec(var(&helper_name)),
+                [result, a_tail.clone(), b_tail.clone()],
+            )
+        };
+
+        let body = select(
+            list::is_not_empty(var("a")),
+            var("res"),
+            compare_tails(select(
+                a_head,
+                select(b_head.clone(), var("res"), bit(true)),
+                select(b_head, bit(false), var("res")),
+            )),
+        );
+
+        rt.def_rec(&helper_name, abs(["res", "a", "b"], body));
+
+        let default_result = match op {
+            "LT" => bit(false),
+            "LE" => bit(true),
+            _ => unreachable!(),
+        };
+
+        rt.def(name, apply(rec(var(helper_name)), [default_result]));
+    }
+
+    apply(var(name), [a, b])
+}
+
+/// Compares two unsigned numbers.
+/// `b` must not be shorter than `a`, but can be longer.
+pub fn less_unsigned(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
+    compare(rt, a, b, "LT")
+}
+
+/// Compares two unsigned numbers.
+/// `b` must not be shorter than `a`, but can be longer.
+pub fn less_equal_unsigned(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
+    compare(rt, a, b, "LE")
+}
+
+/// Compares two unsigned numbers.
+/// `b` must not be shorter than `a`, but can be longer.
+pub fn greater_unsigned(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
+    bit_not(less_equal_unsigned(rt, a, b))
+}
+
+/// Compares two unsigned numbers.
+/// `b` must not be shorter than `a`, but can be longer.
+pub fn greater_equal_unsigned(
+    rt: &mut RuntimeGenerator,
+    a: number::Number,
+    b: number::Number,
+) -> Bit {
+    bit_not(less_unsigned(rt, a, b))
+}
+
+/// Compares two unsigned BE (i.e. reversed) numbers.
+/// The numbers must be of the same bit width.
+///
 /// `op` must be one of: "LTbe" (for Less Than), "LEbe" (for Less Equal).
 fn compare_be(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number, op: &str) -> Bit {
     let name = format!("_{op}");
@@ -113,51 +207,20 @@ fn compare_be(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number, o
     apply(rec(var(name)), [a, b])
 }
 
+/// Compares two unsigned BE (i.e. reversed) numbers.
+/// The numbers must be of the same bit width.
 fn less_unsigned_be(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
     compare_be(rt, a, b, "LTbe")
 }
 
+/// Compares two unsigned BE (i.e. reversed) numbers.
+/// The numbers must be of the same bit width.
 fn less_equal_unsigned_be(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
     compare_be(rt, a, b, "LEbe")
 }
 
-pub fn less_unsigned(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
-    if !rt.has("LT") {
-        let a_be = number::reverse_bits(var("a"));
-        let b_be = number::reverse_bits(var("b"));
-        let a_less_than_b = less_unsigned_be(rt, a_be, b_be);
-
-        rt.def("LT", abs(["a", "b"], a_less_than_b));
-    }
-
-    apply(var("LT"), [a, b])
-}
-
-pub fn less_equal_unsigned(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
-    if !rt.has("LE") {
-        let a_be = number::reverse_bits(var("a"));
-        let b_be = number::reverse_bits(var("b"));
-        let a_less_equal_b = less_equal_unsigned_be(rt, a_be, b_be);
-
-        rt.def("LE", abs(["a", "b"], a_less_equal_b));
-    }
-
-    apply(var("LE"), [a, b])
-}
-
-pub fn greater_unsigned(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
-    bit_not(less_equal_unsigned(rt, a, b))
-}
-
-pub fn greater_equal_unsigned(
-    rt: &mut RuntimeGenerator,
-    a: number::Number,
-    b: number::Number,
-) -> Bit {
-    bit_not(less_unsigned(rt, a, b))
-}
-
-/// `op` msut be one of: "LTs" (for Less Than), "LEs" (for Less Equal).
+/// Cmopares two numbers of the same bit width.
+/// `op` must be one of: "LTs" (for Less Than), "LEs" (for Less Equal).
 fn compare_signed(
     rt: &mut RuntimeGenerator,
     a: number::Number,
@@ -204,18 +267,22 @@ fn compare_signed(
     apply(var(&name), [a, b])
 }
 
+/// The numbers must be of the same bit width.
 pub fn less_signed(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
     compare_signed(rt, a, b, "LTs")
 }
 
+/// The numbers must be of the same bit width.
 pub fn less_equal_signed(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
     compare_signed(rt, a, b, "LEs")
 }
 
+/// The numbers must be of the same bit width.
 pub fn greater_signed(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> Bit {
     bit_not(less_equal_signed(rt, a, b))
 }
 
+/// The numbers must be of the same bit width.
 pub fn greater_equal_signed(
     rt: &mut RuntimeGenerator,
     a: number::Number,

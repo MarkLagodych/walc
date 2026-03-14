@@ -115,11 +115,6 @@ fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
                 "Add" => math::add(rt, var("a"), var("b")),
                 "Sub" => math::sub(rt, var("a"), var("b")),
                 "Mul" => math::mul(rt, var("a"), var("b")),
-                // TODO
-                // "DivU" => math::div_unsigned(rt, var("a"), var("b")),
-                // "DivS" => math::div_signed(rt, var("a"), var("b")),
-                // "RemU" => math::rem_unsigned(rt, var("a"), var("b")),
-                // "RemS" => math::rem_signed(rt, var("a"), var("b")),
                 _ => unreachable!(),
             };
 
@@ -194,6 +189,53 @@ pub fn i64_rotate_left(rt: &mut RuntimeGenerator) -> Instruction {
 
 pub fn i64_rotate_right(rt: &mut RuntimeGenerator) -> Instruction {
     binop(rt, "Rotr64")
+}
+
+/// Invokes a binary operation that returns [optional::Optional]
+/// and that must trap if the result is None.
+fn binop_trapping(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
+    if !rt.has(op) {
+        let definition = {
+            let mut b = InstructionBuilder::new();
+            b.pop(["a", "b"]);
+
+            b.def(
+                "result",
+                match op {
+                    "DivU32" => math::i32_div_unsigned(rt, var("a"), var("b")),
+                    "DivS32" => math::i32_div_signed(rt, var("a"), var("b")),
+                    "DivU64" => math::i64_div_unsigned(rt, var("a"), var("b")),
+                    "DivS64" => math::i64_div_signed(rt, var("a"), var("b")),
+                    // TODO
+                    // "RemU" => math::rem_unsigned(rt, var("a"), var("b")),
+                    // "RemS" => math::rem_signed(rt, var("a"), var("b")),
+                    _ => unreachable!(),
+                },
+            );
+
+            b.push([optional::unwrap(var("result"))]);
+            b.build_check(optional::is_some(var("result")))
+        };
+        rt.def(op, definition);
+    }
+
+    var(op)
+}
+
+pub fn i32_div_u(rt: &mut RuntimeGenerator) -> Instruction {
+    binop_trapping(rt, "DivU32")
+}
+
+pub fn i32_div_s(rt: &mut RuntimeGenerator) -> Instruction {
+    binop_trapping(rt, "DivS32")
+}
+
+pub fn i64_div_u(rt: &mut RuntimeGenerator) -> Instruction {
+    binop_trapping(rt, "DivU64")
+}
+
+pub fn i64_div_s(rt: &mut RuntimeGenerator) -> Instruction {
+    binop_trapping(rt, "DivS64")
 }
 
 /// `op` is "Eq", "Ne", "LtU", "LeU", "GtU", "GeU", "LtS", "LeS", "GtS", or "GeS".

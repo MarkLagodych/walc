@@ -69,6 +69,13 @@ impl InstructionBuilder {
         Self::wrap_with_context(io_command::exit())
     }
 
+    /// Builds an instruction that checks the condition and if it is false, traps.
+    pub fn build_check(self, should_continue: Bit) -> io_command::IoCommand {
+        let next = select(should_continue, io_command::exit(), self.execute_next());
+        let body = self.defs.build_in(next);
+        Self::wrap_with_context(body)
+    }
+
     /// Builds an instruction that writes the given byte to the output *after* performing
     /// all other operations inside itself.
     pub fn build_output(self, byte: number::Byte) -> io_command::IoCommand {
