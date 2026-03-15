@@ -21,9 +21,22 @@ which defines how the expressions should be interpreted in order to perform I/O.
 The format does not change anything about lambda calculus or how it is evaluated
 inside the interpreter, it just defines what the interpreter does with
 the evaluated result.
+
+If you want, you can even convert WALC syntax to the standard mathematical
+notation with:
+
+```sh
+cat INPUT.walc | sed -r 's/\[([_0-9a-zA-Z]+)/(λ\1./g ; s/]/)/g'
+# Example input: [f ([x (f (x x))] [x (f (x x))])]
+# Example output: (λf. ((λx. (f (x x))) (λx. (f (x x)))))
+```
+
 You can run some [example expressions](./examples/walc/) written by hand
 with an [example interpreter](./examples/interpreter/) available in Lua and
-TypeScript.
+TypeScript:
+```sh
+examples/interpreter/lambda.ts examples/walc/hello.walc
+```
 
 Enjoy!
 
@@ -65,9 +78,8 @@ Example Rust programs are [here](./examples/rust/).
 Example:
 
 ```sh
-mkdir bin  # Git will ignore this
-walc examples/bin/mandelbrot.wasm -o bin/mandelbrot.walc
-examples/interpreter/lambda.ts bin/mandelbrot.walc
+walc examples/rust/bin/mandelbrot.wasm -o examples/rust/bin/mandelbrot.walc
+examples/interpreter/lambda.ts examples/rust/bin/mandelbrot.walc
 ```
 
 Output:

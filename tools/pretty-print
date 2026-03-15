@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-if [ $1 = '--help' ]
-then
-    echo "Usage: pretty-print file.walc"
-    exit
-fi
-
-sed -r 's/\[([_0-9a-zA-Z]+)/(λ\1./g ; s/]/)/g' $1
