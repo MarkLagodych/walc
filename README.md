@@ -30,14 +30,13 @@ Enjoy!
 ## Build & run
 
 ```sh
-cargo build
 cargo run -- INPUT.wasm -o OUTPUT.walc
 ```
 
 or install it globally:
 
 ```sh
-cargo install
+cargo install --path .
 walc INPUT.wasm -o OUTPUT.walc
 ```
 
@@ -47,8 +46,6 @@ Example Rust programs are [here](./examples/rust/).
 
 ### Build
 
-This projects ships with pre-built binaries, so you can typically skip this.
-
 1. Install the WASM toolchain for Rust:
     ```sh
     rustup target add wasm32v1-none
@@ -56,10 +53,11 @@ This projects ships with pre-built binaries, so you can typically skip this.
     You can also experiment with the standard `wasm32-unknown-unknown` toolchain,
     but its feature set is unstable and in the future it might extend beyond
     what WALC supports.
-2. Run the `make` command.
-    This will install all the `.wasm` files into the `bin` directory.
+2. Build for release. You can use the provided Makefile that will tell Cargo
+    to also install all the `.wasm` files into the `examples/rust/bin`
+    directory:
     ```sh
-    make
+    make -C examples/rust
     ```
 
 ### Run
@@ -67,8 +65,9 @@ This projects ships with pre-built binaries, so you can typically skip this.
 Example:
 
 ```sh
-walc examples/bin/mandelbrot.wasm -o examples/target/mandelbrot.walc
-examples/interpreter/lambda.ts examples/target/mandelbrot.walc
+mkdir bin  # Git will ignore this
+walc examples/bin/mandelbrot.wasm -o bin/mandelbrot.walc
+examples/interpreter/lambda.ts bin/mandelbrot.walc
 ```
 
 Output:

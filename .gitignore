@@ -9,6 +9,7 @@
 *.swp
 
 # Build/output directories and files
+bin/
 target/
 node_modules/
 __*__/
