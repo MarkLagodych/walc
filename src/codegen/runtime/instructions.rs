@@ -85,7 +85,7 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         I64Store32 { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 32),
 
         // ==================================================================================
-        // Numeric instructions
+        // Integer instructions
         I32Const { .. } | I64Const { .. } => numeric::push_const(rt, op),
 
         I32WrapI64 => numeric::i32_wrap_i64(rt),
@@ -157,8 +157,39 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         I64RemU => numeric::i64_rem_u(rt),
         I64RemS => numeric::i64_rem_s(rt),
 
-        // TODO
-        _ => todo!(),
+        // ==================================================================================
+        // Floating-point instructions
+
+        // Floats are not supported, but to avoid as much compilation problems as possible,
+        // all floats are reinterpreted as integers and any floating-point operations are
+        // replaced with traps.
+        F32Const { .. } | F64Const { .. } => numeric::push_const(rt, op),
+
+        F32Load { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 32, false),
+        F64Load { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 64, false),
+
+        F32Store { memarg, .. } => memory::store(rt, memarg.offset as u32, 32, 32),
+        F64Store { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 64),
+
+        F32ReinterpretI32 => instruction::nop(),
+        F64ReinterpretI64 => instruction::nop(),
+        I32ReinterpretF32 => instruction::nop(),
+        I64ReinterpretF64 => instruction::nop(),
+
+        F32Abs | F64Abs | F32Neg | F64Neg | F32Ceil | F64Ceil | F32Floor | F64Floor | F32Trunc
+        | F64Trunc | F32Nearest | F64Nearest | F32Sqrt | F64Sqrt | F32Add | F64Add | F32Sub
+        | F64Sub | F32Mul | F64Mul | F32Div | F64Div | F32Min | F64Min | F32Max | F64Max
+        | F32Copysign | F64Copysign | F32Eq | F64Eq | F32Ne | F64Ne | F32Lt | F64Lt | F32Le
+        | F64Le | F32Gt | F64Gt | F32Ge | F64Ge | I32TruncF32S | I32TruncF32U | I32TruncF64S
+        | I32TruncF64U | I64TruncF32S | I64TruncF32U | I64TruncF64S | I64TruncF64U
+        | F32ConvertI32S | F32ConvertI32U | F32ConvertI64S | F32ConvertI64U | F64ConvertI32S
+        | F64ConvertI32U | F64ConvertI64S | F64ConvertI64U | F32DemoteF64 | F64PromoteF32 => {
+            eprintln!("Warning: floating-point arithmetic unsupported, replaced with traps");
+
+            io::exit(rt)
+        }
+
+        _ => unreachable!("unsupported instruction: {op:?}"),
     }
 }
 

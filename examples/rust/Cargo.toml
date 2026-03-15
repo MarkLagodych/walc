@@ -22,5 +22,9 @@ name = "echo"
 path = "echo.rs"
 
 [[bin]]
+name = "fibonacci"
+path = "fibonacci.rs"
+
+[[bin]]
 name = "mandelbrot"
 path = "mandelbrot.rs"

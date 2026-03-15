@@ -33,5 +33,5 @@ extensions, here's some notes about them:
     This just enables the wasmparser's support for a slightly different encoding
     of the `call_indirect` instruction that was introduced in the
     `reference-types` extension and later in WASM 2.0.
-
-**TODO** `nontrapping-float-to-int-conversions`
+* `nontrapping-float-to-int-conversions`:
+    Not supported. Floating-point arithmetic is not supported at all.

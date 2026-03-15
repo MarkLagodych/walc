@@ -138,13 +138,10 @@ impl NumberGenerator {
         match init_value {
             Operator::I32Const { value } => self.i32_const(*value as u32),
             Operator::I64Const { value } => self.i64_const(*value as u64),
-            // TODO floats
-            // Should floats be handled the same way as integers?
-            // They can be represented in a different way, e.g. as a triple of (sign, exp, mantissa)
+            // Floats are reinterpreted as integers
             Operator::F32Const { value } => self.i32_const(value.bits()),
             Operator::F64Const { value } => self.i64_const(value.bits()),
-            // FIXME allow global.get for data offsets
-            _ => unreachable!("non-const initializers are unsupported"),
+            _ => unreachable!(),
         }
     }
 
@@ -152,7 +149,7 @@ impl NumberGenerator {
         match ty {
             ValType::I32 => self.i32_const(0),
             ValType::I64 => self.i64_const(0),
-            // TODO floats
+            // Floats are reinterpreted as integers
             ValType::F32 => self.i32_const(0),
             ValType::F64 => self.i64_const(0),
             _ => unreachable!(),

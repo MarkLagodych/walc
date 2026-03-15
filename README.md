@@ -3,11 +3,17 @@
 WALC /wɑlts/ compiles stand-alone modules in [WebAssembly 1.0](https://w3.org/TR/wasm-core-1/)
 ([pdf](https://webassembly.github.io/spec/versions/core/WebAssembly-1.0.pdf))
 into [untyped lambda expressions](https://en.wikipedia.org/wiki/Lambda_calculus).
-It also supports [LIME1](https://github.com/WebAssembly/tool-conventions/blob/main/Lime.md)
-WebAssembly extensions.
+
+The compiler supports [LIME1](https://github.com/WebAssembly/tool-conventions/blob/main/Lime.md)
+WebAssembly extensions, but does not support floating-point arithmetic.
+Floats are stored as integers, reinterpreting conversions between floats and
+integers are replaced with nops and any other operations are replaced with
+traps. This might be useful when you use a standard function like `printf`
+that can use floats internally, but your program never invokes it with any
+float values.
 
 The input modules are only allowed to use custom [WALC functions](./docs/wasm.md)
-for standard I/O, see [example programs](./examples/rust/README.md)
+for standard I/O, see [example programs](./examples/rust/)
 written in Rust.
 
 The output lambda expressions are in [WALC format](./docs/format.md),
@@ -16,41 +22,83 @@ The format does not change anything about lambda calculus or how it is evaluated
 inside the interpreter, it just defines what the interpreter does with
 the evaluated result.
 You can run some [example expressions](./examples/walc/) written by hand
-with an [example interpreter](./examples/interpreter/).
+with an [example interpreter](./examples/interpreter/) available in Lua and
+TypeScript.
 
-## Project state
+Enjoy!
 
-The compiler is almost done, the only things left are some arithmetic
-instructions.
+## Build & run
 
-**Basic instructions:**
+```sh
+cargo build
+cargo run -- INPUT.wasm -o OUTPUT.walc
+```
 
-- [X] all control flow instructions
-- [X] all variable instructions
-- [X] all memory instructions
+or install it globally:
 
-**LIME1 extensions:**
+```sh
+cargo install
+walc INPUT.wasm -o OUTPUT.walc
+```
 
-- [X] `multi-value`
-- [X] `bulk-memory-opt`
-- [X] `sign-extension-ops`
-- [X] `extended-const`
-- [X] `call-indirect-overlong`
-- [ ] `nontrapping-float-to-int-conversions`
+## Examples
 
-**Arithmetic:**
+Example Rust programs are [here](./examples/rust/).
 
-- [X] all bit operations
-- [X] all comparison instructions
-- [X] `add`, `sub`
-- [X] `mul`
-- [ ] `div`, `rem`
-- [ ] floating-point arithmetic?
+### Build
 
-**Other:**
+This projects ships with pre-built binaries, so you can typically skip this.
 
-- [ ] extensive testing
-- [ ] faster interpreter in Rust
-- [ ] more WASM examples
-- [ ] compile Doom to lambda calculus?
+1. Install the WASM toolchain for Rust:
+    ```sh
+    rustup target add wasm32v1-none
+    ```
+    You can also experiment with the standard `wasm32-unknown-unknown` toolchain,
+    but its feature set is unstable and in the future it might extend beyond
+    what WALC supports.
+2. Run the `make` command.
+    This will install all the `.wasm` files into the `bin` directory.
+    ```sh
+    make
+    ```
 
+### Run
+
+Example:
+
+```sh
+walc examples/bin/mandelbrot.wasm -o examples/target/mandelbrot.walc
+examples/interpreter/lambda.ts examples/target/mandelbrot.walc
+```
+
+Output:
+
+```
+              ..............................:::::!?:!!:............
+           ...............................:::::::!?@!:::::............
+         ..............................:::::::?@@@@@@?!::::::...........
+       .............................::::::::::?@@@@@@@!:::::::::..........
+      ..........................:::::??@!::@@??@@@@@@@??!@:::::@::.........
+    ......................::::::::::::@@@@@@@@@@@@@@@@@@@@@?@@@@!::..........
+   ..................:::::::::::::::?!@@@@@@@@@@@@@@@@@@@@@@@@@!::::..........
+  ...............::!:::::::::::::::?@@@@@@@@@@@@@@@@@@@@@@@@@@@@::::...........
+  ............::::::@!!!:!@!:::::!?@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@::...........
+ ..........::::::::::?@@@@@@@@@?!?@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@??::............
+ ........::::::::::!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@?:::............
+ ..:...:::::::::!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@?::::............
+:?@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@?!:::::............
+ ..:...:::::::::!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@?::::............
+ ........::::::::::!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@?:::............
+ ..........::::::::::?@@@@@@@@@?!?@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@??::............
+  ............::::::@!!!:!@!:::::!?@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@::...........
+  ...............::!:::::::::::::::?@@@@@@@@@@@@@@@@@@@@@@@@@@@@::::...........
+   ..................:::::::::::::::?!@@@@@@@@@@@@@@@@@@@@@@@@@!::::..........
+    ......................::::::::::::@@@@@@@@@@@@@@@@@@@@@?@@@@!::..........
+      ..........................:::::??@!::@@??@@@@@@@??!@:::::@::.........
+       .............................::::::::::?@@@@@@@!:::::::::..........
+         ..............................:::::::?@@@@@@?!::::::...........
+           ...............................:::::::!?@!:::::............
+```
+
+Note that this particular example typically takes around 15 minutes or so
+to run.
