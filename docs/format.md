@@ -39,13 +39,16 @@ See more examples in the [examples directory](../examples/walc/).
 
 ## Interpretation
 
-The input lambda expression must not contain free (unbound) variables,
+The input lambda expression must not contain unbound (free) variables,
 must be evaluated [lazily](https://en.wikipedia.org/wiki/Lazy_evaluation)
 (i.e. using [call by need](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_need))
 and must evaluate to a [`command`](#command).
 
 At each step the interpreter performs an I/O operation according to the
 command and continues to the next command derived from the current one.
+
+Unbound variables can be supported by implementations e.g. for debugging
+purposes. In such cases, any restrictions are entirely implementation-specific.
 
 ### Definitions
 
@@ -125,5 +128,6 @@ require a value when the value is not important.
 
 ### Examples
 
-See example interpreters written in several programming languages in
-the [examples directory](../examples/interpreter/).
+See [example interpreters](../examples/interpreter/)
+and [example programs](../examples/walc/).
+

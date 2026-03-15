@@ -1,90 +1,42 @@
 # Lambda calculus basics
 
-See the [WALC format](./format.md).
-
 Here you can find examples of different things in λ-calculus can be done
 with a stress on how they are done in WALC.
 
-Syntactical constructs (e.g. `LET .. IN`) are similar to those in
+See the most basic definitions in the [WALC format description](./format.md).
+
+Syntactical constructs (e.g. `let .. in ..`) are similar to those in
 functional programming languages like ML, OCaml, or Haskell.
 
-## Variable definitions
+Abstractions are denoted as `x -> y`.
+Applications are denoted as `(x y)` (the parentheses are mandatory)
+and can be sugarized, i.e. `((a b) c)` can written as `(a b c)`.
+
+## Let-in
 
 ```
-LET x = some_val IN do_something<x>
+let x = something in y
 ```
 corresponds to this:
 ```
-([x do_something<x>] some_val)
+(x->y something)
 ```
 
-## If-Else
+## If-else
 
 Assuming `cond` is a `bit` and `a` and `b` are values that need to be selected
 based on the value of `a`:
 
 ```
-IF cond THEN a ELSE b
+if cond then a else b
 ```
-corresponds to this:
+corresponds to:
 ```
-((cond b) a)
+(cond b a)
 ```
 
 A `1`/true bit will select the "then" branch resulting in `a`.
 A `0`/false bit will select the "else" branch resulting in `b`.
-
-## Multiple arguments
-
-```
-LET f<x,y,z> = ...
-```
-corresponds to:
-```
-LET f = [x[y[z ...]]]
-```
-
-The lambda that gets the first argument `x` returns another lambda.
-That lambda gets the second argument `y` and returns the third one.
-The third one returns the actual value computed from `x`, `y` and `z`.
-This is called "currying".
-
-## Tuples
-
-Fast and small, tuples serve as the underlying representation of small
-data structures with just a few items (e.g. objects with fields or numbers with
-bits).
-
-```
-tuple<a, b, c>
-```
-corresponds to:
-```
-[getter (((getter a) b) c)]
-```
-
-The getter function can be either one of these three:
-* `[x0[x1[x2 x0]]]`
-* `[x0[x1[x2 x1]]]`
-* `[x0[x1[x2 x2]]]`
-
-To retrieve the needed item of the tuple, just apply a getter function to it:
-```
-(my_tuple my_getter)
-```
-
-## Lists
-
-`list<a,...>` is `optional<pair<a, list<...>>>` and is either:
-* `cons<a,...>`: `some<pair<a, ...>>`
-* `empty`: `none`
-
-Example:
-`list<a,b,c>` is `cons<a, cons<b, cons<c, empty>>>`.
-
-To get if the list has items, use `(my_list 0)`.
-To get the item, use `((my_list 1) 0)`.
-To get the tail, use `((my_list 1) 1)`.
 
 ## Recursion
 
@@ -92,59 +44,74 @@ In λ-calculus, abstractions cannot refer to themselves.
 However, that does not disallow recursion:
 
 ```
-LET f<x,y,z> =
+let f = x -> y -> z ->
     ...use f...
-IN
-    ...f<1,2,3>
+in
+    ...(f 1 2 3)...
 ```
 corresponds to:
 ```
-LET f<f,x,y,z> =
+let f = f -> x -> y -> z ->
     ...use (f f)...
-IN
-    ...f<f,1,2,3>
+in
+    ...((f f) 1 2 3)...
 ```
 
 The key is to always use the function `f` applying it to itself: `(f f)`.
 This way it can always refer to itself by its first argument.
 
-TODO Explain how this becomes simpler with the Y combinator and why we don't
-use it.
+For convenience, recursive functions can be declared with `let_rec`:
 
 ```
-LETREC f<x,y,z> =
+let_rec f = x -> y -> z ->
     ...use f...
-IN
-    ...f<1,2,3>
-```
-corresponds to:
-```
-LET f = (Y [f[x[y[z
-    ...use f...
-]]]])
-IN
-    ...(((f 1)2)3)
+in
+    ...(f 1 2 3)...
 ```
 
-## Recursive loops
+You might have heard of the Y combinator which can serve a similar purpose:
 
-The idea is to implement a loop as a recursive function.
-
-Assuming that we have `next_state<prev_state,i>`, `should_break<state>`:
 ```
-LET loop<state, i, max> =
-    IF i = max then
-        state   ; break
-    ELSE
-        loop<next_state<state,i>, i+1, max>  ; continue
+let Y = f -> (x->(f (x x)) x->(f (x x))) in
+let f = (Y
+    f -> x -> y -> z ->
+        ...use f...
+)
+in
+    ...(f 1 2 3)...
 ```
 
-To compute the loop, simply use `loop<initial_state, 0, max>`.
+However, WALC does not use it at all just because it is redundant.
 
 ## Numbers
 
-TODO
+Numbers are represented as lists of bits.
+Normal numbers are little-endian, because any arithmetics and unsigned
+comparisons can be easily done in little-endian.
+
+The only operations that require bit reversals are signed comparisons,
+some bitwise operations, and tree indexing.
 
 ## Binary trees
 
-TODO
+Example:
+
+```
+let tree = (pair (pair 0 1) (pair 2 3))
+```
+
+represents a tree:
+
+```
+  /\
+ /  \
+/\  /\
+0 1 2 3
+```
+
+The tree can be indexed with a two-bit big-endian bit sequence,
+i.e. an item at index 2 (`10` in BE binary) can be accessed with:
+```
+((tree) 1 0)
+```
+

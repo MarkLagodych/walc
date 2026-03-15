@@ -24,10 +24,10 @@ extensions, here's some notes about them:
     testing.
 * `bulk-memory-opt`: a subset of `bulk-memory-operations` that just defines the
     `memory.init` and `memory.fill` instructions.
-    These instructions are extremely interesting for benchmarking as they are
+    These instructions might be interesting for benchmarking as they are
     the fastest way to initialize/copy memory chunks.
 * `extended-const`: support for `add`, `sub` and `mul` in initializers for
-    globals and data segment offsets. The expressions are completely evaluated
+    globals and data segment offsets. The expressions are evaluated completely
     at compile time, so no additional code is generated for them.
 * `call-indirect-overlong`:
     This just enables the wasmparser's support for a slightly different encoding

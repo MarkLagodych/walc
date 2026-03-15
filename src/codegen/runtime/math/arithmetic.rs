@@ -263,14 +263,14 @@ fn divrem_helper(
     if !rt.has("_DIVREM") {
         // See the comment in `div()`, the algorithm translates to:
         //
-        // let rec _DIV(a, b, partial_result, result) =
+        // let_rec _DIV = a -> b -> partial_result -> result ->
         //     let b_le_a = a >= b in
         //     let a = if b_le_a then a - b else a in
         //     let result = if b_le_a then result + partial_result else result in
-        //     if list_head(partial_result) then
-        //         pair(result, a)
+        //     if (list_head partial_result) then
+        //         (pair result a)
         //     else
-        //         _DIV(a, tail(b), tail(partial_result), result)
+        //         (_DIV a (tail b) (tail partial_result) result)
         //
         // Note that this algorithm checks the sign of a - b rather than checking b <= a because
         // b is not of the same bit width as a, so they cannot be compared.

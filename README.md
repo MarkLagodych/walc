@@ -4,23 +4,14 @@ WALC /wɑlts/ compiles stand-alone modules in [WebAssembly 1.0](https://w3.org/T
 ([pdf](https://webassembly.github.io/spec/versions/core/WebAssembly-1.0.pdf))
 into [untyped lambda expressions](https://en.wikipedia.org/wiki/Lambda_calculus).
 
-The compiler supports [LIME1](https://github.com/WebAssembly/tool-conventions/blob/main/Lime.md)
-WebAssembly extensions, but does not support floating-point arithmetic.
-Floats are stored as integers, reinterpreting conversions between floats and
-integers are replaced with nops and any other operations are replaced with
-traps. This might be useful when you use a standard function like `printf`
-that can use floats internally, but your program never invokes it with any
-float values.
-
 The input modules are only allowed to use custom [WALC functions](./docs/wasm.md)
-for standard I/O, see [example programs](./examples/rust/)
-written in Rust.
+for standard I/O, see [example programs](./examples/rust/) written in Rust.
 
 The output lambda expressions are in [WALC format](./docs/format.md),
-which defines how the expressions should be interpreted in order to perform I/O.
-The format does not change anything about lambda calculus or how it is evaluated
-inside the interpreter, it just defines what the interpreter does with
-the evaluated result.
+which just uses square brackets instead of the lambda symbol.
+It does not introduce any impurities to lambda calculus for I/O.
+Instead, it only specifies how evaluated expressions must be further interpreted
+as I/O commands instead of just plainly printed.
 
 If you want, you can even convert WALC syntax to the standard mathematical
 notation with:
@@ -113,3 +104,30 @@ Output:
 
 Note that this particular example typically takes around 15 minutes or so
 to run.
+
+## Feature support
+
+WALC supports:
+- [WebAssembly 1.0](https://w3.org/TR/wasm-core-1/)
+    ([pdf](https://webassembly.github.io/spec/versions/core/WebAssembly-1.0.pdf))
+- [Linear Memory 1.0](https://github.com/WebAssembly/tool-conventions/blob/main/Lime.md)
+    extensions
+
+WALC does not support:
+- Dynamic type checking and bounds checking.
+
+    Only division by zero and signed division overflow are checked.
+    Other checks are ignored for efficiency, even though this is non-compliant
+    behavior.
+- Floating-point arithmetic.
+
+    Given the scope of the project, there is simply no point in implementing
+    this.
+
+    To avoid as much compilation problems as possible,
+    floats are stored as integers.
+    Reinterpreting conversions between floats and integers are replaced with
+    nops and any other operations are replaced with traps.
+    This behavior might be useful when you use a standard function like `printf`
+    that can use floats internally, but your program never invokes it with any
+    float values.
