@@ -247,19 +247,20 @@ fn prepend_zeroes(rt: &mut RuntimeGenerator, a: number::Number, zeroes: list::Li
     apply(var("PREPZ"), [a, zeroes])
 }
 
-/// Performs unsigned integer division of two numbers of the same bit width specified in `bits`.
+/// Performs unsigned integer division of two numbers of the same bit width specified in `bits`
+/// and returns a pair of (quotient, remainder).
 /// `b` must not be zero and must be shifted to the left with zeroes.
 /// `result_init` is the initial value of the result: 0 of the required bit width.
 /// `partial_result` is the initial value of the partial result: 1 of the required bit width,
 /// shifted to the left with zeroes.
-fn div_helper(
+fn divrem_helper(
     rt: &mut RuntimeGenerator,
     a: number::Number,
     b: number::Number,
     partial_result: number::Number,
     result_init: number::Number,
-) -> number::Number {
-    if !rt.has("_DIV") {
+) -> pair::Pair {
+    if !rt.has("_DIVREM") {
         // See the comment in `div()`, the algorithm translates to:
         //
         // let rec _DIV(a, b, partial_result, result) =
@@ -267,7 +268,7 @@ fn div_helper(
         //     let a = if b_le_a then a - b else a in
         //     let result = if b_le_a then result + partial_result else result in
         //     if list_head(partial_result) then
-        //         result
+        //         pair(result, a)
         //     else
         //         _DIV(a, tail(b), tail(partial_result), result)
         //
@@ -291,7 +292,7 @@ fn div_helper(
         let body = select(
             list::get_head(var("part")),
             apply(
-                rec(var("_DIV")),
+                rec(var("_DIVREM")),
                 [
                     var("a"),
                     list::get_tail(var("b")),
@@ -299,27 +300,27 @@ fn div_helper(
                     var("res"),
                 ],
             ),
-            var("res"),
+            pair::new(var("res"), var("a")),
         );
 
         let definition = abs(["a", "b", "part", "res"], defs.build_in(body));
 
-        rt.def_rec("_DIV", definition);
+        rt.def_rec("_DIVREM", definition);
     }
 
-    apply(rec(var("_DIV")), [a, b, partial_result, result_init])
+    apply(rec(var("_DIVREM")), [a, b, partial_result, result_init])
 }
 
 // Performs unsigned integer division of two numbers of the same bit width specified in `bits`.
-// The result is an optional number of the same width.
+// The result is an optional pair of two number of the same width: the quotient and the remainder.
 // If `b` is zero, the result is `None`.
-fn div(
+fn divrem(
     rt: &mut RuntimeGenerator,
     a: number::Number,
     b: number::Number,
     bits: u8,
 ) -> optional::Optional {
-    let name = format!("DIV{bits}");
+    let name = format!("DIVREM{bits}");
     if !rt.has(&name) {
         // Uses the long division algorithm.
         // See https://en.wikipedia.org/wiki/Division_algorithm#Long_division
@@ -327,7 +328,7 @@ fn div(
         // The algorithm looks like this:
         //
         // In: a, b
-        // Out: a/b
+        // Out: a/b, a%b
         // let max_shift = abs(clz(b) - clz(a)) // "CLZ" means "Count Leading Zeroes"
         // b <<= max_shift                      // implemented by prepending zeroes
         // let partial_result = 1 << max_shift  // implemented by prepending zeroes
@@ -337,7 +338,9 @@ fn div(
         //         a -= b
         //         result += partial_result
         //     }
-        //     if partial_result & 1 { return result }  // "& 1" is the same as taking list head
+        //     if partial_result & 1 {           // "& 1" is the same as taking list head
+        //         return (result, a)
+        //     }
         //     b >>= 1                           // same as taking list tail
         //     partial_result >>= 1              // same as taking list tail
         // }
@@ -360,7 +363,7 @@ fn div(
 
         let body = select(
             super::comparisons::is_zero(rt, var("b")),
-            optional::some(div_helper(rt, var("a"), b, partial_result, result_init)),
+            optional::some(divrem_helper(rt, var("a"), b, partial_result, result_init)),
             optional::none(),
         );
 
@@ -370,29 +373,80 @@ fn div(
     apply(var(name), [a, b])
 }
 
-pub fn i32_div_unsigned(
-    rt: &mut RuntimeGenerator,
-    a: number::Number,
-    b: number::Number,
-) -> optional::Optional {
-    div(rt, a, b, 32)
-}
-
-pub fn i64_div_unsigned(
-    rt: &mut RuntimeGenerator,
-    a: number::Number,
-    b: number::Number,
-) -> optional::Optional {
-    div(rt, a, b, 64)
-}
-
-fn div_signed(
+/// Divides OR computes the remainder.
+/// `op` must be one of: "DIV", "REM".
+fn div_or_rem_unsigned(
     rt: &mut RuntimeGenerator,
     a: number::Number,
     b: number::Number,
     bits: u8,
+    op: &str,
 ) -> optional::Optional {
-    let name = format!("DIVs{}", bits);
+    let name = format!("{op}{bits}");
+    if !rt.has(&name) {
+        let mut defs = LetExprBuilder::new();
+
+        defs.def("divrem", divrem(rt, var("a"), var("b"), bits));
+
+        let result = select(
+            optional::is_some(var("divrem")),
+            optional::none(),
+            optional::some(match op {
+                "DIV" => pair::get_first(optional::unwrap(var("divrem"))),
+                "REM" => pair::get_second(optional::unwrap(var("divrem"))),
+                _ => unreachable!(),
+            }),
+        );
+
+        rt.def(&name, abs(["a", "b"], defs.build_in(result)));
+    }
+
+    apply(var(name), [a, b])
+}
+
+pub fn i32_div_unsigned(
+    rt: &mut RuntimeGenerator,
+    a: number::I32,
+    b: number::I32,
+) -> optional::Optional {
+    div_or_rem_unsigned(rt, a, b, 32, "DIV")
+}
+
+pub fn i32_rem_unsigned(
+    rt: &mut RuntimeGenerator,
+    a: number::I32,
+    b: number::I32,
+) -> optional::Optional {
+    div_or_rem_unsigned(rt, a, b, 32, "REM")
+}
+
+pub fn i64_div_unsigned(
+    rt: &mut RuntimeGenerator,
+    a: number::I64,
+    b: number::I64,
+) -> optional::Optional {
+    div_or_rem_unsigned(rt, a, b, 64, "DIV")
+}
+
+pub fn i64_rem_unsigned(
+    rt: &mut RuntimeGenerator,
+    a: number::I64,
+    b: number::I64,
+) -> optional::Optional {
+    div_or_rem_unsigned(rt, a, b, 64, "REM")
+}
+
+/// Does signed division with remainder.
+/// Returns a pair of two optional numbers: the quotient and the remainder.
+/// This is because signed division can fail due to the result being out of range, but it will still
+/// have a representable remainder.
+fn divrem_signed(
+    rt: &mut RuntimeGenerator,
+    a: number::Number,
+    b: number::Number,
+    bits: u8,
+) -> pair::Pair {
+    let name = format!("DIVREMs{}", bits);
 
     if !rt.has(&name) {
         let mut defs = LetExprBuilder::new();
@@ -400,6 +454,12 @@ fn div_signed(
         let smallest_signed = match bits {
             32 => rt.num.i32_const(i32::MIN as u32),
             64 => rt.num.i64_const(i64::MIN as u64),
+            _ => unreachable!(),
+        };
+
+        let zero = match bits {
+            32 => rt.num.i32_const(0),
+            64 => rt.num.i64_const(0),
             _ => unreachable!(),
         };
 
@@ -424,20 +484,34 @@ fn div_signed(
         defs.def("a", select(var("a_neg"), var("a"), negate(rt, var("a"))));
         defs.def("b", select(var("b_neg"), var("b"), negate(rt, var("b"))));
 
-        defs.def("res", div(rt, var("a"), var("b"), bits));
+        defs.def("divrem", divrem(rt, var("a"), var("b"), bits));
+
+        let quotient = pair::get_first(optional::unwrap(var("divrem")));
+        let remainder = pair::get_second(optional::unwrap(var("divrem")));
+
+        let successful_result = pair::new(
+            select(
+                bit_xor(var("a_neg"), var("b_neg")),
+                quotient.clone(),
+                select(
+                    optional::is_some(quotient.clone()),
+                    optional::none(),
+                    optional::some(negate(rt, quotient)),
+                ),
+            ),
+            select(var("a_neg"), remainder.clone(), negate(rt, remainder)),
+        );
+
+        let checked_result = select(
+            optional::is_some(var("divrem")),
+            pair::new(optional::none(), optional::none()),
+            successful_result,
+        );
 
         let body = select(
             var("range_error"),
-            select(
-                bit_xor(var("a_neg"), var("b_neg")),
-                var("res"),
-                select(
-                    optional::is_some(var("res")),
-                    optional::none(),
-                    optional::some(negate(rt, optional::unwrap(var("res")))),
-                ),
-            ),
-            optional::none(),
+            checked_result,
+            pair::new(optional::none(), optional::some(zero)),
         );
 
         let definition = abs(["a", "b"], defs.build_in(body));
@@ -450,16 +524,32 @@ fn div_signed(
 
 pub fn i32_div_signed(
     rt: &mut RuntimeGenerator,
-    a: number::Number,
-    b: number::Number,
+    a: number::I32,
+    b: number::I32,
 ) -> optional::Optional {
-    div_signed(rt, a, b, 32)
+    pair::get_first(divrem_signed(rt, a, b, 32))
+}
+
+pub fn i32_rem_signed(
+    rt: &mut RuntimeGenerator,
+    a: number::I32,
+    b: number::I32,
+) -> optional::Optional {
+    pair::get_second(divrem_signed(rt, a, b, 32))
 }
 
 pub fn i64_div_signed(
     rt: &mut RuntimeGenerator,
-    a: number::Number,
-    b: number::Number,
+    a: number::I64,
+    b: number::I64,
 ) -> optional::Optional {
-    div_signed(rt, a, b, 64)
+    pair::get_first(divrem_signed(rt, a, b, 64))
+}
+
+pub fn i64_rem_signed(
+    rt: &mut RuntimeGenerator,
+    a: number::I64,
+    b: number::I64,
+) -> optional::Optional {
+    pair::get_second(divrem_signed(rt, a, b, 64))
 }

@@ -151,6 +151,12 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         I64DivU => numeric::i64_div_u(rt),
         I64DivS => numeric::i64_div_s(rt),
 
+        I32RemU => numeric::i32_rem_u(rt),
+        I32RemS => numeric::i32_rem_s(rt),
+
+        I64RemU => numeric::i64_rem_u(rt),
+        I64RemS => numeric::i64_rem_s(rt),
+
         // TODO
         _ => todo!(),
     }

@@ -16,6 +16,7 @@ bin/comparisons.wasm \
 bin/add-sub.wasm \
 bin/mul.wasm \
 bin/div.wasm \
+bin/rem.wasm \
 bin/bitwise.wasm \
 bin/shift.wasm \
 bin/rotations.wasm \

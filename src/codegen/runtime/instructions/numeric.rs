@@ -204,11 +204,16 @@ fn binop_trapping(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
                 match op {
                     "DivU32" => math::i32_div_unsigned(rt, var("a"), var("b")),
                     "DivS32" => math::i32_div_signed(rt, var("a"), var("b")),
+
                     "DivU64" => math::i64_div_unsigned(rt, var("a"), var("b")),
                     "DivS64" => math::i64_div_signed(rt, var("a"), var("b")),
-                    // TODO
-                    // "RemU" => math::rem_unsigned(rt, var("a"), var("b")),
-                    // "RemS" => math::rem_signed(rt, var("a"), var("b")),
+
+                    "RemU32" => math::i32_rem_unsigned(rt, var("a"), var("b")),
+                    "RemS32" => math::i32_rem_signed(rt, var("a"), var("b")),
+
+                    "RemU64" => math::i64_rem_unsigned(rt, var("a"), var("b")),
+                    "RemS64" => math::i64_rem_signed(rt, var("a"), var("b")),
+
                     _ => unreachable!(),
                 },
             );
@@ -236,6 +241,22 @@ pub fn i64_div_u(rt: &mut RuntimeGenerator) -> Instruction {
 
 pub fn i64_div_s(rt: &mut RuntimeGenerator) -> Instruction {
     binop_trapping(rt, "DivS64")
+}
+
+pub fn i32_rem_u(rt: &mut RuntimeGenerator) -> Instruction {
+    binop_trapping(rt, "RemU32")
+}
+
+pub fn i32_rem_s(rt: &mut RuntimeGenerator) -> Instruction {
+    binop_trapping(rt, "RemS32")
+}
+
+pub fn i64_rem_u(rt: &mut RuntimeGenerator) -> Instruction {
+    binop_trapping(rt, "RemU64")
+}
+
+pub fn i64_rem_s(rt: &mut RuntimeGenerator) -> Instruction {
+    binop_trapping(rt, "RemS64")
 }
 
 /// `op` is "Eq", "Ne", "LtU", "LeU", "GtU", "GeU", "LtS", "LeS", "GtS", or "GeS".
