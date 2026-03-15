@@ -3,9 +3,15 @@ name = "walc-wasm-examples"
 version = "0.1.0"
 edition = "2024"
 
+[profile.dev]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
 [profile.release]
 strip = "debuginfo"
 lto = "fat"
+codegen-units = 1
 
 # Memory allocator
 [dependencies.talc]

@@ -86,6 +86,24 @@ pub fn read_line() -> String {
     String::from_utf8(buffer).expect("Invalid UTF-8 input")
 }
 
+pub fn print_u32(mut n: u32) {
+    let mut buffer = [0u8; 10];
+    let mut i = 0;
+
+    loop {
+        buffer[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+        i += 1;
+        if n == 0 {
+            break;
+        }
+    }
+
+    for j in (0..i).rev() {
+        print_byte(buffer[j]);
+    }
+}
+
 macro_rules! print {
     ($($arg:tt)*) => ({
         let s = format!($($arg)*);
@@ -123,14 +141,20 @@ fn main() {
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    print_string("\n-=- -=- -=- FATAL ERROR -=- -=- -=-\n");
+    print_string("\n!!!FATAL ERROR!!!\n");
 
     if let Some(location) = info.location() {
-        println!("Location: {}:{}\n", location.file(), location.line());
+        print_string("Location: ");
+        print_string(location.file());
+        print_string(":");
+        print_u32(location.line());
+        print_string("\n");
     }
 
     if let Some(msg) = info.message().as_str() {
-        println!("Message: {}\n", msg);
+        print_string("Message: ");
+        print_string(msg);
+        print_string("\n");
     }
 
     exit()

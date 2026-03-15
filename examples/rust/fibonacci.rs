@@ -6,8 +6,9 @@ use walc::*;
 pub fn main() {
     let mut a = 0;
     let mut b = 1;
-    for _ in 0..100 {
+    for _ in 0..30 {
         print!("{a} ");
         (a, b) = (b, a + b);
     }
+    print!("\n");
 }

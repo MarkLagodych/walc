@@ -239,9 +239,12 @@ pub fn entrypoint(
     rt: &mut RuntimeGenerator,
     main_id: FuncId,
     start_id: Option<FuncId>,
+    memory_initial_size: u32,
     data_memory_offsets: impl Iterator<Item = number::I32>,
 ) -> io_command::IoCommand {
     let mut code = code::CodeBuilder::new();
+
+    code.push(runtime::instructions::memory::init_size(rt, memory_initial_size));
 
     for (data_id, target_offset) in data_memory_offsets.enumerate() {
         code.push(runtime::instructions::memory::init_with_data(

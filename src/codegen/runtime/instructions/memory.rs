@@ -3,18 +3,41 @@ use super::*;
 // Avoid shadowing of codegen::memory by this module
 use crate::codegen::memory;
 
-/// WALC memory size is 2^32 bytes and WASM memory page size is 2^16 bytes,
-/// so there are 2^16 pages.
-const MEMORY_SIZE_IN_PAGES: u32 = 1 << 16;
+/// Defines the ID of the global that stores the current memory size.
+///
+/// Even though the real size of the memory is always 4 GiB, WASM requires the interpreter
+/// to respect the initial size and growth deltas provided by the program and track the current
+/// memory size. Doing otherwise makes existing memory allocators confused.
+const CURRENT_MEMORY_SIZE_GLOBAL_ID: u16 = u16::MAX;
+
+pub fn init_size(rt: &mut RuntimeGenerator, initial_size: u32) -> Instruction {
+    if !rt.has("MemInitSize") {
+        let body = {
+            let mem_size_id = rt.num.id_const(CURRENT_MEMORY_SIZE_GLOBAL_ID);
+
+            let mut b = InstructionBuilder::new();
+            b.set_global(mem_size_id, var("init"));
+            b.build()
+        };
+
+        rt.def("MemInitSize", abs(["init"], body));
+    }
+
+    apply(var("MemInitSize"), [rt.num.i32_const(initial_size)])
+}
 
 pub fn size(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("MemSize") {
-        let memory_size = rt.num.i32_const(MEMORY_SIZE_IN_PAGES);
-        rt.def("MemSize", {
+        let body = {
+            let mem_size_id = rt.num.id_const(CURRENT_MEMORY_SIZE_GLOBAL_ID);
+
             let mut b = InstructionBuilder::new();
-            b.push([memory_size]);
+            b.get_global("cur_mem_size", mem_size_id);
+            b.push([var("cur_mem_size")]);
             b.build()
-        });
+        };
+
+        rt.def("MemSize", body);
     }
 
     var("MemSize")
@@ -22,13 +45,19 @@ pub fn size(rt: &mut RuntimeGenerator) -> Instruction {
 
 pub fn grow(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("MemGrow") {
-        let memory_size = rt.num.i32_const(MEMORY_SIZE_IN_PAGES);
-        rt.def("MemGrow", {
+        let body = {
+            let mem_size_id = rt.num.id_const(CURRENT_MEMORY_SIZE_GLOBAL_ID);
+
             let mut b = InstructionBuilder::new();
             b.pop(["ngrow"]);
-            b.push([memory_size]);
+            b.get_global("cur_mem_size", mem_size_id.clone());
+            b.push([var("cur_mem_size")]);
+            let new_size = math::add(rt, var("cur_mem_size"), var("ngrow"));
+            b.set_global(mem_size_id, new_size);
             b.build()
-        });
+        };
+
+        rt.def("MemGrow", body);
     }
 
     var("MemGrow")
@@ -170,7 +199,7 @@ pub fn copy(rt: &mut RuntimeGenerator) -> Instruction {
 /// Args:
 /// * `target_bits`: 32 or 64
 /// * `source_bits`: 8, 16, 32, or 64. Must be <= `target_bits`.
-pub fn load(
+fn load(
     rt: &mut RuntimeGenerator,
     memory_offset: u32,
     target_bits: u8,
@@ -234,13 +263,61 @@ pub fn load(
     apply(var(name), [offset])
 }
 
+pub fn i32_load8_u(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 32, 8, false)
+}
+
+pub fn i32_load8_s(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 32, 8, true)
+}
+
+pub fn i32_load16_u(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 32, 16, false)
+}
+
+pub fn i32_load16_s(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 32, 16, true)
+}
+
+pub fn i32_load(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 32, 32, false)
+}
+
+pub fn i64_load8_u(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 64, 8, false)
+}
+
+pub fn i64_load8_s(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 64, 8, true)
+}
+
+pub fn i64_load16_u(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 64, 16, false)
+}
+
+pub fn i64_load16_s(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 64, 16, true)
+}
+
+pub fn i64_load32_u(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 64, 32, false)
+}
+
+pub fn i64_load32_s(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 64, 32, true)
+}
+
+pub fn i64_load(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    load(rt, memory_offset, 64, 64, false)
+}
+
 /// Generates all `store` instructions: `i(32|64).store[(8|16|32)]`, e.g.
 /// `i32.store`, `i64.store32`.
 ///
 /// Args:
 /// * `source_bits`: 32 or 64
 /// * `target_bits`: 8, 16, 32, or 64. Must be <= `source_bits`.
-pub fn store(
+fn store(
     rt: &mut RuntimeGenerator,
     memory_offset: u32,
     source_bits: u8,
@@ -290,4 +367,32 @@ pub fn store(
 
     let offset = rt.num.i32_const(memory_offset);
     apply(var(name), [offset])
+}
+
+pub fn i32_store8(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    store(rt, memory_offset, 32, 8)
+}
+
+pub fn i32_store16(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    store(rt, memory_offset, 32, 16)
+}
+
+pub fn i32_store(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    store(rt, memory_offset, 32, 32)
+}
+
+pub fn i64_store8(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    store(rt, memory_offset, 64, 8)
+}
+
+pub fn i64_store16(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    store(rt, memory_offset, 64, 16)
+}
+
+pub fn i64_store32(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    store(rt, memory_offset, 64, 32)
+}
+
+pub fn i64_store(rt: &mut RuntimeGenerator, memory_offset: u32) -> Instruction {
+    store(rt, memory_offset, 64, 64)
 }

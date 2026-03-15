@@ -19,6 +19,8 @@ pub struct ProgramBuilder<'a> {
     /// they may be used to compute data segment offsets
     globals: Vec<Operator<'a>>,
 
+    memory_initial_size: u32,
+
     data_segments: Vec<list::List>,
     data_memory_offsets: Vec<number::I32>,
 
@@ -38,6 +40,7 @@ impl<'a> ProgramBuilder<'a> {
             &mut self.runtime,
             self.main_id.unwrap(), // The analyzer must ensure that `main` exists
             self.start_id,
+            self.memory_initial_size,
             self.data_memory_offsets.into_iter(),
         );
 
@@ -92,6 +95,10 @@ impl<'a> ProgramBuilder<'a> {
 
     pub fn handle_start(&mut self, id: FuncId) {
         self.start_id = Some(id);
+    }
+
+    pub fn handle_memory(&mut self, initial_size: u32) {
+        self.memory_initial_size = initial_size;
     }
 
     pub fn handle_global(&mut self, init_expr: &[Operator<'a>]) {

@@ -86,11 +86,7 @@ impl<'a> Analyzer<'a> {
             Payload::ElementSection(section) => self.handle_elements(section)?,
             Payload::CodeSectionEntry(function) => self.handle_function(function)?,
             Payload::DataSection(section) => self.handle_data(section)?,
-
-            // Memory section is ignored because WASM 1.0 modules can only have one memory
-            // and its size properties are irrelevant for WALC because its memory
-            // is lazy and always has a virtual size of 4 GiB.
-            Payload::MemorySection(_section) => {}
+            Payload::MemorySection(section) => self.handle_memory(section)?,
 
             // Other sections are checked by the validator
             _ => {}
@@ -344,6 +340,16 @@ impl<'a> Analyzer<'a> {
             }
 
             // Other element kinds do not exist in WASM 1.0
+        }
+
+        Ok(())
+    }
+
+    fn handle_memory(&mut self, section: MemorySectionReader) -> Result<()> {
+        for memory in section {
+            let memory = memory?;
+
+            self.program.handle_memory(memory.initial as u32);
         }
 
         Ok(())

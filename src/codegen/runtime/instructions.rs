@@ -56,33 +56,33 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         MemoryFill { .. } => memory::fill(rt),
         MemoryCopy { .. } => memory::copy(rt),
 
-        I32Load { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 32, false),
-        I64Load { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 64, false),
+        I32Load { memarg, .. } => memory::i32_load(rt, memarg.offset as u32),
+        I64Load { memarg, .. } => memory::i64_load(rt, memarg.offset as u32),
 
-        I32Load8U { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 8, false),
-        I32Load8S { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 8, true),
+        I32Load8U { memarg, .. } => memory::i32_load8_u(rt, memarg.offset as u32),
+        I32Load8S { memarg, .. } => memory::i32_load8_s(rt, memarg.offset as u32),
 
-        I32Load16U { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 16, false),
-        I32Load16S { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 16, true),
+        I32Load16U { memarg, .. } => memory::i32_load16_u(rt, memarg.offset as u32),
+        I32Load16S { memarg, .. } => memory::i32_load16_s(rt, memarg.offset as u32),
 
-        I64Load8U { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 8, false),
-        I64Load8S { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 8, true),
+        I64Load8U { memarg, .. } => memory::i64_load8_u(rt, memarg.offset as u32),
+        I64Load8S { memarg, .. } => memory::i64_load8_s(rt, memarg.offset as u32),
 
-        I64Load16U { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 16, false),
-        I64Load16S { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 16, true),
+        I64Load16U { memarg, .. } => memory::i64_load16_u(rt, memarg.offset as u32),
+        I64Load16S { memarg, .. } => memory::i64_load16_s(rt, memarg.offset as u32),
 
-        I64Load32U { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 32, false),
-        I64Load32S { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 32, true),
+        I64Load32U { memarg, .. } => memory::i64_load32_u(rt, memarg.offset as u32),
+        I64Load32S { memarg, .. } => memory::i64_load32_s(rt, memarg.offset as u32),
 
-        I32Store { memarg, .. } => memory::store(rt, memarg.offset as u32, 32, 32),
-        I64Store { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 64),
+        I32Store { memarg, .. } => memory::i32_store(rt, memarg.offset as u32),
+        I64Store { memarg, .. } => memory::i64_store(rt, memarg.offset as u32),
 
-        I32Store8 { memarg, .. } => memory::store(rt, memarg.offset as u32, 32, 8),
-        I32Store16 { memarg, .. } => memory::store(rt, memarg.offset as u32, 32, 16),
+        I32Store8 { memarg, .. } => memory::i32_store8(rt, memarg.offset as u32),
+        I32Store16 { memarg, .. } => memory::i32_store16(rt, memarg.offset as u32),
 
-        I64Store8 { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 8),
-        I64Store16 { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 16),
-        I64Store32 { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 32),
+        I64Store8 { memarg, .. } => memory::i64_store8(rt, memarg.offset as u32),
+        I64Store16 { memarg, .. } => memory::i64_store16(rt, memarg.offset as u32),
+        I64Store32 { memarg, .. } => memory::i64_store32(rt, memarg.offset as u32),
 
         // ==================================================================================
         // Integer instructions
@@ -165,11 +165,11 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         // replaced with traps.
         F32Const { .. } | F64Const { .. } => numeric::push_const(rt, op),
 
-        F32Load { memarg, .. } => memory::load(rt, memarg.offset as u32, 32, 32, false),
-        F64Load { memarg, .. } => memory::load(rt, memarg.offset as u32, 64, 64, false),
+        F32Load { memarg, .. } => memory::i32_load(rt, memarg.offset as u32),
+        F64Load { memarg, .. } => memory::i64_load(rt, memarg.offset as u32),
 
-        F32Store { memarg, .. } => memory::store(rt, memarg.offset as u32, 32, 32),
-        F64Store { memarg, .. } => memory::store(rt, memarg.offset as u32, 64, 64),
+        F32Store { memarg, .. } => memory::i32_store(rt, memarg.offset as u32),
+        F64Store { memarg, .. } => memory::i64_store(rt, memarg.offset as u32),
 
         F32ReinterpretI32 => instruction::nop(),
         F64ReinterpretI64 => instruction::nop(),

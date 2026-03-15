@@ -258,12 +258,10 @@ impl InstructionBuilder {
 
     pub fn push_locals_frame(&mut self, locals: table::Table) {
         self.set_locals(locals::push_frame(self.locals(), locals));
-        self.set_stack(data_stack::push_frame(self.stack()));
     }
 
     pub fn drop_locals_frame(&mut self) {
         self.set_locals(locals::pop_frame(self.locals()));
-        self.set_stack(data_stack::pop_frame(self.stack()));
     }
 
     pub fn push_stack_frame(&mut self) {
