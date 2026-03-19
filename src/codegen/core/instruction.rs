@@ -1,7 +1,7 @@
 use super::*;
 
 /// An instruction is a function of `(N, F, M, G, L, S, T) -> IoCommand` where:
-/// - `N` is the next code segment (or `unreachable` is this is the last instruction in a function).
+/// - `N` is the next code segment (or `unreachable` if this is the last instruction in a function).
 ///   See [`code::Code`].
 /// - `F` is a pair of the global function table and the user-defined table for indirect calls
 /// - `M` is the memory. See [`memory::Memory`].
@@ -9,8 +9,8 @@ use super::*;
 /// - `L` is the stack of local variable tables. See [`locals::Locals`].
 /// - `S` is the data stack. See [`data_stack::DataStack`].
 /// - `T` is the trace (i.e. control flow stack).
-///   This is only used for jumps directed backwards (`loop`) and function calls.
 ///   This is a normal stack (see [`stack::Stack`]) that stores code segments where to return to.
+///   This is only used for jumps directed backwards (`loop`) and function calls.
 ///
 /// See also [`io_command::IoCommand`].
 ///

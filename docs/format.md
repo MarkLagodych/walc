@@ -5,28 +5,31 @@ This is the text format used by WALC and the interpreters.
 ## Syntax
 
 The only special part is that this format uses `[]` for abstractions instead of
-`λ` or `\`.
-That is simpler to parse and easier to debug.
+`λ` or `\`. This makes it is easier to read the generated code and figure out
+where each subexpression starts and ends.
 
 Also, `;` comments are compatible with virtually any Lisp syntax highlighting
 in code editors.
 
+The whole grammar is:
+
 ```ebnf
-whitespace = ' ' | TAB | VT | FF | CR | LF ;
-comment = ';' (~LF)* LF ;
+term = variable | abstraction | application ;
 variable = ('a'-'z' | 'A'-'Z' | '0'-'9' | '_')+ ;
 abstraction = '[' variable term ']' ;
 application = '(' term term ')' ;
-term = variable | abstraction | application ;
+
+whitespace = ' ' | Tab | VarticalTab | FormFeed | CarriageReturn | LineFeed ;
+comment = ';' (~LineFeed)* LineFeed ;
 ```
 
 ### Examples
 
-```
+```lisp
 ; Comment
-abc _hello_ 123 ; Variables
-[x y]           ; Abstraction: λx. y
-(f x)           ; Application: f x
+abc_def 12hello ; Variables
+[x y]           ; Abstraction: (λx. y)
+(f x)           ; Application: (f x)
 
 ; Y combinator:
 [f ( [x (f (x x))] [x (f (x x))] ) ]
@@ -37,7 +40,7 @@ abc _hello_ 123 ; Variables
 
 See more examples in the [examples directory](../examples/walc/).
 
-## Interpretation
+## Semantics
 
 The input lambda expression must not contain unbound (free) variables,
 must be evaluated [lazily](https://en.wikipedia.org/wiki/Lazy_evaluation)

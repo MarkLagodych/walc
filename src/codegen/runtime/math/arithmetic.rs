@@ -1,3 +1,5 @@
+//! Implements addition, negation, subtraction, multiplication, division and remainder (modulo).
+
 use super::*;
 
 /// `b` must not be shorter than `a`.

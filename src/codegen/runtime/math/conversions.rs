@@ -1,3 +1,6 @@
+//! Implements integer wrapping (truncation) and extension (widening) between integers, and
+//! also conversions between integers and bytes or IDs.
+
 use super::*;
 
 /// Chops the number into parts using the template and returns a big-endian list of the

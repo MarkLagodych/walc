@@ -1,3 +1,5 @@
+//! Contains all basic data structures and functions that are used by all other modules.
+
 pub mod instruction;
 
 pub mod code;
@@ -93,6 +95,7 @@ pub fn select(condition: Bit, branch0: Expr, branch1: Expr) -> Expr {
     apply(condition, [branch0, branch1])
 }
 
+/// This is a dummy value that is inserted where a value is required but will be discarded.
 pub fn unreachable() -> Expr {
     if cfg!(feature = "unbound-unreachable") {
         static mut NEXT_ID: u32 = 0;
@@ -203,7 +206,7 @@ pub mod io_command {
         optional::none()
     }
 
-    pub fn output(out_byte: number::Byte, next: Expr) -> IoCommand {
+    pub fn output(out_byte: number::Byte, next: IoCommand) -> IoCommand {
         optional::some(either::first(pair::new(out_byte, next)))
     }
 

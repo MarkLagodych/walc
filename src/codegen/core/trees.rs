@@ -1,10 +1,24 @@
-//! Trees are lazy. Every subtree that is not initialized is represented by a dummy tree.
-//! All dummy trees are implicitly initialized with the null byte.
-//! This is because the only place where the default item matters is the main memory, which is
-//! zero-initialized in WASM.
-
 use super::*;
 
+/// For simplicity and efficient memory usage, untouched subtrees are initialized with dummies.
+/// Example of a 5-bit tree (max. 32 values) with 5 items:
+/// ```text
+///
+///  A B C D E (dummy tree with depth 0, 1 dummy item)
+///  \/  \/  \/  (dummy tree with depth 1, 2 dummy items)
+///   \  /    \ /
+///    \/     |/   <- these nodes have level 2
+///     \    /
+///      \  /
+///       \/ (dummy tree with depth 3, 8 dummy items)
+///        \/ (dummy tree with depth 4, 16 dummy items)
+///         \/
+///        Tree
+/// ```
+///
+/// All leaves of dummy trees are implicitly initialized with the null byte.
+/// This is because the only place where the default item matters is the main memory, which is
+/// zero-initialized in WASM.
 pub mod tree {
     use super::*;
 

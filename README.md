@@ -1,17 +1,14 @@
 # WebAssembly to Lambda Calculus compiler
 
-WALC /wɑlts/ compiles stand-alone modules in [WebAssembly 1.0](https://w3.org/TR/wasm-core-1/)
-([pdf](https://webassembly.github.io/spec/versions/core/WebAssembly-1.0.pdf))
-into [untyped lambda expressions](https://en.wikipedia.org/wiki/Lambda_calculus).
+WALC /wɑlts/ compiles stand-alone modules in [WebAssembly](https://webassembly.org/)
+into pure [untyped lambda expressions](https://en.wikipedia.org/wiki/Lambda_calculus).
 
 The input modules are only allowed to use custom [WALC functions](./docs/wasm.md)
-for standard I/O, see [example programs](./examples/rust/) written in Rust.
+to input a byte, output a byte, and exit, see [example programs](./examples/rust/)
+written in Rust.
 
-The output lambda expressions are in [WALC format](./docs/format.md),
+The output lambda expressions are in human-readable [WALC format](./docs/format.md),
 which just uses square brackets instead of the lambda symbol.
-It does not introduce any impurities to lambda calculus for I/O.
-Instead, it only specifies how evaluated expressions must be further interpreted
-as I/O commands instead of just plainly printed.
 
 If you want, you can even convert WALC syntax to the standard mathematical
 notation with:
@@ -22,9 +19,15 @@ cat INPUT.walc | sed -r 's/\[([_0-9a-zA-Z]+)/(λ\1./g ; s/]/)/g'
 # Example output: (λf. ((λx. (f (x x))) (λx. (f (x x)))))
 ```
 
-You can run some [example expressions](./examples/walc/) written by hand
-with an [example interpreter](./examples/interpreter/) available in Lua and
-TypeScript:
+All lambda calculus semantics and purity is preserved.
+In order to perform I/O, the interpreter decodes the program as an I/O command,
+executes the command, supplies encoded user input if needed, and repeats again.
+
+See [example interpreters](./examples/interpreter/) written in Lua and
+TypeScript in under 300 LOC that are optimized for running lambda calculus
+for a long time without speed and memory usage degradation.
+
+You can run some [example lambda expressions](./examples/walc/) with:
 ```sh
 examples/interpreter/lambda.ts examples/walc/hello.walc
 ```
@@ -103,7 +106,7 @@ Output:
 ```
 
 Note that this particular example typically takes around 15 minutes or so
-to run.
+to run, however, it does not require much memory.
 
 ## Feature support
 

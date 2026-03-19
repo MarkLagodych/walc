@@ -12,7 +12,7 @@ use super::*;
 /// The definitions obey the dependency order as a result of the on-demand generation.
 /// E.g. if you call `math::sub()` that requires `math::add()` internally, the addition operation
 /// will be generated prior to substraction.
-/// In code this looks like this:
+/// In code it looks like this:
 /// ```
 /// fn sub(rt: &mut RuntimeGenerator, a: Expr, b: Expr) -> Expr {
 ///     if !rt.has("SUB") {
@@ -30,6 +30,7 @@ use super::*;
 ///
 /// fn add(rt: &mut RuntimeGenerator, a: Expr, b: Expr) -> Expr {
 ///     if !rt.has("ADD") {
+///         ...
 ///         rt.def("ADD", ...);
 ///     }
 ///     apply("ADD", [a, b])
@@ -48,19 +49,24 @@ impl RuntimeGenerator {
         self.already_defined.contains(definition_name)
     }
 
-    /// Before defining a new utility, first check if it has already been defined with [`Self::has`]
+    /// Before defining a new utility (or a set of utilities), first check if it has already
+    /// been defined with [`Self::has`].
     fn def(&mut self, name: impl ToString, value: Expr) {
         self.already_defined.insert(name.to_string());
         self.defs.push((name.to_string(), value));
     }
 
     /// Same as [`Self::def`] but for recursive definitions.
+    ///
+    /// Before defining a new utility (or a set of utilities), first check if it has already
+    /// been defined with [`Self::has`].
     fn def_rec(&mut self, name: impl ToString, value: Expr) {
         let value = abs([name.to_string()], value);
         self.already_defined.insert(name.to_string());
         self.defs.push((name.to_string(), value));
     }
 
+    /// Generates variable definitions into the given `let..in` expression builder.
     pub fn generate(self, b: &mut LetExprBuilder) {
         self.num.generate(b);
 

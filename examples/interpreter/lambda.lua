@@ -154,8 +154,8 @@ local function run(closure, recursion_depth)
 end
 
 -- The text in the variable name ensures that it cannot be defined by the
--- program. It is wrapped in a function to prevent it from being preemptively
--- computed by the interpreter.
+-- program. It is wrapped in an abstraction to prevent it from being
+-- preemptively computed by the interpreter.
 local unreachable = Abs("〜⁠(⁠꒪⁠꒳⁠꒪⁠)⁠〜", Var("unreachable (⊙＿⊙')"))
 
 local bit0 = parse("[x0[x1 x0]]")

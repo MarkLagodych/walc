@@ -12,16 +12,16 @@
 //!   This is necessary when loading from the memory and also makes the code for numeric constants
 //!   smaller.
 //!   However, any process of converting between a little-endian number and its parts (e.g. bytes)
-//!   reverses the bits (see the implementation of this module or
-//!   [`crate::codegen::util::UtilGenerator::num_chop`]),
-//!   thus it is more efficient to store bytes as **big-endian**.
+//!   reverses the bits (see the implementation of this module or `chop()` in
+//!   `runtime/math/conversions.rs`),
+//!   thus it is more efficient to store bytes as BE.
 //!
 //! * `Id`s are **big-endian** lists of 16 bits.
 //!   The only operation performed on these is table indexing, which is done in **big endian**.
 //!
 //!   Also, the conversion from little-endian `I32` to `Id` (used in the `call_indirect`
 //!   instruction) directly gives a big-endian number
-//!   (see [`crate::codegen::util::UtilGenerator::num_chop`]).
+//!   (see the chop function in `runtime/math/conversions.rs`).
 //!
 //! # Construction of numbers
 //!

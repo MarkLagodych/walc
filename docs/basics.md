@@ -1,9 +1,9 @@
 # Lambda calculus basics
 
-Here you can find examples of different things in λ-calculus can be done
-with a stress on how they are done in WALC.
+Here are just a few short notes about how the most basic things are implemented
+in WALC. The notation here is also used in the source code comments.
 
-See the most basic definitions in the [WALC format description](./format.md).
+See the foundational definitions in the [WALC format description](./format.md).
 
 Syntactical constructs (e.g. `let .. in ..`) are similar to those in
 functional programming languages like ML, OCaml, or Haskell.
@@ -41,7 +41,7 @@ A `0`/false bit will select the "else" branch resulting in `b`.
 ## Recursion
 
 In λ-calculus, abstractions cannot refer to themselves.
-However, that does not disallow recursion:
+However, that does not mean that recursion is impossible:
 
 ```
 let f = x -> y -> z ->
@@ -60,7 +60,7 @@ in
 The key is to always use the function `f` applying it to itself: `(f f)`.
 This way it can always refer to itself by its first argument.
 
-For convenience, recursive functions can be declared with `let_rec`:
+For convenience, recursive functions are declared with `let_rec`:
 
 ```
 let_rec f = x -> y -> z ->
@@ -81,16 +81,8 @@ in
     ...(f 1 2 3)...
 ```
 
-However, WALC does not use it at all just because it is redundant.
-
-## Numbers
-
-Numbers are represented as lists of bits.
-Normal numbers are little-endian, because any arithmetics and unsigned
-comparisons can be easily done in little-endian.
-
-The only operations that require bit reversals are signed comparisons,
-some bitwise operations, and tree indexing.
+However, WALC does not use it at all because of the redundant evaluation steps
+that it introduces.
 
 ## Binary trees
 

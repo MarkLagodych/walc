@@ -1,3 +1,6 @@
+//! Implements bitwise AND, OR, XOR, and NOT, shifts, rotations, counting leading/trailing
+//! zeroes and counting ones.
+
 use super::*;
 
 /// Applies bit NOT to every bit

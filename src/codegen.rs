@@ -1,4 +1,4 @@
-//! WALC code generator
+//! Generates code for the whole program by assembling data/code/table/global segments
 
 mod core;
 pub use core::*;

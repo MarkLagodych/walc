@@ -1,13 +1,36 @@
 # WALC design
 
-This document describes how WebAssembly is translated into lambda calculus.
+The best way to learn how WebAssembly is translated to lambda calculus is the
+source, all essential algorithms are documented and all output code is generated
+with human-readable Rust code.
 
-TODO
+Lambda expressions are most often generated directly, without any intermediate
+representation. Some data or control flow structures require unintuitive
+shenanigans, e.g. `let VAR1 = VAL1 in let VAR2 = VAL2 in BODY` requires
+generating the code in reverse: first the `let VAR2 = VAL2 in BODY` statement
+and then `let VAR1 = VAL1 in ...`. In those cases,
+[builder](https://refactoring.guru/design-patterns/builder/rust/example)
+objects are used.
 
-For now, the best place to learn about this is the source:
-[1](../src/codegen/core/instruction.rs),
-[2](../src/codegen/core/code.rs),
-[3](../src/codegen/runtime/).
+It is important to keep the resulting code as small as possible because after
+all, no debugging is available other than just reading the code yourself.
+This is exactly why square brackets where chosen instead of lambdas or other
+characters -- it is just easier to go through the code and manually insert
+spaces and line breaks where needed.
+
+WALC extracts all numbers and all operation definitions into global variables,
+so that only several definitions are used thoughout the whole file.
+That is achieved by using generator objects -- objects that accumulate all
+the required definitions and then, given a `let..in` expression builder,
+add definitions to it. This also helps insure that the definitions have the
+correct order. Numbers are ordered by values because in such a way it is easier
+to see what constants the program uses and to check if all constants are
+generated correctly. Maths and simple WASM instructions are generated in their
+dependency order.
+
+You can see how instructions work [here](../src/codegen/core/instruction.rs),
+how they are joined into instruction chains [here](../src/codegen/core/code.rs),
+and how all the algorithms are implemented [here](../src/codegen/runtime/).
 
 ## Supported extensions
 
