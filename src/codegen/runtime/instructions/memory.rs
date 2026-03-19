@@ -121,7 +121,7 @@ pub fn fill(rt: &mut RuntimeGenerator) -> Instruction {
             )
         });
 
-        rt.def("_MemFill", body);
+        rt.def_rec("_MemFill", body);
 
         let body = {
             let mut b = InstructionBuilder::new();
@@ -169,7 +169,7 @@ pub fn copy(rt: &mut RuntimeGenerator) -> Instruction {
             )
         });
 
-        rt.def("_MemCopy", body);
+        rt.def_rec("_MemCopy", body);
 
         let body = {
             let mut b = InstructionBuilder::new();

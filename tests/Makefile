@@ -12,7 +12,9 @@ bin/if.wasm \
 bin/br.wasm \
 bin/loop.wasm \
 bin/memory.wasm \
+bin/memory-bulk-ops.wasm \
 bin/comparisons.wasm \
+bin/extensions.wasm \
 bin/add-sub.wasm \
 bin/mul.wasm \
 bin/div.wasm \
