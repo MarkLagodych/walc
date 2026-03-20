@@ -1,4 +1,4 @@
-# WALC design
+# WALC notes
 
 The best way to learn how WebAssembly is translated to lambda calculus is the
 source, all essential algorithms are documented and all output code is generated
@@ -28,15 +28,51 @@ to see what constants the program uses and to check if all constants are
 generated correctly. Maths and simple WASM instructions are generated in their
 dependency order.
 
-You can see how instructions work [here](../src/codegen/core/instruction.rs),
+See how instructions work [here](../src/codegen/core/instruction.rs),
 how they are joined into instruction chains [here](../src/codegen/core/code.rs),
 and how all the algorithms are implemented [here](../src/codegen/runtime/).
 
+## Debugging
+
+> Quite simply, the deadliest blow in all of programming arts.
+> A bug hits your lambda expression with its fingertips at 5 different pressure
+> points on its subterms, and then lets it run away. But once it's taken five
+> steps its evaluation explodes inside the interpreter and it falls to the
+> floor, dead.
+
+One of the biggest problems of untyped lambda calculus is that it is really
+untyped and is evaluated lazily, so you cannot observe what gets evaluated,
+how and even in which order, unless you are keen on reading thousands of lines
+of interpreter evaluation logs.
+
+Once I tried implementing numbers by using tuples (expressions of the form
+*λf.(((f bit0)bit1)bit2)...*) instead of cons-lists.
+One of the craziest aspects of that approach was that you don't apply a number
+to a function like you do with normal arguments, you apply a function to
+a number. Imagine debugging this for days... ( ͡° ʖ̯ ͡°)
+
+Instead of developing a proper debugger, I introduced a trick that
+makes most compiler bugs observable -- just use something erroneous for
+unreachables, e.g. unbound variables. When an interpreter tries to evaluate
+them, you get an unclear message with unclear location, but at least you have
+something to pin down the problem.
+
+This can be enabled with the `unbound-unreachable` feature, which makes the
+compiler emit `UNREACHABLE_<ID>` variables in place of end-of-lists,
+none-options and various other places. Even though the IDs are unique in
+the whole file, most of the bugs in practice happened in math algorithms
+that work with bit lists, so I overwhelmingly saw a single ID that just lead
+to the definition of the end-of-list.
+
+During the development, always enable the `unbound-unreachable` flag with:
+```bash
+cargo run --features unbound-unreachable -- INPUT -o OUTPUT
+```
+
 ## Supported extensions
 
-This compiler supports `WASM 1.0` (the WWW standard released in 2019) with
-[`LIME1`](https://github.com/WebAssembly/tool-conventions/blob/main/Lime.md)
-extensions, here's some notes about them:
+This compiler supports `WASM 1.0` with `LIME1` extensions,
+here's some notes about them:
 * `multi-value`: support for multiple return values in blocks and functions.
     This was really easy to implement because WASM VM is a just stack machine.
     Not supporting this extension would rather be an unreasonable limitation.

@@ -32,6 +32,9 @@ You can run some [example lambda expressions](./examples/walc/) with:
 examples/interpreter/lambda.ts examples/walc/hello.walc
 ```
 
+You might also utilize [overview notes](./docs/notes.md) as a starting point for
+digging into the codebase.
+
 Enjoy!
 
 ## Build & run
@@ -112,16 +115,19 @@ to run, however, it does not require much memory.
 
 WALC supports:
 - [WebAssembly 1.0](https://w3.org/TR/wasm-core-1/)
-    ([pdf](https://webassembly.github.io/spec/versions/core/WebAssembly-1.0.pdf))
+    ([pdf](https://webassembly.github.io/spec/versions/core/WebAssembly-1.0.pdf)),
+    the WWW standard released in 2019
 - [Linear Memory 1.0](https://github.com/WebAssembly/tool-conventions/blob/main/Lime.md)
     extensions
 
 WALC does not support:
+
 - Dynamic type checking and bounds checking.
 
     Only division by zero and signed division overflow are checked.
     Other checks are ignored for efficiency, even though this is non-compliant
     behavior.
+
 - Floating-point arithmetic.
 
     Given the scope of the project, there is simply no point in implementing

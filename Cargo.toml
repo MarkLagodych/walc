@@ -14,12 +14,12 @@ default = []
 unbound-unreachable = []
 
 [dependencies.wasmparser]
-version = "^0.244"
-default-features = false
-features = ["std", "features", "validate"] # Ignore SIMD and WASM components
+version = "^0.245"
+default-features = false # Disable SIMD and the Сomponent Model
+features = ["std", "features", "validate"]
 
 [dependencies.clap]
-version = "^4.5"
+version = "^4.6"
 features = ["derive"]
 
 [dependencies.anyhow]
