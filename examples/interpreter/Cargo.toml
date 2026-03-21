@@ -1,0 +1,11 @@
+[package]
+name = "lambda"
+version = "0.1.0"
+edition = "2024"
+authors = ["Mark Lagodych"]
+license = "MIT"
+description = "A simple lambda calculus interpreter based on the WALC format"
+
+[[bin]]
+name = "lambda"
+path = "lambda.rs"

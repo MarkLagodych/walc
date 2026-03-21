@@ -14,4 +14,4 @@ target/
 node_modules/
 __*__/
 
-examples/wasm/Cargo.lock
+examples/interpreter/Cargo.lock
