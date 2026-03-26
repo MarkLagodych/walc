@@ -23,13 +23,13 @@ All lambda calculus semantics and purity is preserved.
 In order to perform I/O, the interpreter decodes the program as an I/O command,
 executes the command, supplies encoded user input if needed, and repeats again.
 
-See [example interpreters](./examples/interpreter/) written in Lua and
+See [example interpreters](./interp/) written in Lua and
 TypeScript in under 300 LOC that are optimized for running lambda calculus
 for a long time without speed and memory usage degradation.
 
 You can run some [example lambda expressions](./examples/walc/) with:
 ```sh
-examples/interpreter/lambda.ts examples/walc/hello.walc
+interp/lambda.ts examples/walc/hello.walc
 ```
 
 You might also utilize [overview notes](./docs/notes.md) as a starting point for
@@ -76,7 +76,7 @@ Example:
 
 ```sh
 walc examples/rust/bin/mandelbrot.wasm -o examples/rust/bin/mandelbrot.walc
-examples/interpreter/lambda.ts examples/rust/bin/mandelbrot.walc
+interp/lambda.ts examples/rust/bin/mandelbrot.walc
 ```
 
 Output:

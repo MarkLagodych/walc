@@ -131,6 +131,5 @@ require a value when the value is not important.
 
 ### Examples
 
-See [example interpreters](../examples/interpreter/)
-and [example programs](../examples/walc/).
+See [interpreters](../interp/) and [example programs](../examples/walc/).
 
