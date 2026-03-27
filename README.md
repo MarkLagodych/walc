@@ -7,23 +7,16 @@ The input modules are only allowed to use custom [WALC functions](./docs/wasm.md
 to input a byte, output a byte, and exit, see [example programs](./examples/rust/)
 written in Rust.
 
-The output lambda expressions are in human-readable [WALC format](./docs/format.md),
+The output lambda expressions are in human-readable [WALC format](./docs/text-format.md),
 which just uses square brackets instead of the lambda symbol.
-
-If you want, you can even convert WALC syntax to the standard mathematical
-notation with:
-
-```sh
-cat INPUT.walc | sed -r 's/\[([_0-9a-zA-Z]+)/(λ\1./g ; s/]/)/g'
-# Example input: [f ([x (f (x x))] [x (f (x x))])]
-# Example output: (λf. ((λx. (f (x x))) (λx. (f (x x)))))
-```
+There is even a [one-line script](./tools/text2math) to convert it to the
+standard mathematical notation.
 
 All lambda calculus semantics and purity is preserved.
 In order to perform I/O, the interpreter decodes the program as an I/O command,
 executes the command, supplies encoded user input if needed, and repeats again.
 
-See [example interpreters](./interp/) written in Lua and
+See [example interpreters](./tools/) written in Lua and
 TypeScript in under 300 LOC that are optimized for running lambda calculus
 for a long time without speed and memory usage degradation.
 
@@ -61,8 +54,11 @@ Example Rust programs are [here](./examples/rust/).
     rustup target add wasm32v1-none
     ```
     You can also experiment with the standard `wasm32-unknown-unknown` toolchain,
-    but its feature set is unstable and in the future it might extend beyond
-    what WALC supports.
+    even though its feature set is unstable and in the future it might extend beyond
+    what WALC supports:
+    ```sh
+    rustup target add wasm32-unknown-unknown
+    ```
 2. Build for release. You can use the provided Makefile that will tell Cargo
     to also install all the `.wasm` files into the `examples/rust/bin`
     directory:
@@ -70,13 +66,19 @@ Example Rust programs are [here](./examples/rust/).
     make -C examples/rust
     ```
 
+    Or, for the `wasm32-unknown-unknown` target:
+    ```sh
+    make -C examples/rust TARGET=wasm32-unknown-unknown
+    ```
+
 ### Run
 
 Example:
 
 ```sh
-walc examples/rust/bin/mandelbrot.wasm -o examples/rust/bin/mandelbrot.walc
-interp/lambda.ts examples/rust/bin/mandelbrot.walc
+mkdir bin
+walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
+tools/lambda.ts bin/mandelbrot.walc
 ```
 
 Output:

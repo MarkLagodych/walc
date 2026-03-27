@@ -1,5 +1,7 @@
 .PHONY: all clean
 
+TARGET=wasm32v1-none
+
 all:
 	cargo install \
 		--quiet \
@@ -7,7 +9,7 @@ all:
 		--root . \
 		--no-track \
 		--profile release \
-		--target wasm32v1-none
+		--target ${TARGET}
 
 clean:
 	rm -rf bin
