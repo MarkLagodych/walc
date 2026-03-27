@@ -1,0 +1,23 @@
+If:
+    PathMatch: .*\.[ch]
+
+CompileFlags:
+    Add:
+        - -xc
+        - -std=c99
+        - -Wall
+        - -Wextra
+        - -Wpedantic
+        - -Werror=vla
+
+Diagnostics:
+    Suppress: pp_including_mainfile_in_preamble
+
+    ClangTidy:
+        Add:
+            - bugprone-*
+
+        Remove:
+            - bugprone-assignment-in-if-condition
+            - bugprone-easily-swappable-parameters
+            - bugprone-sizeof-expression

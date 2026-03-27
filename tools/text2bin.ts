@@ -1,21 +1,29 @@
 #!/usr/bin/env -S deno --allow-read --allow-write
 
-// Copyright (c) 2025-2026 Mark Lagodych
-// SPDX-License-Identifier: MIT
+/*
+This script converts lambda expressions from the WALC text format to the
+binary format. The resulting file depends on machine endianness.
+
+The input is fully validated, large files are supported.
+
+Copyright (c) 2026 Mark Lagodych
+SPDX-License-Identifier: MIT
+*/
+
 
 type Expr = Var | Abs | Apply
 
-const VAR_FLAGS = 0b10 << 30
-const ABS_FLAGS = 0b11 << 30
+const VAR_FLAG = 0b10 << 30
+const ABS_FLAG = 0b01 << 30
 
 class Var {
     constructor(public id: number) {}
-    encode(): number { return this.id | VAR_FLAGS; }
+    encode(): number { return this.id | VAR_FLAG; }
 }
 
 class Abs {
     constructor(public var_id: number) {}
-    encode(): number { return this.var_id | ABS_FLAGS; }
+    encode(): number { return this.var_id | ABS_FLAG; }
 }
 
 class Apply {
@@ -132,6 +140,8 @@ class Parser {
     }
 
     parse() {
+        // This function does not use recursion to avoid stack overflows
+        // for large files.
         type ExpectedItem = ")" | "]" | "term"
         const stack: ExpectedItem[] = ["term"]
 
