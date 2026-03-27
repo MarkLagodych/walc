@@ -21,3 +21,4 @@ Diagnostics:
             - bugprone-assignment-in-if-condition
             - bugprone-easily-swappable-parameters
             - bugprone-sizeof-expression
+            - bugprone-suspicious-realloc-usage
