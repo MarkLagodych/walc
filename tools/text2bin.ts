@@ -13,23 +13,23 @@ SPDX-License-Identifier: MIT
 
 type Expr = Var | Abs | Apply
 
-const VAR_FLAG = 0b10 << 30
-const ABS_FLAG = 0b01 << 30
+const VAR_FLAG = 1 << 31
+const ABS_FLAG = 1 << 30
 
 class Var {
     constructor(public id: number) {}
-    encode(): number { return this.id | VAR_FLAG; }
+    encode(): number { return this.id | VAR_FLAG }
 }
 
 class Abs {
     constructor(public var_id: number) {}
-    encode(): number { return this.var_id | ABS_FLAG; }
+    encode(): number { return this.var_id | ABS_FLAG }
 }
 
 class Apply {
     // right_index is an index into the expression list, can be set later.
     constructor(public right_index: number = 0) {}
-    encode(): number { return this.right_index; }
+    encode(): number { return this.right_index }
 }
 
 

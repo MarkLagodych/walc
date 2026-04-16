@@ -9,6 +9,7 @@ CompileFlags:
         - -Wextra
         - -Wpedantic
         - -Werror=vla
+        - -Wno-missing-field-initializers
 
 Diagnostics:
     Suppress: pp_including_mainfile_in_preamble
