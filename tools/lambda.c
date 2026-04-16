@@ -342,6 +342,7 @@ static struct closure eval_inner(
         term t = prog->terms[current_value.term];
 
         if (term_is_variable(t)) {
+
             env_weak_ref env = env_find(
                 prog, term_payload(t), current_value.env
             );
@@ -367,7 +368,7 @@ static struct closure eval_inner(
                 prog,
                 current_value.env,
                 term_payload(t),
-                arg
+                arg // the value is moved
             );
 
             closure_free(prog, current_value);
@@ -375,15 +376,19 @@ static struct closure eval_inner(
 
             env_unreference(prog, new_env);
 
-        } else {
-            // Application
+        } else { // Application
 
             struct closure arg = closure_new(
                 current_value.env,
                 term_payload(t)
             );
 
-            stack_push(&stack, &arg);
+            if (term_is_variable(arg.term) && depth) {
+                // arg is moved into the function
+                arg = eval_inner(prog, arg, depth - 1);
+            }
+
+            stack_push(&stack, &arg); // arg is moved here
 
             current_value.term++;
         }
