@@ -25,6 +25,10 @@ static inline bool term_is_variable(term t)    { return t & 0x80000000; }
 static inline bool term_is_abstraction(term t) { return t & 0x40000000; }
 static inline uint32_t term_payload(term t)    { return t & 0x3FFFFFFF; }
 
+static inline term term_variable(uint32_t var)    { return var | 0x80000000; }
+static inline term term_abstraction(uint32_t var) { return var | 0x40000000; }
+static inline term term_application(uint32_t arg_index) { return arg_index; }
+
 // Index into program.terms
 typedef uint32_t term_id;
 
@@ -196,6 +200,66 @@ static env_weak_ref env_find(
     return env_reference(env);
 }
 
+#define BUILTIN_TERM_COUNT     (15)
+#define BUILTIN_VARIABLE_COUNT (10)
+
+// Include this inside any function that uses built-in term constants.
+#define BUILTIN_USE_CONSTANTS(PROG) \
+    uint32_t t = (PROG)->term_count - BUILTIN_TERM_COUNT; \
+    uint32_t v = (PROG)->variable_count - BUILTIN_VARIABLE_COUNT; \
+    (void) t; (void) v;
+
+// Built-in variable IDs. `v` is the count of program's own variables.
+#define BUILTIN_VAR_X0     (v+0)
+#define BUILTIN_VAR_X1     (v+1)
+#define BUILTIN_VAR_Y0     (v+3)
+#define BUILTIN_VAR_Y1     (v+4)
+#define BUILTIN_VAR_G      (v+5)
+#define BUILTIN_VAR_A      (v+6)
+#define BUILTIN_VAR_B      (v+7)
+#define BUILTIN_VAR_FUNC   (v+8)
+#define BUILTIN_VAR_ARG    (v+9)
+
+// Built-in term indexes. `t` is the count of the program's own terms.
+#define BUILTIN_TERM_0     (t+0)
+#define BUILTIN_TERM_1     (t+3)
+#define BUILTIN_TERM_PAIR  (t+6)
+#define BUILTIN_TERM_APPLY (t+12)
+
+// Writes built-in expression building blocks after the end of the program's
+// code so that all built-in terms can be evaluated in the same way as usual
+// program code.
+static void builtin_init(struct program *prog) {
+    BUILTIN_USE_CONSTANTS(prog)
+    term *T = prog->terms;
+
+    // 0 = [x0 [x1 x0]]
+    T[BUILTIN_TERM_0] = term_abstraction(BUILTIN_VAR_X0);
+    T[BUILTIN_TERM_0+1] = term_application(BUILTIN_VAR_X1);
+    T[BUILTIN_TERM_0+2] = term_variable(BUILTIN_VAR_X0);
+
+    // 1 = [y0 [y1 y1]]
+    T[BUILTIN_TERM_1] = term_abstraction(BUILTIN_VAR_Y0);
+    T[BUILTIN_TERM_1+1] = term_application(BUILTIN_VAR_Y1);
+    T[BUILTIN_TERM_1+2] = term_variable(BUILTIN_VAR_Y1);
+
+    // pair = [g [a b]]
+    // `a` and `b` are manually define by creating the environment
+    T[BUILTIN_TERM_PAIR] = term_application(BUILTIN_VAR_G);
+    T[BUILTIN_TERM_PAIR+1] = term_application(BUILTIN_TERM_PAIR+5);
+    T[BUILTIN_TERM_PAIR+2] = term_application(BUILTIN_TERM_PAIR+4);
+    T[BUILTIN_TERM_PAIR+3] = term_variable(BUILTIN_VAR_G);
+    T[BUILTIN_TERM_PAIR+4] = term_variable(BUILTIN_VAR_A);
+    T[BUILTIN_TERM_PAIR+5] = term_variable(BUILTIN_VAR_B);
+
+    // apply = (func arg)
+    // `func` and `arg` are manually define by creating the environment
+    T[BUILTIN_TERM_APPLY] = term_application(BUILTIN_TERM_APPLY+2);
+    T[BUILTIN_TERM_APPLY+1] = term_variable(BUILTIN_VAR_FUNC);
+    T[BUILTIN_TERM_APPLY+2] = term_variable(BUILTIN_VAR_ARG);
+}
+
+
 static void program_read(struct program *prog, char const *path) {
     FILE *f = fopen(path, "rb");
     if (!f) error("cannot open input file");
@@ -207,11 +271,17 @@ static void program_read(struct program *prog, char const *path) {
     c = fread(&prog->variable_count, sizeof(prog->variable_count), 1, f);
     if (c != 1) error("cannot read variable count");
 
-    prog->terms = malloc(sizeof(*prog->terms) * prog->term_count);
+    prog->terms = malloc(
+        sizeof(*prog->terms) * (prog->term_count + BUILTIN_TERM_COUNT)
+    );
     if (!prog->terms) error("out of memory");
 
     c = fread(prog->terms, sizeof(*prog->terms), prog->term_count, f);
     if (c != prog->term_count) error("cannot read terms");
+
+    prog->term_count += BUILTIN_TERM_COUNT;
+    prog->variable_count += BUILTIN_VARIABLE_COUNT;
+    builtin_init(prog);
 
     prog->shortcut_envs = calloc(
         prog->variable_count, sizeof(*prog->shortcut_envs)
@@ -384,7 +454,7 @@ static struct closure eval_inner(
             );
 
             if (term_is_variable(arg.term) && depth) {
-                // arg is moved into the function
+                // arg is moved to and from the function
                 arg = eval_inner(prog, arg, depth - 1);
             }
 
@@ -400,6 +470,131 @@ static struct closure eval_inner(
 
 static inline struct closure eval(struct program *prog, struct closure value) {
     return eval_inner(prog, value, 10);
+}
+
+static struct closure encode_zero(struct program *prog) {
+    BUILTIN_USE_CONSTANTS(prog)
+    return closure_new(NULL, BUILTIN_TERM_0);
+}
+
+static struct closure encode_one(struct program *prog) {
+    BUILTIN_USE_CONSTANTS(prog)
+    return closure_new(NULL, BUILTIN_TERM_1);
+}
+
+static struct closure encode_bit(struct program *prog, bool b) {
+    return b ? encode_one(prog) : encode_zero(prog);
+}
+
+static struct closure encode_pair(
+    struct program *prog,
+    struct closure a,
+    struct closure b
+) {
+    BUILTIN_USE_CONSTANTS(prog)
+
+    env_strong_ref env_a = env_new(
+        prog,
+        NULL,
+        BUILTIN_VAR_A,
+        a
+    );
+
+    env_strong_ref env_b = env_new(
+        prog,
+        env_a,
+        BUILTIN_VAR_B,
+        b
+    );
+
+    struct closure result = closure_new(env_b, BUILTIN_TERM_PAIR);
+
+    env_unreference(prog, env_a);
+    env_unreference(prog, env_b);
+
+    return result;
+}
+
+static struct closure apply(
+    struct program *prog,
+    struct closure func,
+    struct closure arg
+) {
+    BUILTIN_USE_CONSTANTS(prog)
+
+    env_strong_ref env_func = env_new(
+        prog,
+        NULL,
+        BUILTIN_VAR_FUNC,
+        func
+    );
+
+    env_strong_ref env_arg = env_new(
+        prog,
+        env_func,
+        BUILTIN_VAR_ARG,
+        arg
+    );
+
+    struct closure result = closure_new(env_arg, BUILTIN_TERM_APPLY);
+
+    env_unreference(prog, env_func);
+    env_unreference(prog, env_arg);
+
+    return result;
+}
+
+static inline struct closure encode_none(struct program *prog) {
+    return encode_pair(prog, encode_zero(prog), encode_zero(prog));
+}
+
+static inline struct closure encode_some(
+    struct program *prog,
+    struct closure value
+) {
+    return encode_pair(prog, encode_one(prog), value);
+}
+
+static inline struct closure encode_empty(struct program *prog) {
+    return encode_none(prog);
+}
+
+static inline struct closure encode_cons(
+    struct program *prog,
+    struct closure head,
+    struct closure tail
+) {
+    return encode_some(prog, encode_pair(prog, head, tail));
+}
+
+static struct closure encode_byte(struct program *prog, uint8_t byte) {
+    struct closure result = encode_empty(prog);
+
+    for (int i = 0; i < 8; i++) {
+        struct closure bit = encode_bit(prog, byte & 1);
+        byte >>= 1;
+
+        result = encode_cons(prog, bit, result);
+    }
+
+    return result;
+}
+
+// input is either a byte (0..255) or end of file (-1)
+static struct closure encode_input(struct program *prog, int32_t input) {
+    if (input < 0)
+        return encode_none(prog);
+
+    return encode_some(prog, encode_byte(prog, (uint8_t)input));
+}
+
+static struct closure perform_input(
+    struct program *prog,
+    struct closure state
+) {
+    int32_t input = getchar();
+    struct closure encoded_input = encode_input(prog, input);
+    return apply(prog, state, encoded_input);
 }
 
 char const *help_message =
