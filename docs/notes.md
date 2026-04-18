@@ -22,7 +22,7 @@ WALC extracts all numbers and all operation definitions into global variables,
 so that only several definitions are used thoughout the whole file.
 That is achieved by using generator objects -- objects that accumulate all
 the required definitions and then, given a `let..in` expression builder,
-add definitions to it. This also helps insure that the definitions have the
+add definitions to it. This also helps ensure that the definitions have the
 correct order. Numbers are ordered by values because in such a way it is easier
 to see what constants the program uses and to check if all constants are
 generated correctly. Maths and simple WASM instructions are generated in their
@@ -38,21 +38,22 @@ and how all the algorithms are implemented [here](../src/codegen/runtime/).
 > A bug hits your lambda expression with its fingertips at 5 different pressure
 > points on its subterms, and then lets it run away. But once it's taken five
 > steps its evaluation explodes inside the interpreter and it falls to the
-> floor, dead.
+> floor, Uncaught exception: Error: expected a bit.
 
 One of the biggest problems of untyped lambda calculus is that it is really
-untyped and is evaluated lazily, so you cannot observe what gets evaluated,
+*untyped* and is evaluated lazily, so you cannot observe what gets evaluated,
 how and even in which order, unless you are keen on reading thousands of lines
 of interpreter evaluation logs.
 
-Once I tried implementing numbers by using tuples (expressions of the form
-*λf.(((f bit0)bit1)bit2)...*) instead of cons-lists.
+Once upon a time, I tried implementing numbers by using tuples (expressions of
+the form $λf.(((f\ \mathrm{bit0})\ \mathrm{bit1})\ \mathrm{bit2})...$)
+instead of cons-lists.
 One of the craziest aspects of that approach was that you don't apply a number
 to a function like you do with normal arguments, you apply a function to
 a number. Imagine debugging this for days... ( ͡° ʖ̯ ͡°)
 
 Instead of developing a proper debugger, I introduced a trick that
-makes most compiler bugs observable -- just use something erroneous for
+makes many compiler bugs observable -- just use something erroneous for
 unreachables, e.g. unbound variables. When an interpreter tries to evaluate
 them, you get an unclear message with unclear location, but at least you have
 something to pin down the problem.
@@ -68,6 +69,9 @@ During the development, always enable the `unbound-unreachable` flag with:
 ```bash
 cargo run --features unbound-unreachable -- INPUT -o OUTPUT
 ```
+
+Note that code with unbound variables is only possible to interpret with
+the Lua and TypeScript interpreters.
 
 ## Supported extensions
 

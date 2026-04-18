@@ -16,9 +16,9 @@ All lambda calculus semantics and purity is preserved.
 In order to perform I/O, the interpreter decodes the program as an I/O command,
 executes the command, supplies encoded user input if needed, and repeats again.
 
-See [example interpreters](./tools/) written in Lua and
-TypeScript in under 300 LOC that are optimized for running lambda calculus
-for a long time without speed and memory usage degradation.
+See [example interpreters](./tools/) written in Lua and TypeScript in under
+300 LOC or in C in under 800 LOC that are optimized for running lambda calculus
+for a long time with stable speed and non-badly-exploding memory usage.
 
 You can run some [example lambda expressions](./examples/walc/) with:
 ```sh
@@ -82,7 +82,7 @@ walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
 tools/lambda.ts bin/mandelbrot.walc
 ```
 
-*The TypeScript version runs in about 15 minutes on my machine.*
+The TypeScript version runs in about 15 minutes on my machine.
 
 Using the C interpreter:
 ```sh
@@ -94,9 +94,15 @@ tools/text2bin.ts bin/mandelbrot.walc -o bin/mandelbrot.bin
 bin/lambda bin/mandelbrot.bin
 ```
 
-*The C version runs in about 8 minutes on my machine.*
+The C version runs in about 8 minutes on my machine.
 
-*Both versions require around 1.4 GB of memory.* 🤷
+Both versions require around 1.4 GB of memory. 🤷
+
+*While this might seem underwhelming, note that the interpreter was not the main
+focus of this project and it took quite a bit of optimization to achieve
+even this performance. I would love to hear about more efficient approaches! 🧑‍🔬
+Who knows, maybe graph reduction techniques or conversion to combinatory
+calculus might do a 10x speedup. Or compiler optimizations?*
 
 Output:
 
@@ -147,12 +153,12 @@ WALC does not support:
 - Floating-point arithmetic.
 
     Given the scope of the project, there is simply no point in implementing
-    this.
+    floats.
 
     To avoid as much compilation problems as possible,
     floats are stored as integers.
     Reinterpreting conversions between floats and integers are replaced with
-    nops and any other operations are replaced with traps.
+    nops and all other operations are replaced with traps.
     This behavior might be useful when you use a standard function like `printf`
     that can use floats internally, but your program never invokes it with any
     float values.
