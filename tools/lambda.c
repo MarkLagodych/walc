@@ -472,17 +472,17 @@ static inline struct closure eval(struct program *prog, struct closure value) {
     return eval_inner(prog, value, 10);
 }
 
-static struct closure encode_zero(struct program *prog) {
+static inline struct closure encode_zero(struct program *prog) {
     BUILTIN_USE_CONSTANTS(prog)
     return closure_new(NULL, BUILTIN_TERM_0);
 }
 
-static struct closure encode_one(struct program *prog) {
+static inline struct closure encode_one(struct program *prog) {
     BUILTIN_USE_CONSTANTS(prog)
     return closure_new(NULL, BUILTIN_TERM_1);
 }
 
-static struct closure encode_bit(struct program *prog, bool b) {
+static inline struct closure encode_bit(struct program *prog, bool b) {
     return b ? encode_one(prog) : encode_zero(prog);
 }
 
@@ -544,15 +544,29 @@ static struct closure apply(
     return result;
 }
 
+static inline struct closure encode_left(
+    struct program *prog,
+    struct closure value
+) {
+    return encode_pair(prog, encode_zero(prog), value);
+}
+
+static inline struct closure encode_right(
+    struct program *prog,
+    struct closure value
+) {
+    return encode_pair(prog, encode_one(prog), value);
+}
+
 static inline struct closure encode_none(struct program *prog) {
-    return encode_pair(prog, encode_zero(prog), encode_zero(prog));
+    return encode_left(prog, encode_zero(prog));
 }
 
 static inline struct closure encode_some(
     struct program *prog,
     struct closure value
 ) {
-    return encode_pair(prog, encode_one(prog), value);
+    return encode_right(prog, value);
 }
 
 static inline struct closure encode_empty(struct program *prog) {
@@ -588,13 +602,136 @@ static struct closure encode_input(struct program *prog, int32_t input) {
     return encode_some(prog, encode_byte(prog, (uint8_t)input));
 }
 
+// Returns the next command
 static struct closure perform_input(
     struct program *prog,
-    struct closure state
+    struct closure input_command
 ) {
-    int32_t input = getchar();
+    int32_t input = (int32_t) getchar();
     struct closure encoded_input = encode_input(prog, input);
-    return apply(prog, state, encoded_input);
+    return apply(prog, input_command, encoded_input);
+}
+
+static bool decode_bit(struct program *prog, struct closure value) {
+    BUILTIN_USE_CONSTANTS(prog)
+
+    value = apply(prog, value, encode_zero(prog));
+    value = apply(prog, value, encode_one(prog));
+    value = eval(prog, value);
+
+    if (value.term == BUILTIN_TERM_1) return true;
+    if (value.term != BUILTIN_TERM_0)
+        error("expected bit, got something else");
+    return false;
+}
+
+static void decode_pair(
+    struct program *prog,
+    struct closure value,
+    struct closure *out_first,
+    struct closure *out_second
+) {
+    BUILTIN_USE_CONSTANTS(prog)
+
+    value = eval(prog, value);
+
+    *out_first = apply(prog, closure_clone(value), encode_zero(prog));
+    *out_second = apply(prog, value, encode_one(prog));
+}
+
+// Returns true if the decoded value is right, false, if left.
+static bool decode_either(
+    struct program *prog,
+    struct closure value,
+    struct closure *out_value
+) {
+    struct closure is_right;
+    decode_pair(prog, value, &is_right, out_value);
+    return decode_bit(prog, is_right);
+}
+
+// Returns true if the decoded value is some, false if none.
+static inline bool decode_option(
+    struct program *prog,
+    struct closure value,
+    struct closure *out_value
+) {
+    return decode_either(prog, value, out_value);
+}
+
+// Returns true if list is cons, false is empty.
+static bool decode_list(
+    struct program *prog,
+    struct closure value,
+    struct closure *out_head,
+    struct closure *out_tail
+) {
+    struct closure pair;
+    if (!decode_option(prog, value, &pair))
+        return false;
+
+    decode_pair(prog, pair, out_head, out_tail);
+    return true;
+}
+
+static uint8_t decode_byte(struct program *prog, struct closure value) {
+    uint8_t result = 0;
+
+    for (int i = 0; i < 8; i++) {
+        struct closure bit;
+        if (!decode_list(prog, value, &bit, &value))
+            error("not enough bits in a byte (unexpected end of bit list)");
+
+        result <<= 1;
+        if (decode_bit(prog, bit))
+            result |= 1;
+    }
+
+    return result;
+}
+
+static uint8_t decode_output(
+    struct program *prog,
+    struct closure output_command,
+    struct closure *out_next_command
+) {
+    struct closure output;
+    decode_pair(prog, output_command, &output, out_next_command);
+    return decode_byte(prog, output);
+}
+
+// Returns the next command
+static struct closure perform_output(
+    struct program *prog,
+    struct closure output_command
+) {
+    struct closure next_command;
+    uint8_t byte = decode_output(prog, output_command, &next_command);
+
+    putchar((char) byte);
+    fflush(stdout);
+
+    return next_command;
+}
+
+// Returns true if needs to perform I/O, false if needs to exit.
+static bool decode_command(
+    struct program *prog,
+    struct closure command,
+    struct closure *input_or_output
+) {
+    return decode_option(prog, command, input_or_output);
+}
+
+// Returns the next command.
+static struct closure perform_io(
+    struct program *prog,
+    struct closure input_or_output
+) {
+    if (decode_either(prog, input_or_output, &input_or_output))
+        return perform_input(prog, input_or_output);
+    else
+        return perform_output(prog, input_or_output);
 }
 
 char const *help_message =
@@ -610,8 +747,17 @@ int main(int argc, char **argv) {
     struct program prog;
     program_read(&prog, argv[1]);
 
-    // TODO
+    struct closure command = closure_new(NULL, 0);
 
+    for (;;) {
+        struct closure input_or_output;
+        if (!decode_command(&prog, command, &input_or_output))
+            break;
+
+        command = perform_io(&prog, input_or_output);
+    }
+
+    closure_free(&prog, command);
     program_free(&prog);
     return EXIT_SUCCESS;
 }
