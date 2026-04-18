@@ -18,7 +18,7 @@ static void error(char const *message) {
     exit(EXIT_FAILURE);
 }
 
-// Bit fields: [31]=is_abstraction, [30]=is_variable, [29..0]=payload
+// Bit fields: [31]=is_variable, [30]=is_abstraction, [29..0]=payload
 typedef uint32_t term;
 
 static inline bool term_is_variable(term t)    { return t & 0x80000000; }
@@ -197,7 +197,7 @@ static env_weak_ref env_find(
     // There is no NULL check here because the program must be well-formed.
     for (; env->variable != var; env = env->parent) ;
 
-    return env_reference(env);
+    return env;
 }
 
 #define BUILTIN_TERM_COUNT     (15)
@@ -234,18 +234,18 @@ static void builtin_init(struct program *prog) {
     term *T = prog->terms;
 
     // 0 = [x0 [x1 x0]]
-    T[BUILTIN_TERM_0] = term_abstraction(BUILTIN_VAR_X0);
-    T[BUILTIN_TERM_0+1] = term_application(BUILTIN_VAR_X1);
+    T[BUILTIN_TERM_0]   = term_abstraction(BUILTIN_VAR_X0);
+    T[BUILTIN_TERM_0+1] = term_abstraction(BUILTIN_VAR_X1);
     T[BUILTIN_TERM_0+2] = term_variable(BUILTIN_VAR_X0);
 
     // 1 = [y0 [y1 y1]]
-    T[BUILTIN_TERM_1] = term_abstraction(BUILTIN_VAR_Y0);
-    T[BUILTIN_TERM_1+1] = term_application(BUILTIN_VAR_Y1);
+    T[BUILTIN_TERM_1]   = term_abstraction(BUILTIN_VAR_Y0);
+    T[BUILTIN_TERM_1+1] = term_abstraction(BUILTIN_VAR_Y1);
     T[BUILTIN_TERM_1+2] = term_variable(BUILTIN_VAR_Y1);
 
-    // pair = [g [a b]]
+    // pair = [g ((g a) b)]
     // `a` and `b` are manually define by creating the environment
-    T[BUILTIN_TERM_PAIR] = term_application(BUILTIN_VAR_G);
+    T[BUILTIN_TERM_PAIR]   = term_abstraction(BUILTIN_VAR_G);
     T[BUILTIN_TERM_PAIR+1] = term_application(BUILTIN_TERM_PAIR+5);
     T[BUILTIN_TERM_PAIR+2] = term_application(BUILTIN_TERM_PAIR+4);
     T[BUILTIN_TERM_PAIR+3] = term_variable(BUILTIN_VAR_G);
@@ -254,7 +254,7 @@ static void builtin_init(struct program *prog) {
 
     // apply = (func arg)
     // `func` and `arg` are manually define by creating the environment
-    T[BUILTIN_TERM_APPLY] = term_application(BUILTIN_TERM_APPLY+2);
+    T[BUILTIN_TERM_APPLY]   = term_application(BUILTIN_TERM_APPLY+2);
     T[BUILTIN_TERM_APPLY+1] = term_variable(BUILTIN_VAR_FUNC);
     T[BUILTIN_TERM_APPLY+2] = term_variable(BUILTIN_VAR_ARG);
 }
@@ -367,13 +367,13 @@ struct unevaluated_env {
 
 static void env_ensure_will_be_evaluated(
     struct program *prog,
-    struct stack *uncomputed_envs,
+    struct stack *unevaluated_envs,
     struct stack *value_stack,
     env_weak_ref env
 ) {
     if (env_is_fully_evaluated(prog, env)) return;
 
-    stack_push(uncomputed_envs, &(struct unevaluated_env) {
+    stack_push(unevaluated_envs, &(struct unevaluated_env) {
         .env = env_reference(env),
         .stack_position = value_stack->size,
     });
@@ -393,6 +393,7 @@ static void env_assign_evaluated_value(
         env_strong_ref env = env_to_update->env; // the ref is moved
         stack_pop(unevaluated_envs);
 
+        closure_free(prog, env->value);
         env->value = closure_clone(value);
 
         env_unreference(prog, env);
@@ -406,26 +407,28 @@ static struct closure eval_inner(
 ) {
     struct stack stack = stack_new(sizeof(struct closure));
 
-    struct stack uncomputed_envs = stack_new(sizeof(struct unevaluated_env));
+    struct stack unevaluated_envs = stack_new(sizeof(struct unevaluated_env));
 
     for (;;) {
         term t = prog->terms[current_value.term];
 
         if (term_is_variable(t)) {
 
-            env_weak_ref env = env_find(
-                prog, term_payload(t), current_value.env
+            env_strong_ref env = env_reference(
+                env_find(prog, term_payload(t), current_value.env)
             );
 
-            env_ensure_will_be_evaluated(prog, &uncomputed_envs, &stack, env);
+            env_ensure_will_be_evaluated(prog, &unevaluated_envs, &stack, env);
 
             closure_free(prog, current_value);
             current_value = closure_clone(env->value);
 
+            env_unreference(prog, env);
+
         } else if (term_is_abstraction(t)) {
 
             env_assign_evaluated_value(
-                prog, &uncomputed_envs, &stack, current_value
+                prog, &unevaluated_envs, &stack, current_value
             );
 
             if (stack.size == 0) break;
@@ -441,8 +444,10 @@ static struct closure eval_inner(
                 arg // the value is moved
             );
 
+            term_id body_term = current_value.term + 1;
+
             closure_free(prog, current_value);
-            current_value = closure_new(new_env, current_value.term + 1);
+            current_value = closure_new(new_env, body_term);
 
             env_unreference(prog, new_env);
 
@@ -453,7 +458,7 @@ static struct closure eval_inner(
                 term_payload(t)
             );
 
-            if (term_is_variable(arg.term) && depth) {
+            if (term_is_variable(prog->terms[arg.term]) && depth) {
                 // arg is moved to and from the function
                 arg = eval_inner(prog, arg, depth - 1);
             }

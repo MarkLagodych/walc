@@ -112,6 +112,7 @@ class Generator {
     }
 
     handle_variable(variable: string) {
+        this.expression_starts.push(this.expressions.length)
         this.expressions.push(new Var(this.variables.find_id(variable)))
     }
 }
