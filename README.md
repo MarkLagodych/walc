@@ -53,9 +53,9 @@ Example Rust programs are [here](./examples/rust/).
     ```sh
     rustup target add wasm32v1-none
     ```
-    You can also experiment with the standard `wasm32-unknown-unknown` toolchain,
-    even though its feature set is unstable and in the future it might extend beyond
-    what WALC supports:
+    You can also experiment with the standard `wasm32-unknown-unknown`
+    toolchain, even though its feature set is unstable and in the future it
+    might extend beyond what WALC supports:
     ```sh
     rustup target add wasm32-unknown-unknown
     ```
@@ -73,13 +73,30 @@ Example Rust programs are [here](./examples/rust/).
 
 ### Run
 
-Example:
+Using the TypeScript or Lua interpreters:
 
 ```sh
 mkdir bin
 walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
+
 tools/lambda.ts bin/mandelbrot.walc
 ```
+
+*The TypeScript version runs in about 15 minutes on my machine.*
+
+Using the C interpreter:
+```sh
+mkdir bin
+walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
+
+gcc tools/lambda.c -o bin/lambda -O3
+tools/text2bin.ts bin/mandelbrot.walc -o bin/mandelbrot.bin
+bin/lambda bin/mandelbrot.bin
+```
+
+*The C version runs in about 8 minutes on my machine.*
+
+*Both versions require around 1.4 GB of memory.* 🤷
 
 Output:
 
@@ -109,9 +126,6 @@ Output:
          ..............................:::::::?@@@@@@?!::::::...........
            ...............................:::::::!?@!:::::............
 ```
-
-Note that this particular example typically takes around 15 minutes or so
-to run, however, it does not require much memory.
 
 ## Feature support
 
