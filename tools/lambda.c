@@ -353,7 +353,9 @@ static void stack_pop(struct stack *stack) {
 }
 
 static void stack_free(struct stack *stack) {
-    free(stack->items);
+    if (stack->items)
+        free(stack->items);
+
     stack->items = NULL;
     stack->size = 0;
     stack->capacity = 0;
@@ -470,6 +472,7 @@ static struct closure eval_inner(
     }
 
     stack_free(&stack);
+    stack_free(&unevaluated_envs);
     return current_value;
 }
 
@@ -624,9 +627,13 @@ static bool decode_bit(struct program *prog, struct closure value) {
     value = apply(prog, value, encode_one(prog));
     value = eval(prog, value);
 
-    if (value.term == BUILTIN_TERM_1) return true;
-    if (value.term != BUILTIN_TERM_0)
+    term value_term = value.term;
+    closure_free(prog, value);
+
+    if (value_term == BUILTIN_TERM_1) return true;
+    if (value_term != BUILTIN_TERM_0)
         error("expected bit, got something else");
+
     return false;
 }
 
@@ -661,7 +668,12 @@ static inline bool decode_option(
     struct closure value,
     struct closure *out_value
 ) {
-    return decode_either(prog, value, out_value);
+    bool is_some = decode_either(prog, value, out_value);
+
+    if (!is_some)
+        closure_free(prog, *out_value);
+
+    return is_some;
 }
 
 // Returns true if list is cons, false is empty.
@@ -762,7 +774,9 @@ int main(int argc, char **argv) {
         command = perform_io(&prog, input_or_output);
     }
 
-    closure_free(&prog, command);
     program_free(&prog);
     return EXIT_SUCCESS;
 }
+
+
+// TODO fix memory leaks

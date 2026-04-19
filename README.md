@@ -82,7 +82,8 @@ walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
 tools/lambda.ts bin/mandelbrot.walc
 ```
 
-The TypeScript version runs in about 15 minutes on my machine.
+The TypeScript version runs in about 15 minutes on my machine
+and peaks at 400 MB of memory usage.
 
 Using the C interpreter:
 ```sh
@@ -95,8 +96,6 @@ bin/lambda bin/mandelbrot.bin
 ```
 
 The C version runs in about 8 minutes on my machine.
-
-Both versions require around 1.4 GB of memory. 🤷
 
 *While this might seem underwhelming, note that the interpreter was not the main
 focus of this project and it took quite a bit of optimization to achieve
