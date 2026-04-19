@@ -446,12 +446,9 @@ static struct closure eval_inner(
                 arg // the value is moved
             );
 
-            term_id body_term = current_value.term + 1;
-
             closure_free(prog, current_value);
-            current_value = closure_new(new_env, body_term);
-
-            env_unreference(prog, new_env);
+            current_value.term++;
+            current_value.env = new_env; // `new_env` is moved here
 
         } else { // Application
 
@@ -627,14 +624,20 @@ static bool decode_bit(struct program *prog, struct closure value) {
     value = apply(prog, value, encode_one(prog));
     value = eval(prog, value);
 
-    term value_term = value.term;
-    closure_free(prog, value);
-
-    if (value_term == BUILTIN_TERM_1) return true;
-    if (value_term != BUILTIN_TERM_0)
+    if (value.env != NULL)
         error("expected bit, got something else");
 
-    return false;
+    bool bit = false;
+    if (value.term == BUILTIN_TERM_1)
+        bit = true;
+    else if (value.term == BUILTIN_TERM_0)
+        bit = false;
+    else
+        error("expected bit, got something else");
+
+    closure_free(prog, value);
+
+    return bit;
 }
 
 static void decode_pair(
@@ -676,7 +679,7 @@ static inline bool decode_option(
     return is_some;
 }
 
-// Returns true if list is cons, false is empty.
+// Returns true if list is cons, false if empty.
 static bool decode_list(
     struct program *prog,
     struct closure value,
@@ -694,15 +697,19 @@ static bool decode_list(
 static uint8_t decode_byte(struct program *prog, struct closure value) {
     uint8_t result = 0;
 
+    struct closure tail = value;
+
     for (int i = 0; i < 8; i++) {
         struct closure bit;
-        if (!decode_list(prog, value, &bit, &value))
+        if (!decode_list(prog, tail, &bit, &tail))
             error("not enough bits in a byte (unexpected end of bit list)");
 
         result <<= 1;
         if (decode_bit(prog, bit))
             result |= 1;
     }
+
+    closure_free(prog, tail);
 
     return result;
 }
@@ -768,6 +775,7 @@ int main(int argc, char **argv) {
 
     for (;;) {
         struct closure input_or_output;
+        // `command` is moved here
         if (!decode_command(&prog, command, &input_or_output))
             break;
 

@@ -18,7 +18,7 @@ executes the command, supplies encoded user input if needed, and repeats again.
 
 See [example interpreters](./tools/) written in Lua and TypeScript in under
 300 LOC or in C in under 800 LOC that are optimized for running lambda calculus
-for a long time with stable speed and non-badly-exploding memory usage.
+for a long time with stable speed and bearable memory consumption.
 
 You can run some [example lambda expressions](./examples/walc/) with:
 ```sh
@@ -95,7 +95,8 @@ tools/text2bin.ts bin/mandelbrot.walc -o bin/mandelbrot.bin
 bin/lambda bin/mandelbrot.bin
 ```
 
-The C version runs in about 8 minutes on my machine.
+The C version runs in about 8 minutes on my machine
+and peaks at 75 MB of memory usage.
 
 *While this might seem underwhelming, note that the interpreter was not the main
 focus of this project and it took quite a bit of optimization to achieve
