@@ -53,15 +53,23 @@ struct closure {
 };
 
 // Abstraction environment: represents an abstraction variable being bound to
-// a value and being visible to all child subterms of the abstraction.
+// a value. A bound variable is visible to all subterms of the abstraction.
 struct env {
     env_strong_ref parent;
 
     struct closure value;
 
-    variable_id variable;
+    union {
+        // This is used when the env is alive
+        struct {
+            variable_id variable;
+            uint32_t ref_count;
+        } _;
 
-    uint32_t ref_count;
+        // This is used when the env is being freed for depth-first traversal
+        // of the environment tree (left child: parent, right child: value.env).
+        struct env *prev_freed;
+    } _;
 };
 
 struct program {
@@ -82,17 +90,17 @@ struct program {
 };
 
 static inline void env_register(struct program *prog, env_strong_ref env) {
-    prog->env_counts[env->variable]++;
+    prog->env_counts[env->_._.variable]++;
 
-    if (prog->shortcut_envs[env->variable] == NULL)
-        prog->shortcut_envs[env->variable] = env;
+    if (prog->shortcut_envs[env->_._.variable] == NULL)
+        prog->shortcut_envs[env->_._.variable] = env;
 }
 
 static inline void env_unregister(struct program *prog, env_strong_ref env) {
-    prog->env_counts[env->variable]--;
+    prog->env_counts[env->_._.variable]--;
 
-    if (prog->shortcut_envs[env->variable] == env)
-        prog->shortcut_envs[env->variable] = NULL;
+    if (prog->shortcut_envs[env->_._.variable] == env)
+        prog->shortcut_envs[env->_._.variable] = NULL;
 }
 
 static inline bool env_can_use_shortcut(struct program *prog, variable_id var) {
@@ -109,11 +117,62 @@ static inline env_weak_ref env_get_shortcut(
 
 // `opt_env` can be NULL.
 static inline env_strong_ref env_reference(env_weak_ref opt_env) {
-    if (opt_env) opt_env->ref_count++;
+    if (opt_env) opt_env->_._.ref_count++;
     return opt_env;
 }
 
-static void env_free(struct program *prog, env_strong_ref env);
+static void env_free(struct program *prog, struct env *env) {
+    // This uses a non-recursive depth-first traversal without any additional
+    // memory allocation.
+    // Recursion would be unbounded and in fact occasionally cause stack
+    // overflows for big enough input programs.
+
+    struct env *prev = NULL;
+
+    env_unregister(prog, env);
+
+    for (;;) {
+        env->_.prev_freed = prev;
+
+        if (env->parent) {
+            struct env *parent = env->parent;
+            env->parent = NULL;
+
+            parent->_._.ref_count--;
+
+            if (parent->_._.ref_count == 0) {
+                prev = env;
+                env = parent;
+                env_unregister(prog, env);
+                continue;
+            }
+        }
+
+        if (env->value.env) {
+            struct env *value_env = env->value.env;
+            env->value.env = NULL;
+
+            value_env->_._.ref_count--;
+
+            if (value_env->_._.ref_count == 0) {
+                prev = env;
+                env = value_env;
+                env_unregister(prog, env);
+                continue;
+            }
+        }
+
+        prev = env->_.prev_freed;
+
+        free(env);
+
+        if (!prev)
+            break;
+
+        env = prev;
+        prev = env->_.prev_freed;
+    }
+}
 
 // `opt_env` can be NULL.
 static inline void env_unreference(
@@ -122,8 +181,8 @@ static inline void env_unreference(
 ) {
     if (!opt_env) return;
 
-    opt_env->ref_count--;
-    if (opt_env->ref_count == 0) {
+    opt_env->_._.ref_count--;
+    if (opt_env->_._.ref_count == 0) {
         env_free(prog, opt_env);
     }
 }
@@ -140,9 +199,9 @@ static env_strong_ref env_new(
 
     *env = (struct env) {
         .parent = env_reference(opt_parent),
-        .variable = variable,
+        ._._.variable = variable,
         .value = value,
-        .ref_count = 1,
+        ._._.ref_count = 1,
     };
 
     env_register(prog, env);
@@ -168,16 +227,6 @@ static inline void closure_free(struct program *prog, struct closure c) {
     env_unreference(prog, c.env);
 }
 
-static void env_free(struct program *prog, struct env *env) {
-    env_unregister(prog, env);
-
-    // These two calls may possibly lead to very deep recursion
-    env_unreference(prog, env->parent);
-    closure_free(prog, env->value);
-
-    free(env);
-}
-
 static inline bool env_is_fully_evaluated(
     struct program *prog,
     env_weak_ref env
@@ -195,7 +244,7 @@ static env_weak_ref env_find(
 
     env_weak_ref env = current_env;
     // There is no NULL check here because the program must be well-formed.
-    for (; env->variable != var; env = env->parent) ;
+    for (; env->_._.variable != var; env = env->parent) ;
 
     return env;
 }
@@ -785,6 +834,3 @@ int main(int argc, char **argv) {
     program_free(&prog);
     return EXIT_SUCCESS;
 }
-
-
-// TODO fix memory leaks

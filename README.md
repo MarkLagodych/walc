@@ -17,8 +17,8 @@ In order to perform I/O, the interpreter decodes the program as an I/O command,
 executes the command, supplies encoded user input if needed, and repeats again.
 
 See [example interpreters](./tools/) written in Lua and TypeScript in under
-300 LOC or in C in under 800 LOC that are optimized for running lambda calculus
-for a long time with stable speed and bearable memory consumption.
+300 LOC or in C in under 850 LOC that are optimized for running lambda calculus
+for a long time with stable speed and reasonable memory consumption.
 
 You can run some [example lambda expressions](./examples/walc/) with:
 ```sh
@@ -73,18 +73,6 @@ Example Rust programs are [here](./examples/rust/).
 
 ### Run
 
-Using the TypeScript or Lua interpreters:
-
-```sh
-mkdir bin
-walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
-
-tools/lambda.ts bin/mandelbrot.walc
-```
-
-The TypeScript version runs in about 15 minutes on my machine
-and peaks at 400 MB of memory usage.
-
 Using the C interpreter:
 ```sh
 mkdir bin
@@ -95,14 +83,28 @@ tools/text2bin.ts bin/mandelbrot.walc -o bin/mandelbrot.bin
 bin/lambda bin/mandelbrot.bin
 ```
 
-The C version runs in about 8 minutes on my machine
+The C version runs in about 4 minutes on my machine
 and peaks at 75 MB of memory usage.
+
+Using the TypeScript or Lua interpreters:
+
+```sh
+mkdir bin
+walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
+
+tools/lambda.ts bin/mandelbrot.walc
+# or:
+tools/lambda.lua bin/mandelbrot.walc
+```
+
+The TypeScript version runs in about 15 minutes on my machine
+and peaks at 400 MB of memory usage.
 
 *While this might seem underwhelming, note that the interpreter was not the main
 focus of this project and it took quite a bit of optimization to achieve
 even this performance. I would love to hear about more efficient approaches! 🧑‍🔬
 Who knows, maybe graph reduction techniques or conversion to combinatory
-calculus might do a 10x speedup. Or compiler optimizations?*
+calculus might do a 10x speedup. Or sophisticated compiler optimizations?*
 
 Output:
 
