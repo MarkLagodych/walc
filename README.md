@@ -1,7 +1,7 @@
 # WebAssembly to Lambda Calculus compiler
 
 WALC /wɑlts/ compiles stand-alone modules in [WebAssembly](https://webassembly.org/)
-into pure [untyped lambda expressions](https://en.wikipedia.org/wiki/Lambda_calculus).
+into pure closed untyped [lambda expressions](https://en.wikipedia.org/wiki/Lambda_calculus).
 
 The input modules are only allowed to use custom [WALC functions](./docs/wasm.md)
 to input a byte, output a byte, and exit, see [example programs](./examples/rust/)
@@ -83,9 +83,6 @@ tools/text2bin.ts bin/mandelbrot.walc -o bin/mandelbrot.bin
 bin/lambda bin/mandelbrot.bin
 ```
 
-The C version runs in about 4 minutes on my machine
-and peaks at 75 MB of memory usage.
-
 Using the TypeScript or Lua interpreters:
 
 ```sh
@@ -97,8 +94,17 @@ tools/lambda.ts bin/mandelbrot.walc
 tools/lambda.lua bin/mandelbrot.walc
 ```
 
-The TypeScript version runs in about 15 minutes on my machine
-and peaks at 400 MB of memory usage.
+Just for comparison, here is some approximate performace data from running on my
+machine:
+
+| Interpreter    | Compiler/Runtime   | Execution time | Peak memory usage |
+|----------------|--------------------|----------------|-------------------|
+| lambda.c 1.0   | GCC 13.3 (-O3)     | 4 min          | 75 MB             |
+| lambda.ts 1.0  | Deno 2.7           | 15 min         | 400 MB            |
+| lambda.lua 1.0 | LuaJIT 2.1         | 106 min (*)    | >900 MB           |
+
+(*) Lua execution time is extrapolated from running half of the program for
+53 min. 🤷
 
 *While this might seem underwhelming, note that the interpreter was not the main
 focus of this project and it took quite a bit of optimization to achieve

@@ -3,6 +3,8 @@
 // This is a blazingly-fast™ lambda calculus interpreter based on the WALC
 // binary format. Written in C99, runs even on a potato™.
 
+// Version 1.0
+
 // Copyright (c) 2026 Mark Lagodych
 // SPDX-License-Identifier: MIT
 

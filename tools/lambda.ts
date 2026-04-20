@@ -2,6 +2,8 @@
 
 // This is a simple lambda calculus interpreter based on the WALC format.
 
+// Version 1.0
+
 // Copyright (c) 2025-2026 Mark Lagodych
 // SPDX-License-Identifier: MIT
 

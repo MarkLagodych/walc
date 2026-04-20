@@ -3,6 +3,8 @@
 -- This is a simple lambda calculus interpreter based on the WALC format.
 -- Runs on LuaJIT 2.1 / Lua 5.1.
 
+-- Version 1.0
+
 -- Copyright (c) 2025-2026 Mark Lagodych
 -- SPDX-License-Identifier: MIT
 
