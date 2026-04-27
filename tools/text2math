@@ -1,14 +1,29 @@
 #!/usr/bin/env bash
 
-# Converts lambda expressions from the WALC text format (with brackets)
-# to the traditional mathematical notation (with λ and parentheses).
-#
-# Usage:
-# $ cat INPUT.walc | text2math
-#
-# Example:
-#   $ echo "[f ([x (f (x x))] [x (f (x x))])]" | text2math
-# Output:
-#   (λf. ((λx. (f (x x))) (λx. (f (x x)))))
+HELP=\
+'Usage:
+$ text2math [INPUT.walc | -]
 
-sed -r 's/\[([_0-9a-zA-Z]+)/(λ\1./g ; s/]/)/g'
+Converts lambda expressions from the WALC text format (with brackets)
+to the traditional mathematical notation (with λ and parentheses).
+
+Example:
+    $ echo "[f ([x (f (x x))] [x (f (x x))])]" | text2math -
+Output:
+    (λf. ((λx. (f (x x))) (λx. (f (x x)))))'
+
+if [ "$1" = "" -o "$1" = "--help" ]
+then
+    echo "$HELP"
+    exit 0
+fi
+
+if [ "$1" != "-" -a ! -f "$1" ]
+then
+    echo "Error: file '$1' not found"
+    exit 1
+fi
+
+sed -E 's/;.*//g ; s/\[([_0-9a-zA-Z]+)/(λ\1./g ; s/]/)/g' "$1" \
+| tr '\n' ' ' \
+| tr -s ' '
