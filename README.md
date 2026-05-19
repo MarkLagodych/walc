@@ -22,7 +22,7 @@ for a long time with stable speed and reasonable memory consumption.
 
 You can run some [example lambda expressions](./examples/walc/) with:
 ```sh
-interp/lambda.ts examples/walc/hello.walc
+tools/lambda.ts examples/walc/hello.walc
 ```
 
 You might also utilize [overview notes](./docs/notes.md) as a starting point for
@@ -170,3 +170,14 @@ WALC does not support:
     This behavior might be useful when you use a standard function like `printf`
     that can use floats internally, but your program never invokes it with any
     float values.
+
+## Spiritual inspiration
+
+Or, in other words, you might also like to see:
+
+- [C to Brainfuck compiler](https://github.com/arthaud/c2bf)
+- [Esoteric language compiler infrastructure](https://github.com/shinh/elvm)
+- [DOOM PDF port](https://github.com/ading2210/doompdf)
+    and [Linux PDF port](https://github.com/ading2210/linuxpdf)
+- [LazyK](https://tromp.github.io/cl/lazy-k.html)
+    (see also the [wiki page](https://esolangs.org/wiki/Lazy_K))
