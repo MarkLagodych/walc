@@ -2,14 +2,14 @@
 
 HELP=\
 'Usage:
-$ textstat INPUT.walc
+$ termcount INPUT.walc
 
 Counts the number of abstraction, application, and variable terms
 in a lambda expression.
 
 Example:
     $ echo "[f ([x (f (x x))] [x (f (x x))])]" > /tmp/example.walc
-    $ textstat /tmp/example.walc
+    $ termcount /tmp/example.walc
 Output:
     Number of abstraction terms: 3
     Number of application terms: 5

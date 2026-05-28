@@ -2,7 +2,7 @@
 
 /*
 This script converts lambda expressions from the WALC text format to the
-binary format. The resulting file depends on machine endianness.
+binary format. The resulting files depend on the machine endianness.
 
 The input is fully validated, large files are supported.
 
@@ -208,7 +208,7 @@ import * as fs from "node:fs"
 
 const help_message =
 `Converts lambda expressions from the WALC text format to the binary format.
-The resulting files depend on machine endianness and are not portable.
+The resulting files depend on the machine endianness and are not portable.
 Run with 'deno --allow-read --allow-write' (default), 'tsx', 'bun', etc.:
 $ [<TS_INTERP>] text2bin.ts <INPUT_FILE>.walc <OUTPUT_FILE>.bin`
 
