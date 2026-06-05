@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+# Input and output files
+IN_WASM=$(realpath "$1")
+OUT_LAMBDA=$(mktemp)
+
+SCRIPT_DIR=$(dirname "$0")
+cd "$SCRIPT_DIR/../.."
+
+# Use the unbound-unreachable debug feature
+WALC="cargo run --features unbound-unreachable --quiet --"
+LAMBDA="tools/lambda.ts"
+
+$WALC $IN_WASM -o $OUT_LAMBDA && $LAMBDA $OUT_LAMBDA
