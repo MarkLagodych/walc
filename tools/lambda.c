@@ -296,7 +296,7 @@ static void builtin_init(struct program *prog) {
     T[BUILTIN_TERM_1+2] = term_variable(BUILTIN_VAR_Y1);
 
     // pair = [g ((g a) b)]
-    // `a` and `b` are manually define by creating the environment
+    // `a` and `b` are defined manually by creating environments
     T[BUILTIN_TERM_PAIR]   = term_abstraction(BUILTIN_VAR_G);
     T[BUILTIN_TERM_PAIR+1] = term_application(BUILTIN_TERM_PAIR+5);
     T[BUILTIN_TERM_PAIR+2] = term_application(BUILTIN_TERM_PAIR+4);
@@ -305,7 +305,7 @@ static void builtin_init(struct program *prog) {
     T[BUILTIN_TERM_PAIR+5] = term_variable(BUILTIN_VAR_B);
 
     // apply = (func arg)
-    // `func` and `arg` are manually define by creating the environment
+    // `func` and `arg` are defined manually by creating environments
     T[BUILTIN_TERM_APPLY]   = term_application(BUILTIN_TERM_APPLY+2);
     T[BUILTIN_TERM_APPLY+1] = term_variable(BUILTIN_VAR_FUNC);
     T[BUILTIN_TERM_APPLY+2] = term_variable(BUILTIN_VAR_ARG);
