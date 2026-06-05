@@ -15,9 +15,13 @@ codegen-units = 1
 
 # Memory allocator
 [dependencies.talc]
-version = "^4.4"
-default-features = false
-features = ["lock_api"]
+version = "^5.0"
+
+[dependencies.fixed]
+version = "^1.31"
+
+[dependencies.cordic]
+version = "^0.1"
 
 [[bin]]
 name = "hello"
@@ -34,3 +38,8 @@ path = "fibonacci.rs"
 [[bin]]
 name = "mandelbrot"
 path = "mandelbrot.rs"
+
+[[bin]]
+name = "sincos"
+path = "sincos.rs"
+

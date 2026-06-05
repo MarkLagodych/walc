@@ -15,18 +15,49 @@ pub use alloc::{
 mod walc {
     #[link(wasm_import_module = "walc")]
     unsafe extern "C" {
-        pub fn exit() -> !;
-        pub fn output(c: u8);
-        pub fn input() -> u32;
+        pub safe fn output(c: u8);
+        pub safe fn input() -> u32;
+        pub safe fn exit() -> !;
     }
 }
 
+#[unsafe(export_name = "main")]
+fn main() {
+    crate::main()
+}
+
+#[cfg(target_family = "wasm")]
+#[global_allocator]
+static ALLOCATOR: talc::wasm::WasmDynamicTalc = talc::wasm::new_wasm_dynamic_allocator();
+
+#[cfg(target_family = "wasm")]
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    print_string("\nPanic!\n");
+
+    if let Some(location) = info.location() {
+        print_string("Location: ");
+        print_string(location.file());
+        print_string(":");
+        print_u32(location.line());
+        print_string("\n");
+    }
+
+    if let Some(msg) = info.message().as_str() {
+        print_string("Message: ");
+        print_string(msg);
+        print_string("\n");
+    }
+
+    exit()
+}
+
 pub fn print_byte(c: u8) {
-    unsafe { walc::output(c) }
+    walc::output(c)
 }
 
 pub fn read_byte() -> Option<u8> {
-    let result = unsafe { walc::input() };
+    let result = walc::input();
     if result == 0xFFFFFFFF {
         None
     } else {
@@ -35,7 +66,7 @@ pub fn read_byte() -> Option<u8> {
 }
 
 pub fn exit() -> ! {
-    unsafe { walc::exit() }
+    walc::exit()
 }
 
 pub fn read_buffer(buffer: &mut [u8]) -> usize {
@@ -133,32 +164,3 @@ macro_rules! eprintln {
         println!($($arg)*);
     }};
 }
-
-#[unsafe(export_name = "main")]
-fn main() {
-    crate::main()
-}
-
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    print_string("\n!!!FATAL ERROR!!!\n");
-
-    if let Some(location) = info.location() {
-        print_string("Location: ");
-        print_string(location.file());
-        print_string(":");
-        print_u32(location.line());
-        print_string("\n");
-    }
-
-    if let Some(msg) = info.message().as_str() {
-        print_string("Message: ");
-        print_string(msg);
-        print_string("\n");
-    }
-
-    exit()
-}
-
-#[global_allocator]
-static ALLOCATOR: talc::TalckWasm = unsafe { talc::TalckWasm::new_global() };

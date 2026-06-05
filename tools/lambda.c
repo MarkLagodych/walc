@@ -16,7 +16,8 @@
 #include <stdio.h>
 
 static void error(char const *message) {
-    fprintf(stderr, "Error: %s\n", message);
+    fprintf(stderr, "\n**************************************************\n");
+    fprintf(stderr, "Interpreter error: %s\n", message);
     exit(EXIT_FAILURE);
 }
 
