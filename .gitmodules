@@ -1,0 +1,3 @@
+[submodule "tests/spec/reference-tests"]
+	path = tests/auto-spec/spec
+	url = https://github.com/WebAssembly/spec
