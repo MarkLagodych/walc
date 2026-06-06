@@ -1,12 +1,20 @@
 (module
     (import "walc" "output" (func $output (param i32)))
     (export "main" (func $main))
-    (func $main
-        loop
+    (func $main (local $x i32)
+        i32.const 1
+        local.set $x
+
+        loop $l
             i32.const 0x61 ;; 'a'
             call $output
 
-            br 0
+            local.get $x
+            if
+                i32.const 0
+                local.set $x
+                br $l ;; continue
+            end
 
             i32.const 0x62 ;; 'b'
             call $output

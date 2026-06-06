@@ -8,6 +8,13 @@
 
         i64.const 0x0FF13745E
         call $compare64
+
+        i64.const 0x00F123456
+        i64.const 0x0F0114448
+        i64.and
+
+        i64.const 0x000100440
+        call $compare64
     )
     (func $compare32 (param i32 i32)
         local.get 0

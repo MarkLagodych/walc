@@ -1,0 +1,86 @@
+[
+    {
+        "name": "add-sub",
+        "expected_output": "YYYYYY"
+    },
+    {
+        "name": "bitwise",
+        "expected_output": "YY"
+    },
+    {
+        "name": "br",
+        "expected_output": "a"
+    },
+    {
+        "name": "comparisons",
+        "expected_output": "YYYYYYYY"
+    },
+    {
+        "name": "count-ones",
+        "expected_output": "YYYYYYY"
+    },
+    {
+        "name": "count-zeroes",
+        "expected_output": "YYYYYYYYYY"
+    },
+    {
+        "name": "div",
+        "expected_output": "YYYYYYYYYYYYY"
+    },
+    {
+        "name": "div-zero",
+        "expected_output": "a"
+    },
+    {
+        "name": "extensions",
+        "expected_output": "YYYYYYYYY"
+    },
+    {
+        "name": "function-locals",
+        "expected_output": "a"
+    },
+    {
+        "name": "function",
+        "expected_output": ""
+    },
+    {
+        "name": "if",
+        "expected_output": "ba"
+    },
+    {
+        "name": "loop",
+        "expected_output": "aab"
+    },
+    {
+        "name": "memory-bulk-ops",
+        "expected_output": "YYY"
+    },
+    {
+        "name": "memory",
+        "expected_output": "YYYYYY"
+    },
+    {
+        "name": "minimal",
+        "expected_output": ""
+    },
+    {
+        "name": "mul",
+        "expected_output": "YYYY"
+    },
+    {
+        "name": "rem",
+        "expected_output": "YYYYYY"
+    },
+    {
+        "name": "rotations",
+        "expected_output": "YYYYYYYY"
+    },
+    {
+        "name": "shift",
+        "expected_output": "YYYYYYYYYYYYYYYYYYYYY"
+    },
+    {
+        "name": "simple",
+        "expected_output": "a"
+    }
+]

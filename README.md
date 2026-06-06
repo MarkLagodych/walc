@@ -32,6 +32,15 @@ Enjoy!
 
 ## Build & run
 
+First, download it:
+
+```sh
+git clone https://github.com/MarkLagodych/walc --depth 1 --no-recurse-submodules
+cd walc
+```
+
+Run from the project directory:
+
 ```sh
 cargo run -- INPUT.wasm -o OUTPUT.walc
 ```
