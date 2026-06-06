@@ -1,0 +1,33 @@
+# Specification tests
+
+This script runs the tests provided in the WebAssembly specification repository.
+
+The tester skips all tests that mention floats (`float*`, `f32*`, `f64*`)
+and that are not valid WASM 1.0 / LIME1 (i.e. WASM 2.0 and newer).
+
+Each `.wast` file is split into several stand-alone `.wasm` files that
+should either succeed or fail.
+
+The tester creates some testing files in a local `bin` directory and then uses
+them for running. The testing files are only created once, so in order to
+recreate them, just do `rm -rf bin`.
+
+## Setup
+
+Fetch the submodules:
+
+```sh
+git submodule update --init
+```
+
+## Run
+
+```sh
+./run.ts
+```
+
+## Cleanup
+
+```sh
+rm -rf ./bin/
+```
