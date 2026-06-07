@@ -7,12 +7,12 @@ use clap::*;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Args {
-    /// Input WebAssembly module
-    #[arg()]
+    /// Input WebAssembly module. Use "-" for STDIN.
+    #[arg(default_value = "-")]
     pub input_file: String,
 
-    /// Output lambda calculus file
-    #[arg(short = 'o')]
+    /// Output lambda calculus file. Use "-" for STDOUT.
+    #[arg(short = 'o', default_value = "-")]
     pub output_file: String,
 }
 
@@ -31,8 +31,12 @@ fn run(args: Args) -> Result<()> {
 
     let expr = analyzer::compile(&source)?;
 
-    std::fs::write(&args.output_file, expr.to_string())
-        .map_err(|e| anyhow!("Cannot write output file: {e}"))?;
+    if args.output_file == "-" {
+        println!("{}", expr);
+    } else {
+        std::fs::write(&args.output_file, expr.to_string())
+            .map_err(|e| anyhow!("Cannot write output file: {e}"))?;
+    }
 
     Ok(())
 }

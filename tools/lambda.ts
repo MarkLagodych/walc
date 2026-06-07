@@ -234,6 +234,9 @@ import * as fs from "node:fs"
 const args = process.argv.slice(2)
 
 function read_file(path: string): string {
+    if (path == "-")
+        return fs.readFileSync(process.stdin.fd, "utf-8")
+
     return fs.readFileSync(path, "utf-8")
 }
 
@@ -250,7 +253,7 @@ function read_byte(): number | null {
 const help_message =
 `Lambda calculus interpreter based on WALC format
 Run with 'deno --allow-read' (default), 'tsx', 'bun', etc.:
-$ [<TYPESCRIPT_INTERPRETER>] ./lambda.ts <FILENAME>`
+$ [<TYPESCRIPT_INTERPRETER>] ./lambda.ts { <FILENAME> | - }`
 
 function main() {
     if (args.length != 1 || args[0] == "--help") {
