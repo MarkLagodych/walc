@@ -5,11 +5,23 @@ import path from 'node:path'
 import process from 'node:process'
 import { spawnSync } from 'node:child_process'
 
+
+let jsonFilterStr = null
+if (process.argv.length > 2) {
+    jsonFilterStr = process.argv[2]
+}
+
+const jsonFilter = new RegExp(jsonFilterStr ?? '.*')
+
+
 const scriptDir = fs.realpathSync(import.meta.dirname ?? '.')
 const rootDir = fs.realpathSync(`${scriptDir}/../..`)
 const binDir = `${scriptDir}/bin`
 const wastRootDir = `${scriptDir}/spec/test`
 
+function looksLikeFloatTest(testName: string): boolean {
+    return /^f32|f64|float/.test(testName)
+}
 
 function discoverWastFiles(): string[] {
     const corePath = `${wastRootDir}/core`
@@ -18,7 +30,10 @@ function discoverWastFiles(): string[] {
     // All core tests that don't mention floats
     const coreTests = fs.readdirSync(corePath)
         .filter(file => file.endsWith('.wast'))
-        .filter(file => !/^f32|f64|float/.test(file))
+        .filter(file => !looksLikeFloatTest(file))
+        // These are very complicated tests that use multiple modules,
+        // which WALC doesn't support
+        .filter(file => !(file === 'exports.wast' || file === 'linking.wast'))
         .map(file => `${corePath}/${file}`)
 
     // memory.fill/copy tests
@@ -29,6 +44,8 @@ function discoverWastFiles(): string[] {
 
     return [...coreTests, ...bulkMemoryTests]
 }
+
+
 
 function compileWastFiles(wastFiles: string[]) {
     console.log('Compiling .wast files to .wasm/.json...')
@@ -167,7 +184,7 @@ interface ModuleCommand extends TestCommand {
 interface TestAction {
     type: "invoke",
     field: string,
-    args: TestValue[]
+    args: TestValue[] | undefined
 }
 
 interface TestValue {
@@ -238,11 +255,15 @@ function runWat(watSource: string): string {
 // Tests if the program prints the expected output.
 // Prints a message on error.
 function testPrints(
-    module: TestBaseModule, mainBody: string, expected: string
+    module: TestBaseModule,
+    action: TestAction,
+    testCode: string,
+    expected: string
 ) {
-    try {
-        const watSource = appendCode(module.source, mainFunc(mainBody))
+    const mainBody = performAction(module, action) + testCode
+    const watSource = appendCode(module.source, mainFunc(mainBody))
 
+    try {
         const output = runWat(watSource)
 
         if (output !== expected) {
@@ -254,7 +275,9 @@ function testPrints(
         }
 
         console.error('')
-        console.error(`[FAIL] ${module.filename}: ${error.message}`)
+        console.error(
+        `[FAIL] ${module.filename} (export ${action.field}): ${error.message}`
+        )
         console.error('The test source is: \n' + mainBody)
         console.error('--------------------------------')
     }
@@ -286,13 +309,14 @@ function findExportedFunctions(watSource: string): Map<string, string> {
 }
 
 function prependCode(baseWatSource: string, code: string): string {
-    const firstParenIndex = baseWatSource.indexOf('(module')
+    // The first line should be "(module\n" or "(module $name\n"
+    const firstNewlineIndex = baseWatSource.indexOf('\n')
 
-    if (firstParenIndex === -1) {
+    if (firstNewlineIndex === -1) {
         throw new Error('Invalid .wat source: no module declaration found')
     }
 
-    const insertIndex = firstParenIndex + '(module'.length
+    const insertIndex = firstNewlineIndex + '\n'.length
     return baseWatSource.slice(0, insertIndex) + '\n'
         + code + '\n'
         + baseWatSource.slice(insertIndex)
@@ -329,10 +353,12 @@ function performAction(module: TestBaseModule, action: TestAction): string {
     const func = module.exports.get(action.field)
 
     if (func === undefined) {
-        throw new Error(`Function "${action.field}" not found in exports`)
+        throw new Error(
+        `Function "${action.field}" not found in exports of ${module.filename}`
+        )
     }
 
-    const args = action.args.map(pushValue).map(a => ' ' + a).join('')
+    const args = (action.args ?? []).map(pushValue).map(a => ' ' + a).join('')
 
     return `(call ${func}${args})\n`
 }
@@ -356,9 +382,13 @@ function testExpected(cmd: AssertReturnCommand): string {
     return code
 }
 
+function hasFloats(values: TestValue[]): boolean {
+    return values.find(v => (v.type === 'f32' || v.type === 'f64'))
+        !== undefined
+}
+
 function testReturn(module: TestBaseModule, cmd: AssertReturnCommand) {
-    const body = performAction(module, cmd.action) + testExpected(cmd)
-    testPrints(module, body, 'Y')
+    testPrints(module, cmd.action, testExpected(cmd), 'Y')
 }
 
 function failInTheEnd() {
@@ -369,13 +399,18 @@ function failInTheEnd() {
 }
 
 function testTrap(module: TestBaseModule, cmd: AssertTrapCommand) {
-    const body = performAction(module, cmd.action) + failInTheEnd()
-    testPrints(module, body, '')
+    testPrints(module, cmd.action, failInTheEnd(), '')
 }
 
-function readModule(cmd: ModuleCommand): TestBaseModule {
+// Returns null if the file does not exist (it was filtered out)
+function readModule(cmd: ModuleCommand): TestBaseModule | null {
     const baseName = path.basename(cmd.filename, '.wasm')
     const moduleName = `${binDir}/${baseName}.wat`
+
+    if (!fs.existsSync(moduleName)) {
+        return null // The test was filtered out
+    }
+
     let source = fs.readFileSync(moduleName, 'utf-8')
 
     const exports = findExportedFunctions(source)
@@ -383,7 +418,7 @@ function readModule(cmd: ModuleCommand): TestBaseModule {
     source = prependCode(source, walcImports)
 
     return {
-        filename: cmd.filename,
+        filename: moduleName,
         source: source,
         exports: exports
     }
@@ -398,12 +433,16 @@ function run() {
         .map(file => `${binDir}/${file}`)
 
     for (const testSetFile of testSetFiles) {
+        if (!jsonFilter.test(testSetFile)) {
+            continue
+        }
+
         console.log(`Running tests from ${testSetFile}...`)
 
         const testSetSource = fs.readFileSync(testSetFile, 'utf-8')
         const testSet = JSON.parse(testSetSource) as TestSet
 
-        let module = null as TestBaseModule | null
+        let module = undefined as TestBaseModule | null | undefined
 
         for (const command of testSet.commands) {
             switch (command.type) {
@@ -416,8 +455,20 @@ function run() {
                 case 'assert_trap': {
                     const cmd = command as AssertTrapCommand
 
-                    if (module === null) {
+                    if (module === undefined) {
                         throw new Error(`bad test set: ${testSetFile}`)
+                    }
+
+                    if (module === null) {
+                        continue // The test was filtered
+                    }
+
+                    if (
+                        looksLikeFloatTest(cmd.action.field)
+                        || hasFloats(cmd.action.args ?? [])
+                    ) {
+                        // We don't support floats
+                        continue
                     }
 
                     testTrap(module, cmd)
@@ -427,8 +478,21 @@ function run() {
                 case 'assert_return': {
                     const cmd = command as AssertReturnCommand
 
-                    if (module === null) {
+                    if (module === undefined) {
                         throw new Error(`bad test set: ${testSetFile}`)
+                    }
+
+                    if (module === null) {
+                        continue // The test was filtered
+                    }
+
+                    if (
+                        looksLikeFloatTest(cmd.action.field)
+                        || hasFloats(cmd.action.args ?? [])
+                        || hasFloats(cmd.expected)
+                    ) {
+                        // We don't support floats
+                        continue
                     }
 
                     testReturn(module, cmd)

@@ -40,6 +40,12 @@ or:
 deno -A run.ts
 ```
 
+You can also specify the regex of the JSON files that the tester should use:
+
+```sh
+./run.ts '.*exports.json'
+```
+
 ## Cleanup
 
 ```sh
