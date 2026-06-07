@@ -10,7 +10,10 @@ pub fn eval<'a>(expr: &[Operator<'a>], globals: &[Operator<'a>]) -> Operator<'a>
 
     for op in expr {
         match op {
-            Operator::I32Const { .. } | Operator::I64Const { .. } => stack.push(op.clone()),
+            Operator::I32Const { .. }
+            | Operator::I64Const { .. }
+            | Operator::F32Const { .. }
+            | Operator::F64Const { .. } => stack.push(op.clone()),
 
             Operator::I32Add => {
                 let b = stack.pop().unwrap();

@@ -116,7 +116,9 @@ function convertWasmToWat() {
 
         // We need --name-unnamed because we will be inserting additional
         // imports manually and so we need all function references
-        // to be stable and not change when we add imports
+        // to be stable and not change when we add imports.
+        // --print-offsets is needed for reference when debugging where
+        // modules fail to validate
         const result = spawnSync(
             'wasm-tools',
             [
@@ -124,7 +126,8 @@ function convertWasmToWat() {
                 `${binDir}/${wasmFile}`,
                 '-o',
                 `${binDir}/${baseName}.wat`,
-                '--name-unnamed'
+                '--name-unnamed',
+                '--print-offsets'
             ]
         )
 
@@ -162,6 +165,7 @@ interface TestSet {
 
 interface TestCommand {
     type: string,
+    line: number,
 }
 
 interface AssertReturnCommand extends TestCommand {
@@ -190,6 +194,13 @@ interface TestAction {
 interface TestValue {
     type: "i32" | "i64" | "f32" | "f64",
     value: string
+}
+
+interface TestBaseModule {
+    filename: string,
+    line: number,
+    source: string,
+    exports: Map<string, string>
 }
 
 
@@ -257,11 +268,11 @@ function runWat(watSource: string): string {
 function testPrints(
     module: TestBaseModule,
     action: TestAction,
-    testCode: string,
+    assertionCode: string,
     expected: string
 ) {
-    const mainBody = performAction(module, action) + testCode
-    const watSource = appendCode(module.source, mainFunc(mainBody))
+    const code = mainFunc(performAction(module, action) + assertionCode)
+    const watSource = appendCode(module.source, code)
 
     try {
         const output = runWat(watSource)
@@ -276,24 +287,12 @@ function testPrints(
 
         console.error('')
         console.error(
-        `[FAIL] ${module.filename} (export ${action.field}): ${error.message}`
+            `[FAIL] ${module.filename}:${module.line}`
+            + ` (export "${action.field}"): ${error.message}`
         )
-        console.error('The test source is: \n' + mainBody)
+        console.error('The test source is: \n' + code)
         console.error('--------------------------------')
     }
-}
-
-interface Export {
-    // Exported name
-    name: string,
-    // Function identifier (a number or an identifier like "$foo")
-    func: string
-}
-
-interface TestBaseModule {
-    filename: string,
-    source: string,
-    exports: Map<string, string>
 }
 
 function findExportedFunctions(watSource: string): Map<string, string> {
@@ -334,11 +333,10 @@ function appendCode(baseWatSource: string, code: string): string {
         + baseWatSource.slice(lastParenIndex)
 }
 
-const walcImports = '(import "walc" "output" (func $walc-print (param i32)))'
 
 function mainFunc(body: string): string {
-    return '(export "main" (func $walcMain))'
-        + `(func $walcMain ${body})`
+    return '(export "main" (func $walc-main))'
+        + `(func $walc-main ${body})`
 }
 
 function pushValue(value: TestValue): string {
@@ -354,7 +352,8 @@ function performAction(module: TestBaseModule, action: TestAction): string {
 
     if (func === undefined) {
         throw new Error(
-        `Function "${action.field}" not found in exports of ${module.filename}`
+            `Function "${action.field}" not found in exports of`
+            + ` ${module.filename}:${module.line}`
         )
     }
 
@@ -396,6 +395,7 @@ function failInTheEnd() {
 
     const N = 'N'.charCodeAt(0)
     return `(call $walc-print (i32.const ${N})) ;; print N\n`
+        + '(unreachable) ;; exit\n'
 }
 
 function testTrap(module: TestBaseModule, cmd: AssertTrapCommand) {
@@ -415,10 +415,14 @@ function readModule(cmd: ModuleCommand): TestBaseModule | null {
 
     const exports = findExportedFunctions(source)
 
-    source = prependCode(source, walcImports)
+    source = prependCode(
+        source,
+        '(import "walc" "output" (func $walc-print (param i32)))'
+    )
 
     return {
         filename: moduleName,
+        line: cmd.line,
         source: source,
         exports: exports
     }
