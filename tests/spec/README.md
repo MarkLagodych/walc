@@ -12,6 +12,14 @@ The tester creates some testing files in a local `bin` directory and then uses
 them for running. The testing files are only created once, so in order to
 recreate them, just do `rm -rf bin`.
 
+## Prerequisites
+
+You need the following programs installed and available in your PATH:
+- [Deno](https://deno.com/)
+- [Cargo](https://rust-lang.org/)
+- [wasm-tools](https://github.com/bytecodealliance/wasm-tools)
+  (can be installed with `cargo install wasm-tools`)
+
 ## Setup
 
 Fetch the submodules:
@@ -24,6 +32,12 @@ git submodule update --init
 
 ```sh
 ./run.ts
+```
+
+or:
+
+```sh
+deno -A run.ts
 ```
 
 ## Cleanup

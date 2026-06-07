@@ -2,7 +2,7 @@
 
 import fs from 'node:fs'
 import process from 'node:process'
-import { execSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 
 interface Test{
     name: string,
@@ -17,26 +17,34 @@ function loadTests(): Test[] {
 function compileWatToWasm(tests: Test[], scriptDir: string, binDir: string) {
     process.chdir(scriptDir)
 
-    const wat2wasm = 'wasm-tools parse'
-
     for (const test of tests) {
         const watPath = `${scriptDir}/${test.name}.wat`
         const wasmPath = `${binDir}/${test.name}.wasm`
 
-        execSync(`${wat2wasm} ${watPath} -o ${wasmPath}`)
+        spawnSync('wasm-tools', ['parse', `${watPath}`, '-o', `${wasmPath}`])
     }
 }
 
 function compileWasmToWalc(tests: Test[], rootDir: string, binDir: string) {
     process.chdir(rootDir)
 
-    const walc = 'cargo run --quiet --features unbound-unreachable --'
-
     for (const test of tests) {
         const wasmPath = `${binDir}/${test.name}.wasm`
         const walcPath = `${binDir}/${test.name}.walc`
 
-        execSync(`${walc} ${wasmPath} -o ${walcPath}`)
+        spawnSync(
+            'cargo',
+            [
+                'run',
+                '--quiet',
+                '--features',
+                'unbound-unreachable',
+                '--',
+                wasmPath,
+                '-o',
+                walcPath
+            ]
+        )
     }
 }
 
@@ -49,7 +57,10 @@ function runTests(tests: Test[], rootDir: string, binDir: string) {
         const walcPath = `${binDir}/${test.name}.walc`
 
         try {
-            const output = execSync(`${lambda} ${walcPath}`).toString().trim()
+            const output = spawnSync(
+                'deno', ['-A', lambda, walcPath],
+                { encoding: 'utf-8' }
+            ).stdout
 
             if (output !== test.expected_output) {
                 throw new Error(

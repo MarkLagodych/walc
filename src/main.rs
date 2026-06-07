@@ -4,11 +4,14 @@ mod codegen;
 use anyhow::{Result, anyhow};
 use clap::*;
 
+use std::io::Read;
+
+
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Args {
     /// Input WebAssembly module. Use "-" for STDIN.
-    #[arg(default_value = "-")]
+    #[arg()]
     pub input_file: String,
 
     /// Output lambda calculus file. Use "-" for STDOUT.
@@ -26,8 +29,15 @@ fn main() {
 }
 
 fn run(args: Args) -> Result<()> {
-    let source =
-        std::fs::read(&args.input_file).map_err(|e| anyhow!("Cannot read input file: {e}"))?;
+    let source = if args.input_file == "-" {
+        let mut buffer = Vec::new();
+        std::io::stdin().read_to_end(&mut buffer)
+            .map_err(|e| anyhow!("Cannot read from STDIN: {e}"))?;
+
+        buffer
+    } else {
+        std::fs::read(&args.input_file).map_err(|e| anyhow!("Cannot read input file: {e}"))?
+    };
 
     let expr = analyzer::compile(&source)?;
 

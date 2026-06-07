@@ -97,13 +97,17 @@ function convertWasmToWat() {
     for (const wasmFile of wasmFiles) {
         const baseName = path.basename(wasmFile, '.wasm')
 
+        // We need --name-unnamed because we will be inserting additional
+        // imports manually and so we need all function references
+        // to be stable and not change when we add imports
         const result = spawnSync(
             'wasm-tools',
             [
                 'print',
                 `${binDir}/${wasmFile}`,
                 '-o',
-                `${binDir}/${baseName}.wat`
+                `${binDir}/${baseName}.wat`,
+                '--name-unnamed'
             ]
         )
 
@@ -197,6 +201,7 @@ function convertWasm2Walc(wasmSource: Buffer): Buffer {
             '--features',
             'unbound-unreachable',
             '--',
+            '-' // Read the source from STDIN
         ],
         { input: wasmSource }
     )
@@ -210,9 +215,9 @@ function convertWasm2Walc(wasmSource: Buffer): Buffer {
 
 // Returns the STDOUT or throws an error
 function runWalc(walcSource: Buffer): Buffer {
+    // '-' makes the interpreter read the source from STDIN
     const runResult = spawnSync(
-        `${rootDir}/tools/lambda.ts`,
-        ['-'],
+        'deno', ['-A', `${rootDir}/tools/lambda.ts`, '-'],
         { input: walcSource }
     )
 
@@ -231,12 +236,27 @@ function runWat(watSource: string): string {
 }
 
 // Tests if the program prints the expected output.
-// Throws on error.
-function testPrints(watSource: string, expected: string) {
-    const output = runWat(watSource)
+// Prints a message on error.
+function testPrints(
+    module: TestBaseModule, mainBody: string, expected: string
+) {
+    try {
+        const watSource = appendCode(module.source, mainFunc(mainBody))
 
-    if (output !== expected) {
-        throw new Error(`Expected "${expected}", but got "${output}"`)
+        const output = runWat(watSource)
+
+        if (output !== expected) {
+            throw new Error(`Expected "${expected}", but got "${output}"`)
+        }
+    } catch (error) {
+        if (!(error instanceof Error)) {
+            throw error
+        }
+
+        console.error('')
+        console.error(`[FAIL] ${module.filename}: ${error.message}`)
+        console.error('The test source is: \n' + mainBody)
+        console.error('--------------------------------')
     }
 }
 
@@ -248,6 +268,7 @@ interface Export {
 }
 
 interface TestBaseModule {
+    filename: string,
     source: string,
     exports: Map<string, string>
 }
@@ -264,7 +285,20 @@ function findExportedFunctions(watSource: string): Map<string, string> {
     return exports
 }
 
-function insertAtEnd(baseWatSource: string, code: string): string {
+function prependCode(baseWatSource: string, code: string): string {
+    const firstParenIndex = baseWatSource.indexOf('(module')
+
+    if (firstParenIndex === -1) {
+        throw new Error('Invalid .wat source: no module declaration found')
+    }
+
+    const insertIndex = firstParenIndex + '(module'.length
+    return baseWatSource.slice(0, insertIndex) + '\n'
+        + code + '\n'
+        + baseWatSource.slice(insertIndex)
+}
+
+function appendCode(baseWatSource: string, code: string): string {
     const lastParenIndex = baseWatSource.lastIndexOf(')')
 
     if (lastParenIndex === -1) {
@@ -276,18 +310,15 @@ function insertAtEnd(baseWatSource: string, code: string): string {
         + baseWatSource.slice(lastParenIndex)
 }
 
-const imports = '(import "walc" "output" (func $walc-print (param i32)))'
-const N = '0x4E'
-const Y = '0x59'
+const walcImports = '(import "walc" "output" (func $walc-print (param i32)))'
 
 function mainFunc(body: string): string {
-    return imports + '\n'
-        + ' (export "main" (func $walcMain))' + '\n'
-        + ` (func $walcMain ${body})` + '\n'
+    return '(export "main" (func $walcMain))'
+        + `(func $walcMain ${body})`
 }
 
 function pushValue(value: TestValue): string {
-    return `(${value.type}.const ${value.value})` + '\n'
+    return `(${value.type}.const ${value.value})`
 }
 
 function performAction(module: TestBaseModule, action: TestAction): string {
@@ -301,39 +332,61 @@ function performAction(module: TestBaseModule, action: TestAction): string {
         throw new Error(`Function "${action.field}" not found in exports`)
     }
 
-    const args = action.args.map(pushValue)
-    return `(call ${func} ${args})` + '\n'
+    const args = action.args.map(pushValue).map(a => ' ' + a).join('')
+
+    return `(call ${func}${args})\n`
 }
 
 function testExpected(cmd: AssertReturnCommand): string {
     // The code prints 'N' on failure and 'Y' on success
 
+    const N = 'N'.charCodeAt(0)
+    const Y = 'Y'.charCodeAt(0)
+
     let code = ''
     for (const expected of cmd.expected) {
-        code += pushValue(expected) + '\n'
-            + `(${expected.type}.eq)` + '\n'
-            + `if (nop) else (call $walc-print (i32.const ${N})) end` + '\n'
+        const val = pushValue(expected)
+        code += `(if (${expected.type}.eq ${val})\n`
+            + '  (then nop)\n'
+            + `  (else (call $walc-print (i32.const ${N})))) ;; print N\n`
     }
 
-    code += `(call $walc-print (i32.const ${Y}))` + '\n'
+    code += `(call $walc-print (i32.const ${Y})) ;; print Y\n`
 
     return code
 }
 
 function testReturn(module: TestBaseModule, cmd: AssertReturnCommand) {
     const body = performAction(module, cmd.action) + testExpected(cmd)
-    const testWatSource = insertAtEnd(module.source, mainFunc(body))
-    testPrints(testWatSource, 'Y')
+    testPrints(module, body, 'Y')
 }
 
 function failInTheEnd() {
-    return `(call $walc-print (i32.const ${N}))` + '\n'
+    // The code prints nothing on successful trap and 'N' on failure
+
+    const N = 'N'.charCodeAt(0)
+    return `(call $walc-print (i32.const ${N})) ;; print N\n`
 }
 
 function testTrap(module: TestBaseModule, cmd: AssertTrapCommand) {
     const body = performAction(module, cmd.action) + failInTheEnd()
-    const testWatSource = insertAtEnd(module.source, mainFunc(body))
-    testPrints(testWatSource, '')
+    testPrints(module, body, '')
+}
+
+function readModule(cmd: ModuleCommand): TestBaseModule {
+    const baseName = path.basename(cmd.filename, '.wasm')
+    const moduleName = `${binDir}/${baseName}.wat`
+    let source = fs.readFileSync(moduleName, 'utf-8')
+
+    const exports = findExportedFunctions(source)
+
+    source = prependCode(source, walcImports)
+
+    return {
+        filename: cmd.filename,
+        source: source,
+        exports: exports
+    }
 }
 
 function run() {
@@ -356,14 +409,7 @@ function run() {
             switch (command.type) {
                 case 'module': {
                     const cmd = command as ModuleCommand
-
-                    const baseName = path.basename(cmd.filename, '.wasm')
-                    const moduleName = `${binDir}/${baseName}.wat`
-                    const source = fs.readFileSync(moduleName, 'utf-8')
-                    module = {
-                        source: source,
-                        exports: findExportedFunctions(source)
-                    }
+                    module = readModule(cmd)
                 }
                 break
 
