@@ -82,5 +82,9 @@
     {
         "name": "simple",
         "expected_output": "a"
+    },
+    {
+        "name": "handle_trap",
+        "expected_output": "Qb"
     }
 ]

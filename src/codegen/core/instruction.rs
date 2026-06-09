@@ -38,16 +38,41 @@ pub fn start(
     )
 }
 
+/// An efficient implementation of the `nop` instruction
 pub fn nop() -> Instruction {
     abs(["nop"], var("nop"))
 }
 
+/// Creates an instruction. When executed (given the execution context), it returns the given
+/// I/O command.
+///
+/// This simply contructs a function that gets the execution context variables
+/// (`N`, `F`, `M`, `G`, `L`, `S`, `T`) and returns the given command.
+/// Thus, `cmd` can use these variables.
+pub fn instr(cmd: io_command::IoCommand) -> Instruction {
+    abs(["N", "F", "M", "G", "L", "S", "T"], cmd)
+}
+
+/// Executes the given code segment using the current execution context.
+///
+/// This simply applies the variables of the execution context (`F`, `M`, `G`, `L`, `S`, `T`)
+/// to `code`.
+/// The result must wrapped with [`instr`] for those variables to be defined.
+pub fn exec(code: code::Code) -> io_command::IoCommand {
+    apply(
+        code,
+        [var("F"), var("M"), var("G"), var("L"), var("S"), var("T")],
+    )
+}
+
+/// This is a wrapper around [`LetExprBuilder`] that provides convenient methods to manipulate
+/// the instruction execution context (i.e. the variables `N`, `F`, `M`, `G`, `L`, `S`, `T`).
 #[derive(Default)]
-pub struct InstructionBuilder {
+pub struct InstructionContextBuilder {
     defs: LetExprBuilder,
 }
 
-impl InstructionBuilder {
+impl InstructionContextBuilder {
     pub fn new() -> Self {
         Self::default()
     }
@@ -56,60 +81,17 @@ impl InstructionBuilder {
         self.defs.def(name, value);
     }
 
+    /// Wraps the given I/O command with the new (changed) execution context.
+    ///
+    /// The result must be wrapped with [`instr`] for the execution context variables to be defined.
+    pub fn build(self, cmd: io_command::IoCommand) -> io_command::IoCommand {
+        self.defs.build_in(cmd)
+    }
+
     /// Builds a normal instruction that does not perform any I/O itself.
-    pub fn build(self) -> io_command::IoCommand {
-        let next = self.execute_next();
-        let body = self.defs.build_in(next);
-        Self::wrap_with_context(body)
-    }
-
-    /// Builds an instruction that unconditionally exits the program.
-    /// The instruction body is discarded.
-    pub fn build_exit(self) -> io_command::IoCommand {
-        Self::wrap_with_context(io_command::exit())
-    }
-
-    /// Builds an instruction that checks the condition and if it is false, traps.
-    pub fn build_check(self, should_continue: Bit) -> io_command::IoCommand {
-        let next = select(should_continue, io_command::exit(), self.execute_next());
-        let body = self.defs.build_in(next);
-        Self::wrap_with_context(body)
-    }
-
-    /// Builds an instruction that writes the given byte to the output *after* performing
-    /// all other operations inside itself.
-    pub fn build_output(self, byte: number::Byte) -> io_command::IoCommand {
-        let next = self.execute_next();
-        let cmd = io_command::output(byte, next);
-        let body = self.defs.build_in(cmd);
-        Self::wrap_with_context(body)
-    }
-
-    /// Builds an instruction that reads an input byte and stores it into the given variable
-    /// *before* performing all other operations inside itself.
-    pub fn build_input(self, dest_var: impl ToString) -> io_command::IoCommand {
-        let next = self.execute_next();
-        let body = self.defs.build_in(next);
-        let cmd = io_command::input(abs([dest_var.to_string()], body));
-        Self::wrap_with_context(cmd)
-    }
-
-    fn execute_next(&self) -> io_command::IoCommand {
-        apply(
-            self.next(),
-            [
-                self.function_tables(),
-                self.memory(),
-                self.globals(),
-                self.locals(),
-                self.stack(),
-                self.trace(),
-            ],
-        )
-    }
-
-    fn wrap_with_context(body: Expr) -> Instruction {
-        abs(["N", "F", "M", "G", "L", "S", "T"], body)
+    pub fn build_simple_instruction(self) -> Instruction {
+        let next = self.next();
+        instr(self.build(exec(next)))
     }
 
     pub fn next(&self) -> code::Code {
@@ -200,7 +182,7 @@ impl InstructionBuilder {
         self.def(dest_var, data_stack::top(self.stack()));
     }
 
-    pub fn push_trace(&mut self, item: Expr) {
+    pub fn push_trace(&mut self, item: code::Code) {
         self.set_trace(stack::push(self.trace(), item));
     }
 

@@ -26,6 +26,7 @@ pub struct ProgramBuilder<'a> {
 
     main_id: Option<FuncId>,
     start_id: Option<FuncId>,
+    handle_trap_id: Option<FuncId>,
 
     custom_func_table: Vec<Option<FuncId>>,
 }
@@ -40,6 +41,7 @@ impl<'a> ProgramBuilder<'a> {
             &mut self.runtime,
             self.main_id.unwrap(), // The analyzer must ensure that `main` exists
             self.start_id,
+            self.handle_trap_id,
             self.memory_initial_size,
             self.data_memory_offsets.into_iter(),
         );
@@ -95,6 +97,10 @@ impl<'a> ProgramBuilder<'a> {
 
     pub fn handle_start(&mut self, id: FuncId) {
         self.start_id = Some(id);
+    }
+
+    pub fn handle_trap_handler(&mut self, id: FuncId) {
+        self.handle_trap_id = Some(id);
     }
 
     pub fn handle_memory(&mut self, initial_size: u32) {

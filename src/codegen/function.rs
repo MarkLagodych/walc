@@ -240,16 +240,18 @@ pub fn exit_function(rt: &mut RuntimeGenerator) -> code::Code {
     code::single(runtime::instructions::io::exit(rt))
 }
 
-/// The resulting code will start up the program:
-/// 1. Data segments will be copied into the memory at given offsets.
-/// 2. The memory size will be initialized to the given value.
-/// 3. The start function (if any) will be called.
-/// 4. The main function will be called.
-/// 5. After main returns, the program will exit.
+/// The resulting code starts up the program:
+/// 1. The memory size is initialized to the given value.
+/// 2. Data segments are copied into the memory at given offsets.
+/// 3. The trap handler (if given) is set.
+/// 4. The start function (if given) is called.
+/// 5. The main function is called.
+/// 6. After main returns, the program exits.
 pub fn entrypoint(
     rt: &mut RuntimeGenerator,
     main_id: FuncId,
     start_id: Option<FuncId>,
+    handle_trap_id: Option<FuncId>,
     memory_initial_size: u32,
     data_memory_offsets: impl Iterator<Item = number::I32>,
 ) -> io_command::IoCommand {
@@ -267,6 +269,11 @@ pub fn entrypoint(
             target_offset,
         ));
     }
+
+    code.push(runtime::instructions::trap::set_trap_handler(
+        rt,
+        handle_trap_id.map(|id| var(format!("Func{id:x}"))),
+    ));
 
     if let Some(start_id) = start_id {
         code.push(runtime::instructions::control_flow::call(rt, start_id));

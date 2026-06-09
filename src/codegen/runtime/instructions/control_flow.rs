@@ -8,9 +8,9 @@ pub fn call(rt: &mut RuntimeGenerator, function_id: FuncId) -> Instruction {
     if !rt.has("Call") {
         rt.def("Call", {
             abs(["funcid"], {
-                let mut b = InstructionBuilder::new();
+                let mut b = InstructionContextBuilder::new();
                 b.call(var("funcid"));
-                b.build()
+                b.build_simple_instruction()
             })
         });
     }
@@ -22,13 +22,13 @@ pub fn call(rt: &mut RuntimeGenerator, function_id: FuncId) -> Instruction {
 pub fn call_indirect(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("CallIndirect") {
         let body = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a"]);
 
             b.def("a", math::i32_to_id(rt, var("a")));
             b.call_indirect(var("a"));
 
-            b.build()
+            b.build_simple_instruction()
         };
 
         rt.def("CallIndirect", body);
@@ -40,7 +40,7 @@ pub fn call_indirect(rt: &mut RuntimeGenerator) -> Instruction {
 pub fn begin_block(rt: &mut RuntimeGenerator, blocks: &BlockStack) -> Instruction {
     let block = blocks.get(0);
 
-    let mut b = InstructionBuilder::new();
+    let mut b = InstructionContextBuilder::new();
 
     match &block.labels {
         BlockLabels::Loop => {
@@ -66,13 +66,13 @@ pub fn begin_block(rt: &mut RuntimeGenerator, blocks: &BlockStack) -> Instructio
 
     b.push((0..param_count).map(|i| var(format!("p{i:x}"))));
 
-    b.build()
+    b.build_simple_instruction()
 }
 
 pub fn end_block(_rt: &mut RuntimeGenerator, blocks: &BlockStack) -> Instruction {
     let block = blocks.get(0);
 
-    let mut b = InstructionBuilder::new();
+    let mut b = InstructionContextBuilder::new();
 
     let result_count = block.block_type.result_count;
 
@@ -93,11 +93,11 @@ pub fn end_block(_rt: &mut RuntimeGenerator, blocks: &BlockStack) -> Instruction
         _ => {}
     }
 
-    b.build()
+    b.build_simple_instruction()
 }
 
 pub fn block_else(_rt: &mut RuntimeGenerator, blocks: &BlockStack) -> Instruction {
-    let mut b = InstructionBuilder::new();
+    let mut b = InstructionContextBuilder::new();
 
     match &blocks.get(0).labels {
         BlockLabels::If { end_label, .. } => {
@@ -106,7 +106,7 @@ pub fn block_else(_rt: &mut RuntimeGenerator, blocks: &BlockStack) -> Instructio
         _ => unreachable!(),
     }
 
-    b.build()
+    b.build_simple_instruction()
 }
 
 pub fn ret(rt: &mut RuntimeGenerator, blocks: &BlockStack) -> Instruction {
@@ -114,7 +114,7 @@ pub fn ret(rt: &mut RuntimeGenerator, blocks: &BlockStack) -> Instruction {
 }
 
 pub fn br(_rt: &mut RuntimeGenerator, blocks: &BlockStack, depth: u32) -> Instruction {
-    let mut b = InstructionBuilder::new();
+    let mut b = InstructionContextBuilder::new();
 
     let target_block = blocks.get(depth);
     let pop_count = match &target_block.labels {
@@ -146,11 +146,11 @@ pub fn br(_rt: &mut RuntimeGenerator, blocks: &BlockStack, depth: u32) -> Instru
         }
     }
 
-    b.build()
+    b.build_simple_instruction()
 }
 
 pub fn br_if(rt: &mut RuntimeGenerator, blocks: &BlockStack, depth: u32) -> Instruction {
-    let mut b = InstructionBuilder::new();
+    let mut b = InstructionContextBuilder::new();
 
     b.pop(["cond"]);
 
@@ -160,11 +160,11 @@ pub fn br_if(rt: &mut RuntimeGenerator, blocks: &BlockStack, depth: u32) -> Inst
         b.next(),
     ));
 
-    b.build()
+    b.build_simple_instruction()
 }
 
 pub fn br_table(rt: &mut RuntimeGenerator, blocks: &BlockStack, targets: &BrTable) -> Instruction {
-    let mut b = InstructionBuilder::new();
+    let mut b = InstructionContextBuilder::new();
 
     b.pop(["idx"]);
 
@@ -182,5 +182,5 @@ pub fn br_table(rt: &mut RuntimeGenerator, blocks: &BlockStack, targets: &BrTabl
 
     b.set_next(next);
 
-    b.build()
+    b.build_simple_instruction()
 }

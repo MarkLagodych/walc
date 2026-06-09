@@ -1,23 +1,16 @@
-use super::*;
+use super::{global_ids::CURRENT_MEMORY_SIZE_GLOBAL_ID, *};
 
 // Avoid shadowing of codegen::memory by this module
 use crate::codegen::memory;
-
-/// Defines the ID of the global that stores the current memory size.
-///
-/// Even though the real size of the memory is always 4 GiB, WASM requires the interpreter
-/// to respect the initial size and growth deltas provided by the program and track the current
-/// memory size. Doing otherwise makes existing memory allocators confused.
-const CURRENT_MEMORY_SIZE_GLOBAL_ID: u16 = u16::MAX;
 
 pub fn init_size(rt: &mut RuntimeGenerator, initial_size: u32) -> Instruction {
     if !rt.has("MemInitSize") {
         let body = {
             let mem_size_id = rt.num.id_const(CURRENT_MEMORY_SIZE_GLOBAL_ID);
 
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.set_global(mem_size_id, var("init"));
-            b.build()
+            b.build_simple_instruction()
         };
 
         rt.def("MemInitSize", abs(["init"], body));
@@ -31,10 +24,10 @@ pub fn size(rt: &mut RuntimeGenerator) -> Instruction {
         let body = {
             let mem_size_id = rt.num.id_const(CURRENT_MEMORY_SIZE_GLOBAL_ID);
 
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.get_global("cur_mem_size", mem_size_id);
             b.push([var("cur_mem_size")]);
-            b.build()
+            b.build_simple_instruction()
         };
 
         rt.def("MemSize", body);
@@ -48,13 +41,13 @@ pub fn grow(rt: &mut RuntimeGenerator) -> Instruction {
         let body = {
             let mem_size_id = rt.num.id_const(CURRENT_MEMORY_SIZE_GLOBAL_ID);
 
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["ngrow"]);
             b.get_global("cur_mem_size", mem_size_id.clone());
             b.push([var("cur_mem_size")]);
             let new_size = math::add(rt, var("cur_mem_size"), var("ngrow"));
             b.set_global(mem_size_id, new_size);
-            b.build()
+            b.build_simple_instruction()
         };
 
         rt.def("MemGrow", body);
@@ -87,14 +80,14 @@ pub fn init_with_data(
         rt.def_rec("_MemInit", body);
 
         let body = abs(["dat", "offset"], {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
 
             b.set_memory(apply(
                 rec(var("_MemInit")),
                 [var("dat"), var("offset"), b.memory()],
             ));
 
-            b.build()
+            b.build_simple_instruction()
         });
 
         rt.def("MemInit", body);
@@ -124,7 +117,7 @@ pub fn fill(rt: &mut RuntimeGenerator) -> Instruction {
         rt.def_rec("_MemFill", body);
 
         let body = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
 
             b.pop(["addr", "val", "len"]);
 
@@ -138,7 +131,7 @@ pub fn fill(rt: &mut RuntimeGenerator) -> Instruction {
                 [b.memory(), var("addr"), byte, max],
             ));
 
-            b.build()
+            b.build_simple_instruction()
         };
 
         rt.def("MemFill", body);
@@ -172,7 +165,7 @@ pub fn copy(rt: &mut RuntimeGenerator) -> Instruction {
         rt.def_rec("_MemCopy", body);
 
         let body = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
 
             b.pop(["dst", "src", "len"]);
 
@@ -184,7 +177,7 @@ pub fn copy(rt: &mut RuntimeGenerator) -> Instruction {
                 [b.memory(), var("dst"), var("src"), maxsrc],
             ));
 
-            b.build()
+            b.build_simple_instruction()
         };
 
         rt.def("MemCopy", body);
@@ -215,7 +208,7 @@ fn load(
 
     if !rt.has(&name) {
         let body = abs(["offset"], {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
 
             b.pop(["base_addr"]);
 
@@ -253,7 +246,7 @@ fn load(
 
             b.push([result]);
 
-            b.build()
+            b.build_simple_instruction()
         });
 
         rt.def(&name, body);
@@ -329,7 +322,7 @@ fn store(
 
     if !rt.has(&name) {
         let body = abs(["offset"], {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
 
             b.pop(["base_addr", "val"]);
 
@@ -359,7 +352,7 @@ fn store(
                 b.store(var(format!("addr{i}")), var("b"));
             }
 
-            b.build()
+            b.build_simple_instruction()
         });
 
         rt.def(&name, body);

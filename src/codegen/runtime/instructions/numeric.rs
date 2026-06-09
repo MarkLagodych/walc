@@ -4,9 +4,9 @@ pub fn push_const(rt: &mut RuntimeGenerator, op: &Operator) -> Instruction {
     if !rt.has("Push") {
         rt.def("Push", {
             abs(["item"], {
-                let mut b = InstructionBuilder::new();
+                let mut b = InstructionContextBuilder::new();
                 b.push([var("item")]);
-                b.build()
+                b.build_simple_instruction()
             })
         });
     }
@@ -18,7 +18,7 @@ pub fn push_const(rt: &mut RuntimeGenerator, op: &Operator) -> Instruction {
 pub fn eqz(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Eqz") {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a"]);
 
             let result = select(
@@ -29,7 +29,7 @@ pub fn eqz(rt: &mut RuntimeGenerator) -> Instruction {
 
             b.push([result]);
 
-            b.build()
+            b.build_simple_instruction()
         };
         rt.def("Eqz", definition);
     }
@@ -41,7 +41,7 @@ pub fn eqz(rt: &mut RuntimeGenerator) -> Instruction {
 fn unop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
     if !rt.has(op) {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a"]);
 
             let result = match op {
@@ -57,7 +57,7 @@ fn unop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
             };
 
             b.push([result]);
-            b.build()
+            b.build_simple_instruction()
         };
         rt.def(op, definition);
     }
@@ -92,7 +92,7 @@ pub fn i64_popcnt(rt: &mut RuntimeGenerator) -> Instruction {
 fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
     if !rt.has(op) {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a", "b"]);
 
             let result = match op {
@@ -119,7 +119,7 @@ fn binop(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
             };
 
             b.push([result]);
-            b.build()
+            b.build_simple_instruction()
         };
         rt.def(op, definition);
     }
@@ -196,7 +196,7 @@ pub fn i64_rotate_right(rt: &mut RuntimeGenerator) -> Instruction {
 fn binop_trapping(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
     if !rt.has(op) {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a", "b"]);
 
             b.def(
@@ -219,7 +219,12 @@ fn binop_trapping(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
             );
 
             b.push([optional::unwrap(var("result"))]);
-            b.build_check(optional::is_some(var("result")))
+
+            let next_cmd = exec(b.next());
+            let trap_cmd = exec(code::single(trap::trap(rt, trap::TrapCode::DivisionError)));
+            let cmd = select(optional::is_some(var("result")), trap_cmd, next_cmd);
+
+            instr(b.build(cmd))
         };
         rt.def(op, definition);
     }
@@ -264,7 +269,7 @@ pub fn i64_rem_s(rt: &mut RuntimeGenerator) -> Instruction {
 fn cmp(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
     if !rt.has(op) {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a", "b"]);
 
             let result_bit = match op {
@@ -285,7 +290,7 @@ fn cmp(rt: &mut RuntimeGenerator, op: &str) -> Instruction {
 
             b.push([result]);
 
-            b.build()
+            b.build_simple_instruction()
         };
         rt.def(op, definition);
     }
@@ -336,13 +341,13 @@ pub fn ge_s(rt: &mut RuntimeGenerator) -> Instruction {
 pub fn i32_wrap_i64(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("I32WrapI64") {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a"]);
 
             let result = math::wrap_i32(rt, var("a"));
 
             b.push([result]);
-            b.build()
+            b.build_simple_instruction()
         };
         rt.def("I32WrapI64", definition);
     }
@@ -357,7 +362,7 @@ pub fn i64_extend_i32(rt: &mut RuntimeGenerator, signed: bool) -> Instruction {
 
     if !rt.has(&name) {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a"]);
 
             let mut result = math::widen_i64(rt, var("a"));
@@ -367,7 +372,7 @@ pub fn i64_extend_i32(rt: &mut RuntimeGenerator, signed: bool) -> Instruction {
             }
 
             b.push([result]);
-            b.build()
+            b.build_simple_instruction()
         };
         rt.def(&name, definition);
     }
@@ -383,13 +388,13 @@ pub fn extend_s(rt: &mut RuntimeGenerator, target_bits: u8, source_bits: u8) -> 
 
     if !rt.has(&name) {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a"]);
 
             let result = math::sign_extend(rt, var("a"), target_bits, source_bits);
 
             b.push([result]);
-            b.build()
+            b.build_simple_instruction()
         };
         rt.def(&name, definition);
     }

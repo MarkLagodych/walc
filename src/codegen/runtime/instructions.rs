@@ -3,13 +3,14 @@ pub mod io;
 pub mod memory;
 pub mod numeric;
 pub mod parametric;
+pub mod trap;
 pub mod variable;
 
 use super::*;
 
 use crate::codegen::{
     function::BlockStack,
-    instruction::{Instruction, InstructionBuilder},
+    instruction::{Instruction, InstructionContextBuilder, exec, instr},
 };
 
 use crate::analyzer::{Func, Operator};
@@ -26,7 +27,7 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         // ==================================================================================
         // Constrol flow instructions
         Nop => instruction::nop(),
-        Unreachable => io::exit(rt),
+        Unreachable => trap::trap(rt, trap::TrapCode::ReachedUnreachable),
 
         Call { function_index } => control_flow::call(rt, *function_index),
         CallIndirect { .. } => control_flow::call_indirect(rt),
@@ -184,9 +185,7 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         | I32TruncF64U | I64TruncF32S | I64TruncF32U | I64TruncF64S | I64TruncF64U
         | F32ConvertI32S | F32ConvertI32U | F32ConvertI64S | F32ConvertI64U | F64ConvertI32S
         | F64ConvertI32U | F64ConvertI64S | F64ConvertI64U | F32DemoteF64 | F64PromoteF32 => {
-            eprintln!("Warning: floating-point arithmetic unsupported, replaced with traps");
-
-            io::exit(rt)
+            trap::trap(rt, trap::TrapCode::UsedUnsupportedFloatArithmetic)
         }
 
         _ => unreachable!("unsupported instruction: {op:?}"),
@@ -194,7 +193,7 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
 }
 
 pub fn func_prologue(rt: &mut RuntimeGenerator, func: &Func) -> Instruction {
-    let mut b = InstructionBuilder::new();
+    let mut b = InstructionContextBuilder::new();
 
     let param_count = func.func_type.params().len();
 
@@ -207,5 +206,5 @@ pub fn func_prologue(rt: &mut RuntimeGenerator, func: &Func) -> Instruction {
     b.push_locals_frame(table::from(locals));
     b.push_stack_frame();
 
-    b.build()
+    b.build_simple_instruction()
 }

@@ -3,9 +3,9 @@ use super::*;
 pub fn drop(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Drop") {
         rt.def("Drop", {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a"]);
-            b.build()
+            b.build_simple_instruction()
         });
     }
 
@@ -15,7 +15,7 @@ pub fn drop(rt: &mut RuntimeGenerator) -> Instruction {
 pub fn select(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Select") {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
 
             b.pop(["val_if_not_zero", "val_if_zero", "x"]);
 
@@ -25,7 +25,7 @@ pub fn select(rt: &mut RuntimeGenerator) -> Instruction {
                 var("val_if_zero"),
             )]);
 
-            b.build()
+            b.build_simple_instruction()
         };
 
         rt.def("Select", definition);

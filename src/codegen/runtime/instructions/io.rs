@@ -3,13 +3,15 @@ use super::*;
 pub fn output_and_return(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Output") {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
             b.pop(["a"]);
 
             let byte = math::i32_to_byte(rt, var("a"));
 
             b.ret();
-            b.build_output(byte)
+
+            let next = b.next();
+            instr(b.build(io_command::output(byte, exec(next))))
         };
 
         rt.def("Output", definition);
@@ -21,7 +23,7 @@ pub fn output_and_return(rt: &mut RuntimeGenerator) -> Instruction {
 pub fn input_and_return(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Input") {
         let definition = {
-            let mut b = InstructionBuilder::new();
+            let mut b = InstructionContextBuilder::new();
 
             let invalid_input = rt.num.i32_const(u32::MAX);
 
@@ -41,7 +43,9 @@ pub fn input_and_return(rt: &mut RuntimeGenerator) -> Instruction {
             )]);
 
             b.ret();
-            b.build_input("inp")
+
+            let next = b.next();
+            instr(io_command::input(abs(["inp"], b.build(exec(next)))))
         };
 
         rt.def("Input", definition);
@@ -52,10 +56,7 @@ pub fn input_and_return(rt: &mut RuntimeGenerator) -> Instruction {
 
 pub fn exit(rt: &mut RuntimeGenerator) -> Instruction {
     if !rt.has("Exit") {
-        rt.def("Exit", {
-            let b = InstructionBuilder::new();
-            b.build_exit()
-        });
+        rt.def("Exit", instr(io_command::exit()));
     }
 
     var("Exit")

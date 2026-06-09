@@ -150,24 +150,42 @@ impl<'a> Analyzer<'a> {
         for export in section {
             let export = export?;
 
-            if export.name != "main" {
-                // Other exports are ignored because they will not be used in any way
-                continue;
+            match export.name {
+                "main" => {
+                    let func_type = self.types.get_function_type(export.index);
+
+                    let required_type = FuncType::new([], []);
+
+                    if func_type != &required_type {
+                        Err(anyhow!(
+                            "'main' must have type {required_type}, got {func_type}"
+                        ))?
+                    }
+
+                    has_main = true;
+
+                    self.program.handle_main(export.index);
+                }
+
+                "handle_trap" => {
+                    let func_type = self.types.get_function_type(export.index);
+
+                    let required_type = FuncType::new([ValType::I32], []);
+
+                    if func_type != &required_type {
+                        Err(anyhow!(
+                            "'handle_trap' must have type {required_type}, got {func_type}"
+                        ))?
+                    }
+
+                    self.program.handle_trap_handler(export.index);
+                }
+
+                _ => {
+                    // Other exports are ignored because they will not be used in any way
+                    continue;
+                }
             }
-
-            let func_type = self.types.get_function_type(export.index);
-
-            let required_type = FuncType::new([], []);
-
-            if func_type != &required_type {
-                Err(anyhow!(
-                    "'main' must have type {required_type}, got {func_type}"
-                ))?
-            }
-
-            has_main = true;
-
-            self.program.handle_main(export.index);
         }
 
         if !has_main {

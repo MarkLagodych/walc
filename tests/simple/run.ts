@@ -21,7 +21,14 @@ function compileWatToWasm(tests: Test[], scriptDir: string, binDir: string) {
         const watPath = `${scriptDir}/${test.name}.wat`
         const wasmPath = `${binDir}/${test.name}.wasm`
 
-        spawnSync('wasm-tools', ['parse', `${watPath}`, '-o', `${wasmPath}`])
+        let result = spawnSync(
+            'wasm-tools', ['parse', `${watPath}`, '-o', `${wasmPath}`]
+        )
+
+        if (result.status !== 0) {
+            console.error(`Failed to compile ${watPath} to ${wasmPath}`)
+            console.error(result.stderr.toString())
+        }
     }
 }
 
@@ -32,7 +39,7 @@ function compileWasmToWalc(tests: Test[], rootDir: string, binDir: string) {
         const wasmPath = `${binDir}/${test.name}.wasm`
         const walcPath = `${binDir}/${test.name}.walc`
 
-        spawnSync(
+        const result = spawnSync(
             'cargo',
             [
                 'run',
@@ -45,6 +52,11 @@ function compileWasmToWalc(tests: Test[], rootDir: string, binDir: string) {
                 walcPath
             ]
         )
+
+        if (result.status !== 0) {
+            console.error(`Failed to compile ${wasmPath} to ${walcPath}`)
+            console.error(result.stderr.toString())
+        }
     }
 }
 
@@ -57,14 +69,20 @@ function runTests(tests: Test[], rootDir: string, binDir: string) {
         const walcPath = `${binDir}/${test.name}.walc`
 
         try {
-            const output = spawnSync(
+            const result = spawnSync(
                 'deno', ['-A', lambda, walcPath],
                 { encoding: 'utf-8' }
-            ).stdout
+            )
 
-            if (output !== test.expected_output) {
+            if (result.status !== 0) {
                 throw new Error(
-                    `expected "${test.expected_output}", got "${output}"`
+                    `Failed to run ${walcPath}\n${result.stderr.toString()}`
+                )
+            }
+
+            if (result.stdout !== test.expected_output) {
+                throw new Error(
+                    `expected "${test.expected_output}", got "${result.stdout}"`
                 )
             }
         } catch (error) {

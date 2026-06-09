@@ -36,6 +36,8 @@ use super::*;
 pub type Code = Expr;
 
 /// Builds a chain consisting of a single instruction.
+///
+/// The next instruction in the chain is [`unreachable`], so it must not be executed.
 pub fn single(instr: instruction::Instruction) -> Code {
     apply(instr, [unreachable()])
 }
