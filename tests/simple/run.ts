@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import process from 'node:process'
 import { spawnSync } from 'node:child_process'
 
-interface Test{
+interface Test {
     name: string,
     expected_output: string,
 }
@@ -21,7 +21,7 @@ function compileWatToWasm(tests: Test[], scriptDir: string, binDir: string) {
         const watPath = `${scriptDir}/${test.name}.wat`
         const wasmPath = `${binDir}/${test.name}.wasm`
 
-        let result = spawnSync(
+        const result = spawnSync(
             'wasm-tools', ['parse', `${watPath}`, '-o', `${wasmPath}`]
         )
 

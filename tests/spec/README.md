@@ -2,15 +2,15 @@
 
 This script runs the tests provided in the WebAssembly specification repository.
 
-The tester skips all tests that mention floats (`float*`, `f32*`, `f64*`)
-and that are not valid WASM 1.0 / LIME1 (i.e. WASM 2.0 and newer).
+The list of used tests is in [`tests.txt`](./tests.txt).
+It contains all tests relevant to WASM 1.0 and LIME1,
+except for the float tests (`float*.wast`, `f32*.wast`, `f64*.wast`)
+and the tests that require linking multiple WASM modules
+(`export.wast`, `linking.wast`).
 
-Each `.wast` file is split into several stand-alone `.wasm` files that
-should either succeed or fail.
-
-The tester creates some testing files in a local `bin` directory and then uses
-them for running. The testing files are only created once, so in order to
-recreate them, just do `rm -rf bin`.
+Each `.wast` file is compiled into several stand-alone `.wasm` files
+by the `wast2wasm.ts` script in a `bin` directory.
+The files are then run by the `run.ts` script.
 
 ## Prerequisites
 
@@ -28,22 +28,23 @@ Fetch the submodules:
 git submodule update --init
 ```
 
+Compile the test scripts:
+```sh
+./wast2wasm.ts
+```
+or:
+```sh
+deno -A ./wast2wasm.ts
+```
+
 ## Run
 
 ```sh
 ./run.ts
 ```
-
 or:
-
 ```sh
 deno -A run.ts
-```
-
-You can also specify the regex of the JSON files that the tester should use:
-
-```sh
-./run.ts '.*exports.json'
 ```
 
 ## Cleanup

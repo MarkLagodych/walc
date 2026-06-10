@@ -184,7 +184,9 @@ pub fn instruction(rt: &mut RuntimeGenerator, op: &Operator, blocks: &BlockStack
         | F64Le | F32Gt | F64Gt | F32Ge | F64Ge | I32TruncF32S | I32TruncF32U | I32TruncF64S
         | I32TruncF64U | I64TruncF32S | I64TruncF32U | I64TruncF64S | I64TruncF64U
         | F32ConvertI32S | F32ConvertI32U | F32ConvertI64S | F32ConvertI64U | F64ConvertI32S
-        | F64ConvertI32U | F64ConvertI64S | F64ConvertI64U | F32DemoteF64 | F64PromoteF32 => {
+        | F64ConvertI32U | F64ConvertI64S | F64ConvertI64U | F32DemoteF64 | F64PromoteF32
+        | I32TruncSatF32S | I32TruncSatF32U | I32TruncSatF64S | I32TruncSatF64U
+        | I64TruncSatF32S | I64TruncSatF32U | I64TruncSatF64S | I64TruncSatF64U => {
             trap::trap(rt, trap::TrapCode::UsedUnsupportedFloatArithmetic)
         }
 

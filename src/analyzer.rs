@@ -101,7 +101,7 @@ impl<'a> Analyzer<'a> {
 
             let type_id = match import.ty {
                 TypeRef::Func(type_id) | TypeRef::FuncExact(type_id) => type_id,
-                _ => Err(anyhow!("Only function imports are supported"))?,
+                _ => Err(anyhow!("Only WALC function imports are supported"))?,
             };
 
             self.next_function_id += 1;

@@ -6,7 +6,6 @@ use clap::*;
 
 use std::io::Read;
 
-
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Args {
@@ -31,7 +30,8 @@ fn main() {
 fn run(args: Args) -> Result<()> {
     let source = if args.input_file == "-" {
         let mut buffer = Vec::new();
-        std::io::stdin().read_to_end(&mut buffer)
+        std::io::stdin()
+            .read_to_end(&mut buffer)
             .map_err(|e| anyhow!("Cannot read from STDIN: {e}"))?;
 
         buffer
