@@ -86,5 +86,9 @@
     {
         "name": "handle_trap",
         "expected_output": "Qb"
+    },
+    {
+        "name": "br_table",
+        "expected_output": "abccc"
     }
 ]

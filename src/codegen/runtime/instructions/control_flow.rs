@@ -168,7 +168,7 @@ pub fn br_table(rt: &mut RuntimeGenerator, blocks: &BlockStack, targets: &BrTabl
 
     b.pop(["idx"]);
 
-    let mut next = br(rt, blocks, targets.default());
+    let mut next = code::single(br(rt, blocks, targets.default()));
 
     // Here `targets` contain parsing `Result`s.
     // The validator should catch all parsing errors, so we can just unwrap it.

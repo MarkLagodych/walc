@@ -10,8 +10,9 @@ interface Test {
 }
 
 const scriptDir = fs.realpathSync(import.meta.dirname ?? '.')
-const rootDir = fs.realpathSync(`${scriptDir}/..`)
+const srcDir = `${scriptDir}/src`
 const binDir = `${scriptDir}/bin`
+const rootDir = fs.realpathSync(`${scriptDir}/..`)
 
 const tests = JSON.parse(fs.readFileSync('tests.json', 'utf-8')) as Test[]
 
@@ -34,7 +35,7 @@ function compileWatToWasm() {
     process.chdir(scriptDir)
 
     for (const test of tests) {
-        const watPath = `${scriptDir}/${test.name}.wat`
+        const watPath = `${srcDir}/${test.name}.wat`
         const wasmPath = `${binDir}/${test.name}.wasm`
 
         const result = spawnSync(
