@@ -9,12 +9,28 @@ interface Test {
     expected_output: string,
 }
 
-function loadTests(): Test[] {
-    const source = fs.readFileSync('tests.json', 'utf-8')
-    return JSON.parse(source) as Test[]
+const scriptDir = fs.realpathSync(import.meta.dirname ?? '.')
+const rootDir = fs.realpathSync(`${scriptDir}/..`)
+const binDir = `${scriptDir}/bin`
+
+const tests = JSON.parse(fs.readFileSync('tests.json', 'utf-8')) as Test[]
+
+
+function main() {
+    if (!(fs.existsSync(binDir))) {
+        fs.mkdirSync(binDir)
+    }
+
+    console.log('Compiling .wat files to .wasm...')
+    compileWatToWasm()
+    console.log('Compiling .wasm files to .walc...')
+    compileWasmToWalc()
+    console.log('Running tests...')
+    runTests()
+    console.log('All tests completed')
 }
 
-function compileWatToWasm(tests: Test[], scriptDir: string, binDir: string) {
+function compileWatToWasm() {
     process.chdir(scriptDir)
 
     for (const test of tests) {
@@ -22,7 +38,13 @@ function compileWatToWasm(tests: Test[], scriptDir: string, binDir: string) {
         const wasmPath = `${binDir}/${test.name}.wasm`
 
         const result = spawnSync(
-            'wasm-tools', ['parse', `${watPath}`, '-o', `${wasmPath}`]
+            'wasm-tools',
+            [
+                'parse',
+                watPath,
+                '-o',
+                wasmPath
+            ]
         )
 
         if (result.status !== 0) {
@@ -32,7 +54,7 @@ function compileWatToWasm(tests: Test[], scriptDir: string, binDir: string) {
     }
 }
 
-function compileWasmToWalc(tests: Test[], rootDir: string, binDir: string) {
+function compileWasmToWalc() {
     process.chdir(rootDir)
 
     for (const test of tests) {
@@ -60,7 +82,7 @@ function compileWasmToWalc(tests: Test[], rootDir: string, binDir: string) {
     }
 }
 
-function runTests(tests: Test[], rootDir: string, binDir: string) {
+function runTests() {
     const lambda = `${rootDir}/tools/lambda.ts`
 
     for (const test of tests) {
@@ -70,7 +92,12 @@ function runTests(tests: Test[], rootDir: string, binDir: string) {
 
         try {
             const result = spawnSync(
-                'deno', ['-A', lambda, walcPath],
+                'deno',
+                [
+                    '-A',
+                    lambda,
+                    walcPath
+                ],
                 { encoding: 'utf-8' }
             )
 
@@ -89,26 +116,6 @@ function runTests(tests: Test[], rootDir: string, binDir: string) {
             console.error(`[FAIL] ${error}`)
         }
     }
-}
-
-function main() {
-    const tests = loadTests()
-
-    const scriptDir = fs.realpathSync(import.meta.dirname ?? '.')
-    const rootDir = fs.realpathSync(`${scriptDir}/../..`)
-    const binDir = `${scriptDir}/bin`
-
-    if (!(fs.existsSync(binDir))) {
-        fs.mkdirSync(binDir)
-    }
-
-    console.log('Compiling .wat files to .wasm...')
-    compileWatToWasm(tests, scriptDir, binDir)
-    console.log('Compiling .wasm files to .walc...')
-    compileWasmToWalc(tests, rootDir, binDir)
-    console.log('Running tests...')
-    runTests(tests, rootDir, binDir)
-    console.log('All tests completed')
 }
 
 main()

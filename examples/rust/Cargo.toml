@@ -43,3 +43,12 @@ path = "mandelbrot.rs"
 name = "sincos"
 path = "sincos.rs"
 
+[[bin]]
+name = "trap"
+path = "trap.rs"
+
+[[bin]]
+name = "panic"
+path = "panic.rs"
+
+

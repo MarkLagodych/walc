@@ -6,13 +6,7 @@ WALC environment spcifically.
 ## Build
 
 ```sh
-cargo install \
-    --quiet \
-    --path . \
-    --root . \
-    --no-track \
-    --profile release \
-    --target wasm32-unknown-unknown
+cargo install -q --path . --root . --no-track --profile release --target wasm32-unknown-unknown
 ```
 
 This will install `.wasm` binaries into a `bin` directory inside the current

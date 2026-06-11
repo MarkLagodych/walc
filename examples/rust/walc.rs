@@ -22,8 +22,20 @@ mod walc {
 }
 
 #[unsafe(export_name = "main")]
-fn main() {
+extern "C" fn main() {
     crate::main()
+}
+
+#[unsafe(export_name = "handle_trap")]
+extern "C" fn handle_trap(trap_code: u32) {
+    print_string("\nTRAP ");
+    print_u32(trap_code);
+    match trap_code {
+        0 => print_string(" reached unreachable instruction"),
+        1 => print_string(" division error"),
+        2 => print_string(" float math not supported"),
+        _ => {}
+    }
 }
 
 #[cfg(target_family = "wasm")]
@@ -33,20 +45,17 @@ static ALLOCATOR: talc::wasm::WasmDynamicTalc = talc::wasm::new_wasm_dynamic_all
 #[cfg(target_family = "wasm")]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    print_string("\nPanic!\n");
+    print_string("\nPANIC ");
+
+    if let Some(msg) = info.message().as_str() {
+        print_string(msg);
+    }
 
     if let Some(location) = info.location() {
-        print_string("Location: ");
+        print_string(" at ");
         print_string(location.file());
         print_string(":");
         print_u32(location.line());
-        print_string("\n");
-    }
-
-    if let Some(msg) = info.message().as_str() {
-        print_string("Message: ");
-        print_string(msg);
-        print_string("\n");
     }
 
     exit()
