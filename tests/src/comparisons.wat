@@ -57,6 +57,80 @@
 
         i32.const 1
         call $compare32
+
+        ;; more lt_s tests
+
+        i32.const 0
+        i32.const 0
+        i32.lt_s
+
+        i32.const 0
+        call $compare32
+
+        i32.const 0
+        i32.const 1
+        i32.lt_s
+
+        i32.const 1
+        call $compare32
+
+        i32.const 0xFFFFFFFF
+        i32.const 0xFFFFFFFF
+        i32.lt_s
+
+        i32.const 0
+        call $compare32
+
+        i32.const 0xFFFFFFFF ;; -1
+        i32.const 0
+        i32.lt_s
+
+        i32.const 1
+        call $compare32
+
+        i32.const 0
+        i32.const 0xFFFFFFFF ;; -1
+        i32.lt_s
+
+        i32.const 0
+        call $compare32
+
+        i32.const 0xFFFFFFFF ;; -1
+        i32.const 0xFFFFFFFE ;; -2
+        i32.lt_s
+
+        i32.const 0
+        call $compare32
+
+        i32.const 0xFFFFFFFE ;; -2
+        i32.const 0xFFFFFFFF ;; -1
+        i32.lt_s
+
+        i32.const 1
+        call $compare32
+
+        ;; ne tests
+
+        i32.const 0
+        i32.const 0
+        i32.ne
+
+        i32.const 0
+        call $compare32
+
+        i32.const 0
+        i32.const 1
+        i32.ne
+
+        i32.const 1
+        call $compare32
+
+        i32.const 0xFFFFFFFF
+        i32.const 0xFFFFFFFF
+        i32.ne
+
+        i32.const 0
+        call $compare32
     )
     (func $compare32 (param i32 i32)
         local.get 0

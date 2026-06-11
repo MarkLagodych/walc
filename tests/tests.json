@@ -13,7 +13,7 @@
     },
     {
         "name": "comparisons",
-        "expected_output": "YYYYYYYY"
+        "expected_output": "YYYYYYYYYYYYYYYYYY"
     },
     {
         "name": "count-ones",
@@ -28,6 +28,10 @@
         "expected_output": "YYYYYYYYYYYYY"
     },
     {
+        "name": "div2",
+        "expected_output": "YYYYYYYYYYYYYYYYYYYOK"
+    },
+    {
         "name": "div-zero",
         "expected_output": "a"
     },
@@ -37,7 +41,7 @@
     },
     {
         "name": "function-locals",
-        "expected_output": "a"
+        "expected_output": "aYYYYY"
     },
     {
         "name": "function",

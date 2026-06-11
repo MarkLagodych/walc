@@ -35,7 +35,7 @@ pub fn add(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number) -> n
             list::node(sum_head, sum_tail),
         );
 
-        rt.def_rec("_ADD", abs(["c", "a", "b"], b.build_in(body)));
+        rt.def_rec("_ADD", abs(["c", "a", "b"], b.build(body)));
 
         rt.def("ADD", apply(rec(var("_ADD")), [bit(false)]));
     }
@@ -305,7 +305,7 @@ fn divrem_helper(
             pair::new(var("res"), var("a")),
         );
 
-        let definition = abs(["a", "b", "part", "res"], defs.build_in(body));
+        let definition = abs(["a", "b", "part", "res"], defs.build(body));
 
         rt.def_rec("_DIVREM", definition);
     }
@@ -369,7 +369,7 @@ fn divrem(
             optional::none(),
         );
 
-        rt.def(&name, abs(["a", "b"], defs.build_in(body)));
+        rt.def(&name, abs(["a", "b"], defs.build(body)));
     }
 
     apply(var(name), [a, b])
@@ -400,7 +400,7 @@ fn div_or_rem_unsigned(
             }),
         );
 
-        rt.def(&name, abs(["a", "b"], defs.build_in(result)));
+        rt.def(&name, abs(["a", "b"], defs.build(result)));
     }
 
     apply(var(name), [a, b])
@@ -492,16 +492,16 @@ fn divrem_signed(
         let remainder = pair::get_second(optional::unwrap(var("divrem")));
 
         let successful_result = pair::new(
-            select(
+            optional::some(select(
                 bit_xor(var("a_neg"), var("b_neg")),
                 quotient.clone(),
-                select(
-                    optional::is_some(quotient.clone()),
-                    optional::none(),
-                    optional::some(negate(rt, quotient)),
-                ),
-            ),
-            select(var("a_neg"), remainder.clone(), negate(rt, remainder)),
+                negate(rt, quotient),
+            )),
+            optional::some(select(
+                var("a_neg"),
+                remainder.clone(),
+                negate(rt, remainder),
+            )),
         );
 
         let checked_result = select(
@@ -516,7 +516,7 @@ fn divrem_signed(
             pair::new(optional::none(), optional::some(zero)),
         );
 
-        let definition = abs(["a", "b"], defs.build_in(body));
+        let definition = abs(["a", "b"], defs.build(body));
 
         rt.def(&name, definition);
     }

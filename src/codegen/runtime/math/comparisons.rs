@@ -78,7 +78,7 @@ fn compare(rt: &mut RuntimeGenerator, a: number::Number, b: number::Number, op: 
         //
         // A < B or A <= B ("cmp(A, B)" for short) is computed by:
         //
-        // | A        | B        | cmp(result, A, B)             |
+        // | A        | B        | cmp(A, B, result)             |
         // | -------- | -------- | ----------------------------- |
         // | 0aaaaaaa | 0bbbbbbb | cmp(aaaaaaa, bbbbbbb, result) |
         // | 0aaaaaaa | 1bbbbbbb | cmp(aaaaaaa, bbbbbbb, true)   |
@@ -261,7 +261,7 @@ fn compare_signed(
             select(b_head, bit(true), compare_tail),
         );
 
-        rt.def(&name, abs(["a", "b"], b.build_in(body)));
+        rt.def(&name, abs(["a", "b"], b.build(body)));
     }
 
     apply(var(&name), [a, b])

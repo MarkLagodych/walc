@@ -203,7 +203,7 @@ fn apply_shift(
                 _ => unreachable!(),
             };
 
-            b.build_in(result)
+            b.build(result)
         };
 
         rt.def(&name, abs(["a", "shift"], body));

@@ -9,17 +9,20 @@ lto = "fat"
 codegen-units = 1
 
 [profile.release]
-strip = "debuginfo"
+opt-level = 3
 lto = "fat"
 codegen-units = 1
+strip = "debuginfo"
 
 # Memory allocator
 [dependencies.talc]
 version = "^5.0"
 
+# Fixed-point arithmetic
 [dependencies.fixed]
 version = "^1.31"
 
+# For trigonometric functions with fixed-point numbers
 [dependencies.cordic]
 version = "^0.1"
 

@@ -85,7 +85,7 @@ impl InstructionContextBuilder {
     ///
     /// The result must be wrapped with [`instr`] for the execution context variables to be defined.
     pub fn build(self, cmd: io_command::IoCommand) -> io_command::IoCommand {
-        self.defs.build_in(cmd)
+        self.defs.build(cmd)
     }
 
     /// Builds a normal instruction that does not perform any I/O itself.

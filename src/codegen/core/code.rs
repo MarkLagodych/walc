@@ -72,7 +72,7 @@ impl CodeBuilder {
             }
         }
 
-        defs.build_in(chain)
+        defs.build(chain)
     }
 
     pub fn push(&mut self, instruction: instruction::Instruction) {

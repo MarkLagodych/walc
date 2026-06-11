@@ -14,7 +14,8 @@ const srcDir = `${scriptDir}/src`
 const binDir = `${scriptDir}/bin`
 const rootDir = fs.realpathSync(`${scriptDir}/..`)
 
-const tests = JSON.parse(fs.readFileSync('tests.json', 'utf-8')) as Test[]
+const testSource = fs.readFileSync(`${scriptDir}/tests.json`, 'utf-8')
+const tests = JSON.parse(testSource) as Test[]
 
 
 function main() {

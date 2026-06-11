@@ -88,7 +88,7 @@ impl<'a> ProgramBuilder<'a> {
         defs.def("CustomTable", custom_table);
         defs.def("Globals", globals);
 
-        defs.build_in(start)
+        defs.build(start)
     }
 
     pub fn handle_main(&mut self, id: FuncId) {

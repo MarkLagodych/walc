@@ -175,7 +175,7 @@ impl LetExprBuilder {
     /// let varN = valueN in
     /// body
     /// ```
-    pub fn build_in(self, body: Expr) -> Expr {
+    pub fn build(self, body: Expr) -> Expr {
         let mut result = body;
         for (var, value) in self.defs.into_iter().rev() {
             result = let_in(var, value, result);
