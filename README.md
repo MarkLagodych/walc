@@ -69,34 +69,41 @@ Example Rust programs are [here](./examples/rust/).
 
 ### Run
 
-The commands are run from the root directory.
+- You can use the [runwasm](./tools/runwasm) script:
+    ```sh
+    tools/runwasm examples/rust/bin/mandelbrot.wasm
+    ```
+    This is a shorthand for running the C interpreter, which requires
+    a C compiler (`cc`) for the interpreter itself
+    and also [Deno](https://deno.com/) for the [pre-parser script](./tools/text2bin.ts).
+- Alternatively, you can run everything manually.
+    The commands here are run from the root directory.
 
-You can use the C interpreter:
-```sh
-mkdir -p bin
-walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
+    + To use the C interpreter, run:
+        ```sh
+        mkdir -p bin
+        walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
 
-# Compile the interpreter
-gcc tools/lambda.c -o bin/lambda -O3
-# Pre-compile the lambda expression
-tools/text2bin.ts bin/mandelbrot.walc -o bin/mandelbrot.bin
-# Run!
-bin/lambda bin/mandelbrot.bin
-```
+        # Compile the interpreter
+        gcc tools/lambda.c -o bin/lambda -O3
+        # Pre-compile the lambda expression
+        tools/text2bin.ts bin/mandelbrot.walc -o bin/mandelbrot.bin
+        # Run!
+        bin/lambda bin/mandelbrot.bin
+        ```
+    + To use the TypeScript/Lua interpreters, run:
 
-Alternatively, you can use the TypeScript or Lua interpreters:
+        ```sh
+        mkdir -p bin
+        walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
 
-```sh
-mkdir -p bin
-walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
+        tools/lambda.ts bin/mandelbrot.walc
+        # or:
+        tools/lambda.lua bin/mandelbrot.walc
+        ```
 
-tools/lambda.ts bin/mandelbrot.walc
-# or:
-tools/lambda.lua bin/mandelbrot.walc
-```
-
-Just for comparison, here is some approximate performace data from running on my
-machine:
+Just for comparison, here are some approximate performace data from
+running the [Mandelbrot example](./examples/rust/mandelbrot.rs) on my machine:
 
 | Interpreter    | Compiler/Runtime   | Execution time | Peak memory usage |
 |----------------|--------------------|----------------|-------------------|
@@ -146,7 +153,7 @@ calculus might do a 10x speedup. Or sophisticated compiler optimizations?*
            ...............................:::::::!?@!:::::............
 ```
 
-#### Tic-tac-toe
+#### Tic-Tac-Toe
 
 [`tictactoe.rs`](./examples/rust/tictactoe.rs)
 

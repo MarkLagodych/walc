@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+HELP=\
+'Usage:
+$ runwasm INPUT.wasm
+
+Compiles a WebAssembly module to lambda calculus and runs it using
+the C interpreter.
+
+This requires Cargo, Deno and a C compiler (cc) to be installed.'
+
+if [ "$1" = "" -o "$1" = "--help" ]
+then
+    echo "$HELP"
+    exit 0
+fi
+
+if [ "$1" != "-" -a ! -f "$1" ]
+then
+    echo "Error: file '$1' not found"
+    exit 1
+fi
+
+SCRIPT_DIR=$(dirname "$0")
+INPUT=$(realpath "$1")
+
+cd "$SCRIPT_DIR/.."
+
+if [ ! -e bin/lambda ]
+then
+    mkdir -p bin
+    cc tools/lambda.c -o bin/lambda -O3 1>/dev/null
+fi
+
+TMP=$(mktemp)
+
+# Compile from WebAssembly (.wasm) to lambda calculus (.walc)
+cargo run --quiet -- "$INPUT" -o "$TMP"
+# Pre-compile .walc to .bin
+tools/text2bin.ts "$TMP" "$TMP"
+# Run the pre-compiled .bin file using the C interpreter
+bin/lambda "$TMP"
+
+rm "$TMP"
