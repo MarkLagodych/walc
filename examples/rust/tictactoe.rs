@@ -154,9 +154,9 @@ fn main() {
 
     print_string("Welcome to Tic-Tac-Toe! (^o^)/\n");
 
-    loop {
-        game.print_board();
+    game.print_board();
 
+    loop {
         // User turn
         loop {
             print_string("Your move (row column): ");
@@ -175,29 +175,26 @@ fn main() {
         }
 
         game.print_board();
-        print_string("My move... :-P\n");
 
         if game.check_winner() == Player::X {
-            game.print_board();
             print_string("You win! :-D\n");
             break;
         }
         if game.is_full() {
-            game.print_board();
             print_string("It's a draw! :-O\n");
             break;
         }
 
         // AI turn
+        print_string("My move... :-P\n");
         game.ai_move();
+        game.print_board();
 
         if game.check_winner() == Player::O {
-            game.print_board();
             print_string("I win! ;-)\n");
             break;
         }
         if game.is_full() {
-            game.print_board();
             print_string("It's a draw! :-O\n");
             break;
         }

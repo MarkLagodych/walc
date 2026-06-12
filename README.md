@@ -32,13 +32,6 @@ Enjoy!
 
 ## Build & run
 
-First, download it:
-
-```sh
-git clone https://github.com/MarkLagodych/walc --depth 1 --no-recurse-submodules
-cd walc
-```
-
 Run from the project directory:
 
 ```sh
@@ -60,42 +53,41 @@ Example Rust programs are [here](./examples/rust/).
 
 1. Install the WASM toolchain for Rust:
     ```sh
-    rustup target add wasm32v1-none
-    ```
-    You can also experiment with the standard `wasm32-unknown-unknown`
-    toolchain, even though its feature set is unstable and in the future it
-    might extend beyond what WALC supports:
-    ```sh
     rustup target add wasm32-unknown-unknown
     ```
-2. Build for release. You can use the provided Makefile that will tell Cargo
-    to also install all the `.wasm` files into the `examples/rust/bin`
-    directory:
-    ```sh
-    make -C examples/rust
-    ```
+    Note that the feature set of `wasm32-unknown-unknown` is unstable and
+    in the future it might extend beyond what WALC supports.
+    In that case, use `wasm32v1-none`.
 
-    Or, for the `wasm32-unknown-unknown` target:
+2. Build:
     ```sh
-    make -C examples/rust TARGET=wasm32-unknown-unknown
+    cd examples/rust
+
+    # This will build in the "bin" directory
+    cargo install -q --path . --root . --no-track --profile release --target wasm32-unknown-unknown
     ```
 
 ### Run
 
-Using the C interpreter:
+The commands are run from the root directory.
+
+You can use the C interpreter:
 ```sh
-mkdir bin
+mkdir -p bin
 walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
 
+# Compile the interpreter
 gcc tools/lambda.c -o bin/lambda -O3
+# Pre-compile the lambda expression
 tools/text2bin.ts bin/mandelbrot.walc -o bin/mandelbrot.bin
+# Run!
 bin/lambda bin/mandelbrot.bin
 ```
 
-Using the TypeScript or Lua interpreters:
+Alternatively, you can use the TypeScript or Lua interpreters:
 
 ```sh
-mkdir bin
+mkdir -p bin
 walc examples/rust/bin/mandelbrot.wasm -o bin/mandelbrot.walc
 
 tools/lambda.ts bin/mandelbrot.walc
@@ -121,7 +113,11 @@ even this performance. I would love to hear about more efficient approaches! ðŸ§
 Who knows, maybe graph reduction techniques or conversion to combinatory
 calculus might do a 10x speedup. Or sophisticated compiler optimizations?*
 
-Output:
+### Gallery
+
+#### Mandelbrot fractal
+
+[`mandelbrot.rs`](./examples/rust/mandelbrot.rs)
 
 ```
               ..............................:::::!?:!!:............
@@ -148,6 +144,62 @@ Output:
        .............................::::::::::?@@@@@@@!:::::::::..........
          ..............................:::::::?@@@@@@?!::::::...........
            ...............................:::::::!?@!:::::............
+```
+
+#### Tic-tac-toe
+
+[`tictactoe.rs`](./examples/rust/tictactoe.rs)
+
+```
+Welcome to Tic-Tac-Toe! (^o^)/
+    0   1   2
+  +---+---+---+
+0 |   |   |   |
+  +---+---+---+
+1 |   |   |   |
+  +---+---+---+
+2 |   |   |   |
+  +---+---+---+
+Your move (row column): 1 0
+    0   1   2
+  +---+---+---+
+0 |   |   |   |
+  +---+---+---+
+1 | X |   |   |
+  +---+---+---+
+2 |   |   |   |
+  +---+---+---+
+My move... :-P
+    0   1   2
+  +---+---+---+
+0 | O |   |   |
+  +---+---+---+
+1 | X |   |   |
+  +---+---+---+
+2 |   |   |   |
+  +---+---+---+
+
+(..........output shortened............)
+
+    0   1   2
+  +---+---+---+
+0 | O | X | O |
+  +---+---+---+
+1 | X | X | O |
+  +---+---+---+
+2 | X | O | X |
+  +---+---+---+
+It's a draw! :-O
+```
+
+#### Sine and cosine
+
+[`sincos.rs`](./examples/rust/sincos.rs)
+
+```
+Enter angle in radians: 1.047
+sin: 0.866
+cos: 0.500
 ```
 
 ## Feature support
