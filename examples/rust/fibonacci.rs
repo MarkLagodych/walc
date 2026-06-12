@@ -10,5 +10,5 @@ pub fn main() {
         print!("{a} ");
         (a, b) = (b, a + b);
     }
-    print!("\n");
+    println!("");
 }

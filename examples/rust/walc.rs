@@ -29,11 +29,11 @@ extern "C" fn main() {
 #[unsafe(export_name = "handle_trap")]
 extern "C" fn handle_trap(trap_code: u32) {
     print_string("\nTRAP ");
-    print_u32(trap_code);
+
     match trap_code {
-        0 => print_string(" reached unreachable instruction"),
-        1 => print_string(" division error"),
-        2 => print_string(" float math not supported"),
+        0 => print_string("reached unreachable"),
+        1 => print_string("division error"),
+        2 => print_string("floats unsupported"),
         _ => {}
     }
 }

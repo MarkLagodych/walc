@@ -64,6 +64,10 @@
         "expected_output": "YYYYYY"
     },
     {
+        "name": "memory-grow",
+        "expected_output": "YYYYYYYYYYYOK"
+    },
+    {
         "name": "minimal",
         "expected_output": ""
     },
