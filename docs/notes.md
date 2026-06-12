@@ -53,7 +53,7 @@ to a function like you do with normal arguments, you apply a function to
 a number. Imagine debugging this for days... ( ͡° ʖ̯ ͡°)
 
 Instead of developing a proper debugger, I introduced a trick that
-makes many compiler bugs observable -- just use something erroneous for
+makes many compiler bugs observable &mdash; just use something erroneous for
 unreachables, e.g. unbound variables. When an interpreter tries to evaluate
 them, you get an unclear message with unclear location, but at least you have
 something to pin down the problem.
