@@ -21,12 +21,12 @@ mod walc {
     }
 }
 
-#[unsafe(export_name = "main")]
+#[unsafe(no_mangle)]
 extern "C" fn main() {
     crate::main()
 }
 
-#[unsafe(export_name = "handle_trap")]
+#[unsafe(no_mangle)]
 extern "C" fn handle_trap(trap_code: u32) {
     print_string("\nTRAP ");
 
