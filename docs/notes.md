@@ -14,13 +14,13 @@ objects are used.
 
 It is important to keep the resulting code as small as possible because after
 all, no debugging is available other than just reading the code yourself.
-This is exactly why square brackets where chosen instead of lambdas or other
-characters -- it is just easier to go through the code and manually insert
+This is exactly why square brackets were chosen instead of lambdas or other
+characters &mdash; it is just easier to go through the code and manually insert
 spaces and line breaks where needed.
 
 WALC extracts all numbers and all operation definitions into global variables,
 so that only several definitions are used thoughout the whole file.
-That is achieved by using generator objects -- objects that accumulate all
+That is achieved by using generator objects &mdash; objects that accumulate all
 the required definitions and then, given a `let..in` expression builder,
 add definitions to it. This also helps ensure that the definitions have the
 correct order. Numbers are ordered by values because in such a way it is easier
