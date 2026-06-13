@@ -38,10 +38,12 @@ extern "C" fn handle_trap(trap_code: u32) {
     }
 }
 
+// The target_family attribute suppresses rust-analyzer errors
 #[cfg(target_family = "wasm")]
 #[global_allocator]
 static ALLOCATOR: talc::wasm::WasmDynamicTalc = talc::wasm::new_wasm_dynamic_allocator();
 
+// The target_family attribute suppresses rust-analyzer errors
 #[cfg(target_family = "wasm")]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
@@ -66,11 +68,9 @@ pub fn print_byte(c: u8) {
 }
 
 pub fn read_byte() -> Option<u8> {
-    let result = walc::input();
-    if result == 0xFFFFFFFF {
-        None
-    } else {
-        Some(result as u8)
+    match walc::input() {
+        0xFFFFFFFF => None,
+        byte => Some(byte as u8),
     }
 }
 
