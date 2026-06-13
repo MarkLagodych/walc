@@ -35,7 +35,7 @@ fi
 TMP=$(mktemp)
 
 # Compile from WebAssembly (.wasm) to lambda calculus (.walc)
-cargo run --quiet -- "$INPUT" -o "$TMP"
+cargo run --quiet --release -- "$INPUT" -o "$TMP"
 # Pre-compile .walc to .bin
 tools/text2bin.ts "$TMP" "$TMP"
 # Run the pre-compiled .bin file using the C interpreter

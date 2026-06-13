@@ -27,33 +27,62 @@ pub enum Expr {
     },
 }
 
+enum DisplayItem<'a> {
+    Expr(&'a Expr),
+    /// ')'
+    RightParen,
+    /// ']'
+    RightBracket,
+}
+
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Expr::Variable { name } => {
-                write!(f, "{}", name)
-            }
-            Expr::Abstraction { variable, body } => {
-                write!(f, "[{}", variable)?;
+        // This is a non-recursive implementation that does not overflow the stack for big Exprs
 
-                if matches!(**body, Expr::Variable { .. }) {
-                    write!(f, " ")?;
+        let mut stack = vec![DisplayItem::Expr(self)];
+
+        while let Some(item) = stack.pop() {
+            match item {
+                DisplayItem::Expr(expr) => match expr {
+                    Expr::Variable { name } => {
+                        write!(f, "{name}")?;
+                    }
+                    Expr::Abstraction { variable, body } => {
+                        write!(f, "[{variable}")?;
+
+                        if let Expr::Variable { name } = body.as_ref() {
+                            write!(f, " {name}]")?;
+                            continue;
+                        }
+
+                        stack.push(DisplayItem::RightBracket);
+                        stack.push(DisplayItem::Expr(body));
+                    }
+                    Expr::Application { function, argument } => {
+                        write!(f, "(")?;
+
+                        if let Expr::Variable { name: func } = function.as_ref()
+                            && let Expr::Variable { name: arg } = argument.as_ref()
+                        {
+                            write!(f, "{func} {arg})")?;
+                            continue;
+                        }
+
+                        stack.push(DisplayItem::RightParen);
+                        stack.push(DisplayItem::Expr(argument));
+                        stack.push(DisplayItem::Expr(function));
+                    }
+                },
+                DisplayItem::RightParen => {
+                    write!(f, ")")?;
                 }
-
-                write!(f, "{}]", body)
-            }
-            Expr::Application { function, argument } => {
-                write!(f, "({}", function)?;
-
-                if matches!(**function, Expr::Variable { .. })
-                    && matches!(**argument, Expr::Variable { .. })
-                {
-                    write!(f, " ")?;
+                DisplayItem::RightBracket => {
+                    write!(f, "]")?;
                 }
-
-                write!(f, "{})", argument)
             }
         }
+
+        Ok(())
     }
 }
 

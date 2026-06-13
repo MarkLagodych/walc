@@ -4,7 +4,7 @@ mod codegen;
 use anyhow::{Result, anyhow};
 use clap::*;
 
-use std::io::Read;
+use std::io::{Read, Write};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -42,7 +42,9 @@ fn run(args: Args) -> Result<()> {
     let expr = analyzer::compile(&source)?;
 
     if args.output_file == "-" {
-        println!("{}", expr);
+        std::io::stdout()
+            .write_all(expr.to_string().as_bytes())
+            .map_err(|e| anyhow!("Cannot write to STDOUT: {e}"))?;
     } else {
         std::fs::write(&args.output_file, expr.to_string())
             .map_err(|e| anyhow!("Cannot write output file: {e}"))?;
